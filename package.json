@@ -1,0 +1,52 @@
+{
+  "name": "triobridge-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.13.0 || >=24.0.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:office": "vite --mode office --host 127.0.0.1",
+    "certs": "office-addin-dev-certs install",
+    "build": "tsc -b && vite build",
+    "build:pages": "tsc -b && node scripts/build-pages.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "start": "node scripts/serve.mjs",
+    "typecheck": "tsc -b",
+    "test": "vitest run && node --test tests/server.test.mjs tests/pages.test.mjs",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:pages": "npm run build:pages && playwright test --config playwright.pages.config.ts",
+    "manifest:validate": "office-addin-manifest validate manifest.xml",
+    "sideload:mac": "node scripts/sideload.mjs install",
+    "sideload:mac:remove": "node scripts/sideload.mjs remove",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json",
+    "format:check": "prettier --check src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json"
+  },
+  "dependencies": {
+    "lucide-react": "^1.77.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@testing-library/jest-dom": "^6.10.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
+    "@types/node": "^26.6.6",
+    "@types/office-js": "^1.0.617",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^29.1.1",
+    "office-addin-dev-certs": "^3.0.1",
+    "office-addin-manifest": "^3.0.1",
+    "prettier": "^3.10.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12"
+  }
+}

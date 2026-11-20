@@ -16,15 +16,26 @@
 *.local
 *.pem
 *.key
+*.crt
+*.p12
+*.pfx
 
 # Dependencies and generated output
 node_modules/
 dist/
+dist-pages/
 build/
 out/
+output/
 coverage/
 .cache/
 *.tsbuildinfo
 
 # Logs
 *.log
+
+# Test reports and local design inspection
+test-results/
+playwright-report/
+.impeccable/
+~$*
