@@ -90,8 +90,8 @@ summary { cursor: pointer; }
 .feature-list { list-style: none; margin: 31px 0; padding: 0; flex: 1; }
 .feature-list li + li { margin-top: 19px; }
 .feature-list strong { display: block; font-size: 1rem; font-weight: 600; }
-.feature-list span { display: block; color: var(--muted); font-size: .9375rem; margin-top: 2px; }
-.writeback { border-top: 1px solid var(--line); padding-top: 22px; color: var(--muted); font-size: .9375rem; }
+.feature-list span { display: block; color: var(--muted); font-size: 1rem; margin-top: 2px; }
+.writeback { border-top: 1px solid var(--line); padding-top: 22px; color: var(--muted); font-size: 1rem; }
 .writeback strong { display: block; color: var(--green); font-size: .875rem; margin-bottom: 5px; }
 .workflow { padding-block: 76px 44px; background: var(--green-deep); color: var(--white); }
 .workflow .eyebrow { color: #b9d8ca; }
@@ -161,7 +161,7 @@ summary::-webkit-details-marker { display: none; }
 .connection-notes summary, .capability-details summary, .faq-list summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 19px; font-weight: 600; }
 .connection-notes summary::after, .capability-details summary::after, .faq-list summary::after { content: '+'; color: var(--green); font-size: 1.45rem; font-weight: 400; line-height: 1; flex: 0 0 auto; }
 .connection-notes [open] > summary::after, .capability-details[open] > summary::after, .faq-list [open] > summary::after { content: '−'; }
-.connection-notes details > div { padding-bottom: 23px; color: var(--muted); font-size: .9375rem; }
+.connection-notes details > div { padding-bottom: 23px; color: var(--muted); font-size: 1rem; }
 .connection-notes details p + p { margin-top: 13px; }
 .block-code { display: block; padding: 12px 14px; margin: 15px 0; border: 1px solid var(--line); }
 .compatibility-section { background: var(--paper); }
@@ -286,9 +286,9 @@ tbody tr + tr { border-top: 1px solid var(--line); }
   .workflow-heading > p { font-size: .9375rem; }
   .workflow-steps { gap: 29px 25px; margin-block: 36px 33px; }
   .workflow-steps h3 { font-size: 1.125rem; }
-  .workflow-steps p { font-size: .9375rem; margin-top: 9px; }
+  .workflow-steps p { font-size: 1rem; margin-top: 9px; }
   .download-block { flex-direction: column; gap: 20px; padding: 23px; }
-  .download-block p { font-size: .9375rem; }
+  .download-block p { font-size: 1rem; }
   .download-actions { align-items: flex-start; width: 100%; }
   .download-actions .button { width: 100%; }
   .platform-guide > summary { flex-wrap: wrap; padding: 19px; gap: 4px 15px; }
@@ -297,27 +297,27 @@ tbody tr + tr { border-top: 1px solid var(--line); }
   .platform-body { padding: 23px 18px; }
   .instruction-list { padding-left: 22px; }
   .instruction-list > li { padding-left: 2px; }
-  .instruction-list p { font-size: .9375rem; }
+  .instruction-list p { font-size: 1rem; }
   .path-list { margin-left: -22px; }
   .path-row { padding-inline: 13px; }
-  .path-row code { font-size: .8125rem; }
+  .path-row code { font-size: .875rem; }
   .reference-link { margin-left: 0; font-size: .875rem; }
   .inline-note { padding: 15px 17px; }
   .guide-section { padding-block: 58px; }
   .guide-intro > p:not(.eyebrow) { font-size: 1rem; }
   .start-list > li { padding-left: 38px; }
   .configuration-list > div { grid-template-columns: 1fr; gap: 8px; }
-  .configuration-list dd { font-size: .9375rem; }
-  table { font-size: .9375rem; }
+  .configuration-list dd { font-size: 1rem; }
+  table { font-size: 1rem; }
   th, td { padding: 17px 14px; }
   tbody th { width: 32%; font-size: .875rem; }
   thead th { font-size: .875rem; }
-  .capability-details { font-size: .9375rem; }
+  .capability-details { font-size: 1rem; }
   .privacy-heading > p:not(.eyebrow) { font-size: 1rem; }
   .privacy-list dt { font-size: 1.0625rem; }
-  .privacy-list dd { font-size: .9375rem; }
+  .privacy-list dd { font-size: 1rem; }
   .faq-list summary { font-size: 1rem; gap: 18px; }
-  .faq-list details > div { font-size: .9375rem; }
+  .faq-list details > div { font-size: 1rem; }
   .closing-inner h2 { font-size: 1.75rem; }
   .closing-inner p { font-size: .9375rem; }
   .closing-inner .actions { width: 100%; }
