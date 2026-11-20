@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+._*
+
+# IDE and editor state
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+out/
+coverage/
+.cache/
+*.tsbuildinfo
+
+# Logs
+*.log
