@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-pages
+package-lock.json
+.impeccable
+test-results
+playwright-report
