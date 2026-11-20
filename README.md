@@ -43,5 +43,10 @@ TrioBridge 的 Trio 代表 Office 三件套，Bridge 代表办公应用与用户
 - `README.md`：项目定位与初期规划。
 - `.gitignore`：排除 IDE 文件、构建产物和本地敏感配置。
 - `.editorconfig`：统一编码、换行和基础缩进。
+- `LICENSE`：MIT 开源许可证。
 
 GitHub：<https://github.com/kobe8bryant24lakers/triobridge-ai>
+
+## License
+
+本项目采用 [MIT License](LICENSE)。
