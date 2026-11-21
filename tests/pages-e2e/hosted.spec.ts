@@ -44,6 +44,7 @@ test('site resources and hosted manifest are served while unapproved docs stay p
 }) => {
   for (const path of [
     '',
+    'zh-CN.html',
     'site.css',
     'assets/icon.svg',
     'assets/workbench.png',
@@ -69,7 +70,7 @@ test('quick setup works in the hosted pane and installer links download real ZIP
   await page.goto('');
   for (const platform of ['Mac', 'Windows']) {
     const download = page.waitForEvent('download');
-    await page.getByRole('link', { name: `下载 ${platform} 安装包`, exact: true }).click();
+    await page.getByRole('link', { name: `Download ${platform} installer`, exact: true }).click();
     expect((await download).suggestedFilename()).toBe(`TrioBridge-AI-${platform}.zip`);
   }
   await page.setViewportSize({ width: 360, height: 800 });
@@ -84,4 +85,82 @@ test('quick setup works in the hosted pane and installer links download real ZIP
   await page.getByRole('button', { name: '连接并保存', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('连接成功，配置已保存');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('site defaults to English and supports Chinese navigation, reloads, and direct links', async ({
+  page,
+}) => {
+  await page.goto('');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  const languages = page.locator('.language-switch');
+  await expect(languages.getByRole('link', { name: 'English', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.locator('head link[rel="alternate"][hreflang="zh-CN"]')).toHaveAttribute(
+    'href',
+    './zh-CN.html',
+  );
+  const englishTitle = await page.title();
+  const englishHero = await page.locator('#hero-title').innerText();
+
+  await languages.getByRole('link', { name: '中文', exact: true }).click();
+  await expect(page).toHaveURL(/\/zh-CN\.html$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await expect(languages.getByRole('link', { name: '中文', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.locator('#hero-title')).toContainText('接上你的 AI 模型');
+  expect(await page.title()).not.toBe(englishTitle);
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await page.goto('zh-CN.html#install');
+  await expect(page.locator('#install')).toBeInViewport();
+  await expect(page.getByRole('link', { name: '下载 Mac 安装包', exact: true })).toBeVisible();
+
+  await languages.getByRole('link', { name: 'English', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page).toHaveTitle(englishTitle);
+  await expect(page.locator('#hero-title')).toHaveText(englishHero, { useInnerText: true });
+});
+
+test.describe('site without JavaScript', () => {
+  test.use({ javaScriptEnabled: false, locale: 'zh-CN' });
+
+  test('still defaults to English and switches languages using ordinary links', async ({
+    page,
+  }) => {
+    await page.goto('');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await page.locator('.language-switch').getByRole('link', { name: '中文', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+    await expect(page.locator('#hero-title')).toContainText('接上你的 AI 模型');
+    await page
+      .locator('.language-switch')
+      .getByRole('link', { name: 'English', exact: true })
+      .click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  });
+});
+
+test('both site languages keep navigation visible without horizontal overflow', async ({
+  page,
+}) => {
+  for (const path of ['', 'zh-CN.html']) {
+    await page.goto(path);
+    for (const width of [360, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(page.locator('.primary-nav')).toBeVisible();
+      for (const name of ['English', '中文']) {
+        const language = page.locator('.language-switch').getByRole('link', { name, exact: true });
+        await expect(language).toBeInViewport();
+      }
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `${path || 'English home'} at ${width}px`,
+      ).toBe(true);
+    }
+  }
 });

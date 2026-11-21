@@ -1,102 +1,104 @@
 # TrioBridge AI · 三桥 AI
 
-让 Word、Excel、PowerPoint 连接你自己的 AI 模型。
+**English** | [简体中文](README.zh-CN.md)
 
-TrioBridge AI 是面向 **Mac 和 Windows** 的 Office 任务窗格加载项，使用 React、TypeScript 和 Office.js。具备所需 WebView 和 API 的 Office 永久授权版也可以使用，无需 Microsoft 365 订阅。
+Connect Word, Excel, and PowerPoint to your own AI models.
 
-[功能介绍与 Mac / Windows 安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/) · [免密钥浏览器演示](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [下载在线版清单](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/latest/download/manifest.xml)
+TrioBridge AI is an Office task pane add-in for **Mac and Windows**, built with React, TypeScript, and Office.js. Perpetually licensed Office editions with the required WebView and APIs can also use it; a Microsoft 365 subscription is not required.
 
-**快速安装在线版**（个人测试旁加载，无需 Node.js、本机服务或开发证书）：
+[Features and Mac / Windows installation guide](https://kobe8bryant24lakers.github.io/triobridge-ai/) · [Browser demo without an API key](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [Download the hosted manifest](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/latest/download/manifest.xml)
 
-1. 在[安装页](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)下载对应系统的 ZIP，解压后双击 Mac 的 `Install.command` 或 Windows 的 `Install.cmd`。Windows 需解压整个文件夹，按系统提示批准创建专用共享目录。
-2. 保存文档并完全退出 Office。重新打开后，在「主页 → 加载项」选择「TrioBridge AI · 三桥 AI（在线版）」；Windows 从「高级 / 更多加载项 → 共享文件夹」添加。
-3. 在「模型设置」选择服务、填入 API Key，点击「连接并保存」。常用服务自动填写地址与模型，其他参数在高级设置中。
+**Quick installation of the hosted version** (sideloading for personal testing; no Node.js, local server, or development certificate required):
 
-安装包尚未签名，首次运行可能被系统拦截。Mac 可按「系统设置 → 隐私与安全性」中的提示允许；受组织策略限制时使用[手动安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)或联系管理员。Windows 自动安装仍待实机验证。共享目录旁加载是微软的测试方式，正式分发应采用 Office 商店或组织部署。
+1. Download the ZIP for your operating system from the [installation page](https://kobe8bryant24lakers.github.io/triobridge-ai/#install), extract it, and double-click `Install.command` on Mac or `Install.cmd` on Windows. On Windows, extract the entire folder and approve the system prompt to create a dedicated shared directory.
+2. Save your documents and quit Office completely. Reopen Office and select **TrioBridge AI · 三桥 AI（在线版）** under **Home → Add-ins**. On Windows, add it through **Advanced / More Add-ins → Shared Folder**.
+3. In **Model settings (模型设置)**, select a provider, enter your API key, and click **Connect and save (连接并保存)**. Common providers have preset URLs and models; other options are available in advanced settings.
 
-移除安装文件：运行包内的 `Uninstall.command` / `Uninstall.cmd`。只移除三桥在线版自己的清单和目录登记，不清理其他加载项、Office 缓存或模型数据。需要清除密钥时，请先在插件内删除配置。开发版和在线版使用不同清单文件名，可并存。
+The installers are unsigned and may be blocked on first launch. On Mac, follow the prompt in **System Settings → Privacy & Security** to allow execution. If organizational policies restrict installation, use the [manual installation guide](https://kobe8bryant24lakers.github.io/triobridge-ai/#install) or contact your administrator. The Windows automatic installer still requires verification on a physical machine. Shared-folder sideloading is a Microsoft testing method; production distribution should use the Office Store or organizational deployment.
 
-## 已实现功能
+To remove the installation, run `Uninstall.command` / `Uninstall.cmd` from the package. This removes only TrioBridge's hosted manifest and directory registration; it does not clear other add-ins, Office caches, or model data. To remove saved keys, delete the configuration inside the add-in first. The development and hosted versions use different manifest filenames and can coexist.
 
-| 应用 | 功能 | 写回方式 |
+## Features
+
+| Application | Features | Write-back behavior |
 | --- | --- | --- |
-| Word | 选区改写、摘要、翻译、内容起草 | 预览和编辑后确认替换原选区，或插入到光标处 |
-| Excel | 公式生成与解释、表格问答、分析建议 | 核对目标位置后写入单个公式；分析和解释可复制 |
-| PowerPoint | 演示大纲、文案改写、要点整理 | 确认替换选中文字；支持的版本可从大纲创建基础文字页 |
+| Word | Rewrite selections, summarize, translate, and draft content | Preview and edit the result, then confirm replacement of the original selection or insertion at the cursor |
+| Excel | Generate and explain formulas, answer questions about tables, and suggest analyses | Check the destination before writing a single formula; analyses and explanations can be copied |
+| PowerPoint | Create presentation outlines, rewrite copy, and organize key points | Confirm replacement of selected text; supported versions can create basic text slides from an outline |
 
-- 多模型配置与切换、连接测试、5–300 秒超时、取消请求、中文错误提示。
-- OpenAI 兼容 Chat Completions 接口，支持无 API Key 的本地模型。
-- 密钥默认仅保留到当前会话结束；明确勾选后才明文保存在当前 WebView 的本地存储。
-- 配置导入导出不包含密钥。各 Office 应用可能隔离存储，可手动导入复用配置。
-- 读取、生成、写入分别由用户触发；写入前再次确认位置和内容。
-- Word 跟踪原选区，Excel 固定工作表 ID 与单元格地址，覆盖前检查内容变化。
-- 应用不保存文档、生成历史或遥测；真实请求只携带可见参考内容、任务与要求。
-- 浏览器演示无需 Office 或密钥，固定输出明确标识；也能接入真实模型处理模拟文档。
+- Multiple model profiles, profile switching, connection tests, 5–300 second timeouts, request cancellation, and Chinese error messages.
+- OpenAI-compatible Chat Completions APIs, including local models that do not require an API key.
+- Keys are kept only for the current session by default. They are stored in plain text in the current WebView's local storage only when explicitly enabled.
+- Configuration imports and exports exclude keys. Office applications may use isolated storage; profiles can be imported manually for reuse.
+- Reading, generation, and writing are each triggered by the user. The destination and content are confirmed again before writing.
+- Word tracks the original selection. Excel pins the worksheet ID and cell address and checks for content changes before overwriting.
+- The application does not save documents, generation history, or telemetry. Real requests contain only the visible reference content, task, and requirements.
+- The browser demo requires neither Office nor an API key and clearly labels its fixed outputs. It can also connect to a real model to work with simulated documents.
 
-## 兼容范围
+## Compatibility
 
-订阅类型与 API 能力是两回事。本项目使用 XML manifest，并按运行时能力启用功能。
+Subscription type and API capabilities are separate concerns. This project uses an XML manifest and enables features according to runtime capabilities.
 
-| 环境 | 目标支持范围 |
+| Environment | Target support |
 | --- | --- |
-| Windows Microsoft 365 / Office 2021、2024、LTSC | 现代 WebView2，按实际 API 版本启用功能 |
-| Mac Microsoft 365 / Office 2021、2024 | 现代 WKWebView，按实际 API 版本启用功能 |
-| Office 2016、2019 / 旧构建 | 尽力兼容；必须具备现代 WebView 与所需 API，不承诺完整支持 |
-| Office 网页版 | 架构兼容；需可信 HTTPS 和允许加载项的账号 / 组织策略，尚待宿主验证 |
-| IE11、EdgeHTML、WPS、LibreOffice | 不支持 |
+| Windows Microsoft 365 / Office 2021, 2024, LTSC | Modern WebView2; features enabled according to available API versions |
+| Mac Microsoft 365 / Office 2021, 2024 | Modern WKWebView; features enabled according to available API versions |
+| Office 2016, 2019 / older builds | Best effort; a modern WebView and the required APIs are mandatory, and full support is not guaranteed |
+| Office on the web | Architecturally compatible; requires trusted HTTPS and an account / organizational policy that allows add-ins; host verification is still pending |
+| IE11, EdgeHTML, WPS, LibreOffice | Not supported |
 
-基础引擎目标为 ES2020 / Safari 15.4+，Windows 需现代 WebView2。Office 产品名称不能单独保证内置浏览器与 API 版本；企业策略也可能禁用加载项。
+The baseline engine target is ES2020 / Safari 15.4+, with modern WebView2 required on Windows. An Office product name alone does not guarantee a particular embedded browser or API version. Enterprise policies may also disable add-ins.
 
-- 通用文本读取使用 `TextCoercion 1.1`；Word 安全写回使用 `WordApi 1.1`；Excel 公式写入使用 `ExcelApi 1.1`。
-- PowerPoint 文案改写使用通用文本 API；无法监听选区变化时仅提供复制，避免误覆盖。
-- 自动创建幻灯片需要 `PowerPointApi 1.4`；旧版本仍可生成和复制大纲。微软的版本表将 Windows 批量授权此能力列为 Office 2024；Mac 对应最低版本 16.62。
-- 大纲最多 12 页，创建基础标题和要点文本框，不生成主题、图片或图表。可在 Office 中继续排版。
+- Common text reading uses `TextCoercion 1.1`. Word safe write-back uses `WordApi 1.1`. Excel formula writing uses `ExcelApi 1.1`.
+- PowerPoint copy rewriting uses the common text API. When selection changes cannot be monitored, only copying is offered to avoid overwriting the wrong content.
+- Automatic slide creation requires `PowerPointApi 1.4`; older versions can still generate and copy outlines. Microsoft's version table lists Office 2024 for this capability in volume-licensed Windows editions, and version 16.62 as the minimum on Mac.
+- Outlines support up to 12 slides and create basic title and bullet-point text boxes, without themes, images, or charts. Layout can be refined in Office.
 
-**实机验证**覆盖 Mac 版 Word、Excel 和 PowerPoint 的选区读取、生成预览和写入。PowerPoint 还连接过 OpenAI 官方 API，Word 和 Excel 使用本机固定回包验证读写。Windows 和不同永久授权版本仍待实机验证。见[版本与测试记录](docs/TESTING.md)。
+**Testing in native Office applications** covers selection reading, generated previews, and writing in Mac versions of Word, Excel, and PowerPoint. PowerPoint has also been tested with the official OpenAI API; Word and Excel read/write verification used fixed responses from a local server. Windows and different perpetual-license editions still require testing on physical machines. See the [version and testing records](docs/TESTING.md).
 
-官方依据：[加载项清单](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/add-in-manifests)、[Word API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/word/word-api-requirement-sets)、[Excel API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/excel/excel-api-requirement-sets)、[PowerPoint API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/powerpoint/powerpoint-api-requirement-sets)。
+Official references: [Add-in manifests](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/add-in-manifests), [Word APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/word/word-api-requirement-sets), [Excel APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/excel/excel-api-requirement-sets), and [PowerPoint APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/powerpoint/powerpoint-api-requirement-sets).
 
-## 本地运行浏览器演示
+## Run the browser demo locally
 
-开发环境使用 Node.js **22.13 及以上的 22.x，或 24 及以上版本**。
+Development requires Node.js **22.x starting at 22.13, or version 24 and later**.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-打开 <http://localhost:3000>，选择应用 → 读取示例选区 → 选择任务 → 生成预览 → 确认写入。模拟文档仅在内存中保存，刷新后重置。HTTP 演示入口不能用于 Office 网页版。
+Open <http://localhost:3000>, then select an application → read the sample selection → choose a task → generate a preview → confirm writing. Simulated documents are stored only in memory and reset on refresh. The HTTP demo URL cannot be used in Office on the web.
 
-## 在 Office 中使用本地开发版
+## Use the local development version in Office
 
-仓库根目录的 `manifest.xml` 指向本机服务。以下步骤适用于开发和本机模型代理。在线版使用上方发布入口提供的独立清单。
+The root `manifest.xml` points to the local server. The following steps are for development and local model proxying. The hosted version uses the separate manifest available from the release links above.
 
-### 1. 启动本机 HTTPS 服务
+### 1. Start the local HTTPS server
 
 ```sh
-# 首次安装开发证书；系统可能要求确认信任或输入密码
+# Install the development certificate on first use; the system may ask you to confirm trust or enter a password
 npm run certs
 npm run dev:office
 ```
 
-运行构建产物：
+To serve the production build locally:
 
 ```sh
 npm run build
 npm start
 ```
 
-两者都监听 `https://localhost:3000`，只绑定本机回环接口。先打开该地址验证证书，再安装清单。`npm start` 服务 `dist/` 并支持下文的本机代理。`npm run preview` 仅用于 HTTP 预览，不包含代理。
+Both listen at `https://localhost:3000` and bind only to the local loopback interface. Open that address first to verify the certificate, then install the manifest. `npm start` serves `dist/` and supports the local proxy described below. `npm run preview` provides only an HTTP preview and does not include the proxy.
 
-证书默认读取 `~/.office-addin-dev-certs/localhost.crt` 与 `localhost.key`；也可在 `.env` 中配置 `TLS_CERT_PATH`、`TLS_KEY_PATH`。项目不会自动修改系统证书信任设置。
+Certificates are read from `~/.office-addin-dev-certs/localhost.crt` and `localhost.key` by default. You can also set `TLS_CERT_PATH` and `TLS_KEY_PATH` in `.env`. The project does not automatically change system certificate trust settings.
 
-### 2A. Mac 安装
+### 2A. Install on Mac
 
 ```sh
 npm run sideload:mac
 ```
 
-脚本把本项目清单复制为下列目录中的 `triobridge-ai.xml`：
+The script copies this project's manifest as `triobridge-ai.xml` into these directories:
 
 ```text
 ~/Library/Containers/com.microsoft.Word/Data/Documents/wef/
@@ -104,56 +106,56 @@ npm run sideload:mac
 ~/Library/Containers/com.microsoft.Powerpoint/Data/Documents/wef/
 ```
 
-重新打开 Office，打开文档，在 **主页 → 加载项**（部分版本为 **插入 → 我的加载项**）选择 **TrioBridge AI · 三桥 AI**。服务需保持运行。
+Reopen Office, open a document, and select **TrioBridge AI · 三桥 AI** under **Home → Add-ins** (or **Insert → My Add-ins** in some versions). Keep the server running.
 
-移除：`npm run sideload:mac:remove`。若 Office 仍缓存入口，按微软文档清理加载项缓存。
+To remove it, run `npm run sideload:mac:remove`. If Office still caches the entry, follow Microsoft's documentation to clear the add-in cache.
 
-官方步骤：[Mac 旁加载](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/sideload-an-office-add-in-on-mac)。
+Official instructions: [Sideload on Mac](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/sideload-an-office-add-in-on-mac).
 
-### 2B. Windows 安装（开发旁加载）
+### 2B. Install on Windows (development sideloading)
 
-1. 创建专用目录，例如 `C:\OfficeAddins\TrioBridge`，复制 `manifest.xml` 到其中。
-2. 在文件夹属性中设置网络共享，仅向自己的账号授予所需读写权限，取得 UNC 地址，例如 `\\YOUR-PC\TrioBridge`。
-3. 在 Office 的 **文件 → 选项 → 信任中心 → 信任中心设置 → 受信任的加载项目录** 中添加 UNC 地址，勾选“在菜单中显示”。
-4. 重启 Office，在 **插入 → 我的加载项 → 共享文件夹** 中选择 TrioBridge AI。入口文字可能因版本而异。
+1. Create a dedicated directory, such as `C:\OfficeAddins\TrioBridge`, and copy `manifest.xml` into it.
+2. Enable network sharing in the folder's properties, grant only your own account the required read/write permissions, and obtain the UNC address, such as `\\YOUR-PC\TrioBridge`.
+3. In Office, go to **File → Options → Trust Center → Trust Center Settings → Trusted Add-in Catalogs**, add the UNC address, and enable **Show in Menu**.
+4. Restart Office and select TrioBridge AI under **Insert → My Add-ins → Shared Folder**. Labels may vary by version.
 
-清单中的 `localhost` 指运行 Office 的电脑，HTTPS 服务和证书必须配置在同一台电脑。共享文件夹目录用于开发测试，不是正式生产分发渠道。
+The manifest's `localhost` refers to the computer running Office. The HTTPS server and certificate must be configured on that same computer. Shared-folder catalogs are for development testing, not production distribution.
 
-官方步骤：[Windows 共享文件夹旁加载](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins)。
+Official instructions: [Windows shared-folder sideloading](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins).
 
-### 3. 配置模型
+### 3. Configure a model
 
-在模型设置中选择 DeepSeek、OpenAI 或通义千问（北京），填写自己的 API Key，点击「连接并保存」。成功后自动保存；失败或取消不会保存本次修改。预设只提供默认参数，服务仍需允许浏览器跨域访问，账户也需具有对应模型权限。测试只发送一句简短文字，可能产生少量费用。
+In model settings, select DeepSeek, OpenAI, or Qwen (Beijing), enter your API key, and click **Connect and save (连接并保存)**. Settings are saved automatically on success; failures or cancellation do not save the current changes. Presets provide default parameters only. The provider must still allow cross-origin browser access, and your account must have access to the selected model. The connection test sends only a short message and may incur a small charge.
 
-其他兼容服务选择「自定义 / 本地模型」，填写服务名称、Base URL 和模型 ID；无需鉴权时可不填 API Key。高级设置可修改地址、模型、超时，也可选择「仅保存配置」而不发起请求。切换服务或更换地址会清空原密钥，避免把密钥发送到另一服务。
+For other compatible services, select **Custom / local model (自定义 / 本地模型)** and enter a provider name, Base URL, and model ID. Leave the API key blank when authentication is not required. Advanced settings let you change the URL, model, and timeout, or choose **Save configuration only (仅保存配置)** without sending a request. Switching providers or changing the URL clears the previous key to avoid sending it to another service.
 
-预设参数依据：[DeepSeek](https://api-docs.deepseek.com/)、[OpenAI GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)、[通义千问兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope)。预设不会覆盖已有自定义配置。
+Preset references: [DeepSeek](https://api-docs.deepseek.com/), [OpenAI GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), and [Qwen's compatible API](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope). Presets do not overwrite existing custom configurations.
 
-- Base URL 包含服务所需路径，例如 `https://api.example.com/v1`；客户端追加 `/chat/completions`，也接受完整 Chat Completions URL。
-- 不自动补 `/v1`；不同服务的路径不同。密钥可以留空。
-- 暂不支持流式响应，以及仅提供 Responses / Anthropic 原生等非 Chat Completions 协议的服务。
+- Include the provider's required path in the Base URL, such as `https://api.example.com/v1`. The client appends `/chat/completions` and also accepts a complete Chat Completions URL.
+- `/v1` is not added automatically because providers use different paths. The key may be left blank.
+- Streaming responses and providers that only expose non-Chat Completions protocols, such as Responses or native Anthropic APIs, are not currently supported.
 
-## 本地模型与 CORS
+## Local models and CORS
 
-默认由任务窗格直连模型。远程地址需 HTTPS，服务需允许插件来源（在线版为 `https://kobe8bryant24lakers.github.io`，本机开发版通常为 `https://localhost:3000`）的 CORS，包括 `Authorization`、`Content-Type` 和 OPTIONS 预检。GitHub Pages 提供静态文件；在线版使用的模型服务需允许直接访问。以下代理步骤适用于本机版。
+By default, the task pane connects directly to the model. Remote endpoints require HTTPS, and the provider must allow CORS from the add-in's origin (`https://kobe8bryant24lakers.github.io` for the hosted version, usually `https://localhost:3000` for local development), including `Authorization`, `Content-Type`, and OPTIONS preflight requests. GitHub Pages serves static files, so model providers used with the hosted version must allow direct access. The proxy steps below apply to the local version.
 
-HTTPS 页面访问 HTTP 本机模型可能被混合内容 / 私有网络策略阻止。可用固定目标本机代理，也适用于不支持 CORS 的远程 HTTPS 服务：
+Requests from an HTTPS page to an HTTP local model may be blocked by mixed-content or private-network policies. A local proxy with a fixed target can address this and can also be used for remote HTTPS services that do not support CORS:
 
 ```sh
 cp .env.example .env
 ```
 
-编辑 `.env`，填写上游根地址，不含 `/v1`：
+Edit `.env` and set the upstream root URL without `/v1`:
 
 ```dotenv
 MODEL_PROXY_TARGET=http://127.0.0.1:11434
 ```
 
-重启 `npm run dev:office` 或 `npm start`，模型设置中 Base URL 填 **`/model-proxy/v1`**，模型 ID 填本地实际模型名。
+Restart `npm run dev:office` or `npm start`. In model settings, set the Base URL to **`/model-proxy/v1`** and the model ID to the actual name of your local model.
 
-代理只接受同源 JSON POST 和 Chat Completions 路径，仅访问本机配置的固定目标，不允许客户端指定任意目标、不跟随重定向、不记录正文和密钥。更换目标需修改 `.env` 并重启。不要将本机开发代理直接暴露到公共网络。
+The proxy accepts only same-origin JSON POST requests to Chat Completions paths. It accesses only the locally configured fixed target, does not allow clients to specify arbitrary targets, does not follow redirects, and does not log request bodies or keys. To change the target, edit `.env` and restart. Do not expose the local development proxy directly to the public internet.
 
-## 检查与项目结构
+## Checks and project structure
 
 ```sh
 npm run typecheck
@@ -161,33 +163,33 @@ npm test
 npm run build
 npx playwright install chromium webkit
 npm run test:e2e
-npm run test:pages        # 构建并验证静态站点、在线工作台及清单
-npm run manifest:validate  # 微软验证器，需要网络
+npm run test:pages         # Build and verify the static site, hosted workbench, and manifest
+npm run manifest:validate # Microsoft validator; requires network access
 ```
 
-GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.1.0.0`，应用版本为 `0.2.0`。
+GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest version is `1.1.0.0`; the application version is `0.2.0`.
 
 ```text
-src/core/          任务、模型客户端、结果校验、配置存储
-src/office/        宿主适配、版本检测、模拟文档
-src/components/    工作台、模型设置、写入确认
-scripts/           HTTPS 服务、固定代理、安装包构建与平台安装脚本
-tests/             核心、Office 模拟、代理集成、浏览器测试
-manifest.xml       三应用共用 XML 清单
+src/core/          Tasks, model client, result validation, configuration storage
+src/office/        Host adapters, version detection, simulated documents
+src/components/    Workbench, model settings, write confirmation
+scripts/           HTTPS server, fixed-target proxy, installer builds, platform install scripts
+tests/             Core, Office mocks, proxy integration, browser tests
+manifest.xml       Shared XML manifest for all three applications
 ```
 
-## 部署与限制
+## Deployment and limitations
 
-在线版通过本仓库的 GitHub Pages 分发。运行 `npm run build:pages` 可在 `dist-pages/` 生成安装指南、`app/` 工作台、在线清单，以及 `install/TrioBridge-AI-Mac.zip` 和 `install/TrioBridge-AI-Windows.zip`。安装包构建需在配有 `zip` 命令的 macOS / Linux 上运行（CI 已具备）；终端用户无需这些构建工具。每个包仅包含安装 / 卸载脚本、说明和固定在线清单，不含密钥、证书或 `.env`。合并到 `main` 后，检查通过的构建由 GitHub Actions 部署到 Pages。版本清单见 [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases)。
+The hosted version is distributed through this repository's GitHub Pages site. Run `npm run build:pages` to generate the installation guide, `app/` workbench, hosted manifest, `install/TrioBridge-AI-Mac.zip`, and `install/TrioBridge-AI-Windows.zip` in `dist-pages/`. Installer builds require macOS / Linux with the `zip` command available (as configured in CI); end users do not need these build tools. Each package contains only installation / uninstallation scripts, instructions, and the fixed hosted manifest, without keys, certificates, or `.env`. After merging into `main`, GitHub Actions deploys builds that pass the checks to Pages. See [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases) for release manifests.
 
-团队可将 `dist/` 托管到可信 HTTPS 域名，更新清单中的 SourceLocation、图标和 AppDomain，通过组织已有的加载项渠道分发。静态托管要求模型允许 CORS，也可自行部署经过鉴权的网关。
+Teams can host `dist/` on a trusted HTTPS domain, update the manifest's SourceLocation, icons, and AppDomain, and distribute it through their existing organizational add-in channels. Static hosting requires a model provider that allows CORS; teams can also deploy their own authenticated gateway.
 
-写回主要是纯文本，Word 不保证保留选区内部全部富文本样式；PowerPoint 基础页面可继续排版；Excel 不自动批量写公式或创建图表。Office 写入并非通用事务，建页出错可能留下部分新增页，请检查后撤销。
+Write-back primarily uses plain text. Word does not guarantee preservation of all rich-text formatting within the selection. Basic PowerPoint slides can be refined afterward. Excel does not automatically write formulas in bulk or create charts. Office writes are not general-purpose transactions: a slide-creation failure may leave partially added slides. Inspect the result and use Undo if needed.
 
-真实 API Key、文档内容、`.env`、证书和私有配置不得提交仓库。
+Never commit real API keys, document content, `.env`, certificates, or private configurations to the repository.
 
-GitHub：<https://github.com/kobe8bryant24lakers/triobridge-ai>
+GitHub: <https://github.com/kobe8bryant24lakers/triobridge-ai>
 
 ## License
 
-[MIT License](LICENSE)。
+[MIT License](LICENSE).

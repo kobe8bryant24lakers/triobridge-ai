@@ -24,7 +24,7 @@ test('hosted manifest uses separate identity, HTTPS icons and the Office entry q
   assert.throws(() => hostedManifest(local.replace('<Id>', '<MissingId>')), /exactly one/);
 });
 
-test('site packaging copies only the four approved files and refuses symlinks', async () => {
+test('site packaging copies only approved files for both languages and refuses symlinks', async () => {
   const root = await mkdtemp(join(tmpdir(), 'triobridge-pages-'));
   try {
     for (const [source] of SITE_FILES) {
@@ -35,7 +35,12 @@ test('site packaging copies only the four approved files and refuses symlinks', 
     await writeFile(join(root, 'docs/TESTING.md'), 'not a site asset');
     const output = join(root, 'output');
     await copySiteFiles(root, output);
-    assert.deepEqual((await readdir(output)).sort(), ['assets', 'index.html', 'site.css']);
+    assert.deepEqual((await readdir(output)).sort(), [
+      'assets',
+      'index.html',
+      'site.css',
+      'zh-CN.html',
+    ]);
     assert.deepEqual((await readdir(join(output, 'assets'))).sort(), ['icon.svg', 'workbench.png']);
     await rm(join(root, 'docs/assets/icon.svg'));
     await symlink(join(root, 'docs/private-test-data.json'), join(root, 'docs/assets/icon.svg'));

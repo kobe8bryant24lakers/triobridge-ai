@@ -9,6 +9,7 @@ export const APP_URL = new URL('app/', SITE_URL).href;
 export const HOSTED_MANIFEST_ID = '9d977989-12ea-46cf-920e-b54a12b4d728';
 export const SITE_FILES = [
   ['docs/index.html', 'index.html'],
+  ['docs/zh-CN.html', 'zh-CN.html'],
   ['docs/site.css', 'site.css'],
   ['docs/assets/icon.svg', 'assets/icon.svg'],
   ['docs/assets/workbench.png', 'assets/workbench.png'],
