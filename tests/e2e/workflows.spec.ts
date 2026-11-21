@@ -59,11 +59,12 @@ test('cancellation and model HTTP errors remain recoverable', async ({ page }) =
   await page.getByRole('button', { name: '停止', exact: true }).click();
   await expect(page.getByText('已取消生成。', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '模型设置', exact: true }).click();
+  await page.getByLabel('模型服务').selectOption('custom');
   await page.getByLabel('服务名称').fill('Test model');
   await page.getByLabel('API Base URL').fill('https://example.test/v1');
   await page.getByLabel('模型 ID').fill('example-model');
   await page.getByLabel(/API Key 本地/).fill('test-only-key');
-  await page.getByRole('button', { name: '保存配置' }).click();
+  await page.getByRole('button', { name: '仅保存配置' }).click();
   await page.route('https://example.test/v1/chat/completions', (route) =>
     route.fulfill({
       status: 401,
@@ -71,7 +72,7 @@ test('cancellation and model HTTP errors remain recoverable', async ({ page }) =
       body: '{"error":"invalid"}',
     }),
   );
-  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByRole('button', { name: '连接并保存' }).click();
   await expect(page.getByRole('alert')).toContainText('API Key 无效');
   await page.getByRole('button', { name: '返回工作台' }).click();
   await page.getByRole('button', { name: '读取示例选区' }).click();
@@ -86,7 +87,7 @@ test('360px Office pane has no horizontal overflow in workbench or settings', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: '模型设置', exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await expect(page.getByRole('button', { name: '保存配置' })).toBeAttached();
+  await expect(page.getByRole('button', { name: '连接并保存' })).toBeAttached();
 });
 
 test('keyboard users can inspect both overflowing confirmation previews', async ({ page }) => {

@@ -124,6 +124,7 @@ summary::-webkit-details-marker { display: none; }
 [open] > summary .disclosure-mark::after { transform: rotate(0); }
 .platform-body { border-top: 1px solid var(--line); padding: 30px 42px 34px; }
 .instruction-list { margin: 0; padding-left: 26px; }
+.quick-install-steps { margin-block: 30px; }
 .instruction-list > li { padding-left: 10px; }
 .instruction-list > li::marker { color: var(--green); font-weight: 650; }
 .instruction-list > li + li { margin-top: 29px; }

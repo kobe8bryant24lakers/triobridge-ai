@@ -6,7 +6,15 @@ TrioBridge AI 是面向 **Mac 和 Windows** 的 Office 任务窗格加载项，�
 
 [功能介绍与 Mac / Windows 安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/) · [免密钥浏览器演示](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [下载在线版清单](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/latest/download/manifest.xml)
 
-**在 Office 中使用在线版**。下载上述 `manifest.xml`，按安装指南将它放进 Mac 对应应用的 `wef` 目录，或在 Windows 添加受信任的共享文件夹目录。重新打开 Office，选择「TrioBridge AI · 三桥 AI（在线版）」，再在插件的「模型设置」中测试并保存自己的模型。使用在线版无需在电脑上运行 Node.js 或安装开发证书。
+**快速安装在线版**（个人测试旁加载，无需 Node.js、本机服务或开发证书）：
+
+1. 在[安装页](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)下载对应系统的 ZIP，解压后双击 Mac 的 `Install.command` 或 Windows 的 `Install.cmd`。Windows 需解压整个文件夹，按系统提示批准创建专用共享目录。
+2. 保存文档并完全退出 Office。重新打开后，在「主页 → 加载项」选择「TrioBridge AI · 三桥 AI（在线版）」；Windows 从「高级 / 更多加载项 → 共享文件夹」添加。
+3. 在「模型设置」选择服务、填入 API Key，点击「连接并保存」。常用服务自动填写地址与模型，其他参数在高级设置中。
+
+安装包尚未签名，首次运行可能被系统拦截。Mac 可按「系统设置 → 隐私与安全性」中的提示允许；受组织策略限制时使用[手动安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)或联系管理员。Windows 自动安装仍待实机验证。共享目录旁加载是微软的测试方式，正式分发应采用 Office 商店或组织部署。
+
+移除安装文件：运行包内的 `Uninstall.command` / `Uninstall.cmd`。只移除三桥在线版自己的清单和目录登记，不清理其他加载项、Office 缓存或模型数据。需要清除密钥时，请先在插件内删除配置。开发版和在线版使用不同清单文件名，可并存。
 
 ## 已实现功能
 
@@ -115,7 +123,11 @@ npm run sideload:mac
 
 ### 3. 配置模型
 
-在模型设置中填写服务名称、Base URL、模型 ID 和 API Key，测试后保存。测试会发送一句简短文字，可能产生少量费用。
+在模型设置中选择 DeepSeek、OpenAI 或通义千问（北京），填写自己的 API Key，点击「连接并保存」。成功后自动保存；失败或取消不会保存本次修改。预设只提供默认参数，服务仍需允许浏览器跨域访问，账户也需具有对应模型权限。测试只发送一句简短文字，可能产生少量费用。
+
+其他兼容服务选择「自定义 / 本地模型」，填写服务名称、Base URL 和模型 ID；无需鉴权时可不填 API Key。高级设置可修改地址、模型、超时，也可选择「仅保存配置」而不发起请求。切换服务或更换地址会清空原密钥，避免把密钥发送到另一服务。
+
+预设参数依据：[DeepSeek](https://api-docs.deepseek.com/)、[OpenAI GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)、[通义千问兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope)。预设不会覆盖已有自定义配置。
 
 - Base URL 包含服务所需路径，例如 `https://api.example.com/v1`；客户端追加 `/chat/completions`，也接受完整 Chat Completions URL。
 - 不自动补 `/v1`；不同服务的路径不同。密钥可以留空。
@@ -153,20 +165,20 @@ npm run test:pages        # 构建并验证静态站点、在线工作台及清�
 npm run manifest:validate  # 微软验证器，需要网络
 ```
 
-GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.0.0.0`，应用版本为 `0.1.0`。
+GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.1.0.0`，应用版本为 `0.2.0`。
 
 ```text
 src/core/          任务、模型客户端、结果校验、配置存储
 src/office/        宿主适配、版本检测、模拟文档
 src/components/    工作台、模型设置、写入确认
-scripts/           HTTPS 服务、固定代理、Mac 安装辅助
+scripts/           HTTPS 服务、固定代理、安装包构建与平台安装脚本
 tests/             核心、Office 模拟、代理集成、浏览器测试
 manifest.xml       三应用共用 XML 清单
 ```
 
 ## 部署与限制
 
-在线版通过本仓库的 GitHub Pages 分发。运行 `npm run build:pages` 可在 `dist-pages/` 生成安装指南、`app/` 工作台和在线清单。合并到 `main` 后，检查通过的构建由 GitHub Actions 部署到 Pages。版本清单见 [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases)。
+在线版通过本仓库的 GitHub Pages 分发。运行 `npm run build:pages` 可在 `dist-pages/` 生成安装指南、`app/` 工作台、在线清单，以及 `install/TrioBridge-AI-Mac.zip` 和 `install/TrioBridge-AI-Windows.zip`。安装包构建需在配有 `zip` 命令的 macOS / Linux 上运行（CI 已具备）；终端用户无需这些构建工具。每个包仅包含安装 / 卸载脚本、说明和固定在线清单，不含密钥、证书或 `.env`。合并到 `main` 后，检查通过的构建由 GitHub Actions 部署到 Pages。版本清单见 [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases)。
 
 团队可将 `dist/` 托管到可信 HTTPS 域名，更新清单中的 SourceLocation、图标和 AppDomain，通过组织已有的加载项渠道分发。静态托管要求模型允许 CORS，也可自行部署经过鉴权的网关。
 

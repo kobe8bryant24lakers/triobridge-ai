@@ -1,6 +1,6 @@
 {
   "name": "triobridge-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,7 +15,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "start": "node scripts/serve.mjs",
     "typecheck": "tsc -b",
-    "test": "vitest run && node --test tests/server.test.mjs tests/pages.test.mjs",
+    "test": "vitest run && node --test tests/server.test.mjs tests/pages.test.mjs tests/installers.test.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:pages": "npm run build:pages && playwright test --config playwright.pages.config.ts",

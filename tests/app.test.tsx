@@ -45,10 +45,11 @@ describe('workflow boundaries', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: '模型设置' }));
+    await user.selectOptions(screen.getByLabelText('模型服务'), 'custom');
     await user.type(screen.getByLabelText('服务名称'), 'My model');
     await user.type(screen.getByLabelText('模型 ID'), 'my-model');
     await user.type(screen.getByLabelText(/API Key 本地/), 'test-private-key');
-    await user.click(screen.getByRole('button', { name: '保存配置' }));
+    await user.click(screen.getByRole('button', { name: '仅保存配置' }));
     expect(await screen.findByText('模型配置已保存，可返回工作台开始使用。')).toBeInTheDocument();
     expect(localStorage.getItem('triobridge.profiles.v1')).not.toContain('test-private-key');
   });

@@ -245,6 +245,8 @@ Primary, secondary, and danger actions share a minimum height of 44px, the `butt
 
 Inputs and selects have a 44px minimum height, `input-border`, and white fill. Textareas resize vertically and use a 1.85 line height. The source textarea has 14px padding and a 187px minimum height, reduced to 165px in narrow panes. Disabled fields use muted text on `canvas`; errors appear in labeled notices rather than an invented red field-border variant.
 
+Model connection starts with a provider selector and API key. Presets fill the service name, endpoint and model without sending a request; the destination remains visible as wrapping help text. A single “连接并保存” action tests before saving. Advanced settings disclose editable names, endpoints, model IDs, timeouts and an offline save action. Custom profiles open these fields immediately; existing saved values remain intact. The saved-profile toolbar appears only after at least one profile exists. Changing the provider or endpoint clears its credential and remember-key choice.
+
 ### Navigation
 
 Host buttons pair an icon with a name. The active host uses deep green with white content and a trailing chevron on desktop; selected disabled host buttons retain full opacity. Utility navigation uses a pale green active fill on desktop and an accent underline in narrow panes. Existing disabled and hover treatments remain distinct from selection.

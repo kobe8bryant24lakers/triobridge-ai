@@ -1,6 +1,7 @@
 import { copyFile, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildInstallers, INSTALLER_FILES } from './build-installers.mjs';
 
 export const SITE_URL = 'https://kobe8bryant24lakers.github.io/triobridge-ai/';
 export const APP_BASE = '/triobridge-ai/app/';
@@ -65,6 +66,7 @@ export async function copySiteFiles(root, destination) {
 }
 
 export async function verifyPagesOutput(destination) {
+  for (const file of INSTALLER_FILES) await assertRegularFile(join(destination, 'install', file));
   for (const [, output] of SITE_FILES) await assertRegularFile(join(destination, output));
   for (const icon of APP_ICONS) await assertRegularFile(join(destination, 'app', icon));
   const html = await readFile(join(destination, 'app/index.html'), 'utf8');
@@ -100,6 +102,7 @@ export async function buildPages(root = PROJECT_ROOT) {
   for (const icon of APP_ICONS)
     await copyFile(join(root, 'public', icon), join(destination, 'app', icon));
   await writeFile(join(destination, 'manifest.xml'), manifest);
+  await buildInstallers(root, join(destination, 'install'), manifest, HOSTED_MANIFEST_ID);
   await writeFile(join(destination, '.nojekyll'), '');
   await verifyPagesOutput(destination);
   console.log(`Pages / Release files: ${destination}`);

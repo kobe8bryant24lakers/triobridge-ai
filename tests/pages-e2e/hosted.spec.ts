@@ -49,6 +49,8 @@ test('site resources and hosted manifest are served while unapproved docs stay p
     'assets/workbench.png',
     'app/icon-32.png',
     'app/icon-80.png',
+    'install/TrioBridge-AI-Mac.zip',
+    'install/TrioBridge-AI-Windows.zip',
   ])
     expect((await request.get(path)).status(), path).toBe(200);
   const manifest = await request.get('manifest.xml');
@@ -59,4 +61,27 @@ test('site resources and hosted manifest are served while unapproved docs stay p
   expect((await request.get('TESTING.md')).status()).toBe(404);
   expect((await request.get('docs/TESTING.md')).status()).toBe(404);
   expect((await request.get('app/ASSETS.md')).status()).toBe(404);
+});
+
+test('quick setup works in the hosted pane and installer links download real ZIPs', async ({
+  page,
+}) => {
+  await page.goto('');
+  for (const platform of ['Mac', 'Windows']) {
+    const download = page.waitForEvent('download');
+    await page.getByRole('link', { name: `下载 ${platform} 安装包`, exact: true }).click();
+    expect((await download).suggestedFilename()).toBe(`TrioBridge-AI-${platform}.zip`);
+  }
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('app/');
+  await page.getByRole('button', { name: '模型设置', exact: true }).click();
+  await page.getByLabel('模型服务').selectOption('deepseek');
+  await expect(page.getByLabel('API Base URL')).not.toBeAttached();
+  await page.getByLabel('API Key', { exact: true }).fill('synthetic-key');
+  await page.route('https://api.deepseek.com/chat/completions', (route) =>
+    route.fulfill({ json: { choices: [{ message: { content: 'OK' } }] } }),
+  );
+  await page.getByRole('button', { name: '连接并保存', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('连接成功，配置已保存');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

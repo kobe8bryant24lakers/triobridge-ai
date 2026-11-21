@@ -803,7 +803,8 @@ pre {
   margin-bottom: 23px;
   border-bottom: 1px solid var(--line);
 }
-.settings-page fieldset > label {
+.settings-page fieldset > label,
+.advanced-settings > label {
   margin-bottom: 18px;
 }
 .settings-page fieldset > label:has(+ .field-help) {
@@ -814,6 +815,17 @@ pre {
 }
 .settings-page label {
   font-size: 13px;
+}
+.connection-summary {
+  overflow-wrap: anywhere;
+}
+.advanced-toggle {
+  margin-bottom: 18px;
+}
+.advanced-settings {
+  padding: 18px 0;
+  margin-bottom: 18px;
+  border-block: 1px solid var(--line);
 }
 .inline-label {
   display: flex;
