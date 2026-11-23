@@ -15,11 +15,16 @@ $path = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_PATH', 'Proces
 $kind = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_KIND', 'Process')
 $fresh = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_CREATED', 'Process') -eq '1'
 if ([String]::IsNullOrWhiteSpace($path) -or $kind -notin @('file', 'directory')) { throw 'Invalid private path request.' }
+$stage = 'GET_ITEM'
 $item = Get-Item -LiteralPath $path -Force
+$stage = 'TYPE'
 if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Linked private paths are not supported.' }
 if (($kind -eq 'directory') -ne [bool]$item.PSIsContainer) { throw 'Private path type mismatch.' }
+$stage = 'IDENTITY'
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$stage = 'GET_ACL'
 $current = Get-Acl -LiteralPath $path
+$stage = 'READ_OWNER'
 $owner = $current.GetOwner([Security.Principal.SecurityIdentifier]).Value
 if ($owner -ne $identity.User.Value) {
   $stage = 'OWNER'
@@ -97,7 +102,7 @@ export async function protectWindowsPath(
     );
   } catch (error) {
     const stage = String(error.stderr || '').match(
-      /TBACL_(INSPECT|OWNER|BUILD|APPLY|VERIFY)\b/,
+      /TBACL_(INSPECT|GET_ITEM|TYPE|IDENTITY|GET_ACL|READ_OWNER|OWNER|BUILD|APPLY|VERIFY)\b/,
     )?.[1];
     throw new Error(
       'Could not enforce private permissions for the current Windows account.' +
