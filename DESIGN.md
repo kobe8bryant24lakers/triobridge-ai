@@ -27,6 +27,11 @@ colors:
   pending: "#80631d"
   success: "#255c40"
   success-bg: "#e9f3ec"
+  warning: "#70551a"
+  warning-bg: "#fff8e8"
+  document-ink: "#000"
+  document-border: "#d9d9d9"
+  document-table-header: "#e8eef2"
 typography:
   headline:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif"
@@ -43,6 +48,10 @@ typography:
     fontSize: "16px"
     fontWeight: 650
     lineHeight: 1.45
+  report-title:
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: 1.6
   dialog-title:
     fontSize: "22px"
     fontWeight: 650
@@ -243,7 +252,7 @@ Primary, secondary, and danger actions share a minimum height of 44px, the `butt
 
 ### Inputs / Fields
 
-Inputs and selects have a 44px minimum height, `input-border`, and white fill. Textareas resize vertically and use a 1.85 line height. The source textarea has 14px padding and a 187px minimum height, reduced to 165px in narrow panes. Disabled fields use muted text on `canvas`; errors appear in labeled notices rather than an invented red field-border variant.
+Inputs and selects have a 44px minimum height, `input-border`, and white fill. Native select behavior is retained with a standard chevron and normalized appearance so WebKit respects the control height. Textareas resize vertically and use a 1.85 line height. The source textarea has 14px padding and a 187px minimum height, reduced to 165px in narrow panes. Narrow document inputs use 16px type. Disabled fields use muted text on `canvas`; invalid fields have an error border plus an associated message. Length limits report the excess without truncating pasted content.
 
 Model connection starts with a provider selector and API key. Presets fill the service name, endpoint and model without sending a request; the destination remains visible as wrapping help text. A single “连接并保存” action tests before saving. Advanced settings disclose editable names, endpoints, model IDs, timeouts and an offline save action. Custom profiles open these fields immediately; existing saved values remain intact. The saved-profile toolbar appears only after at least one profile exists. Changing the provider or endpoint clears its credential and remember-key choice.
 
@@ -255,13 +264,25 @@ Host buttons pair an icon with a name. The active host uses deep green with whit
 
 Task choices use outlined rectangular buttons, a soft green selected fill, the `selected-border`, stronger text weight, and a check icon. A pending result label becomes an applied label only after writing. Connection and result badges are informational, not clickable filters.
 
+Changing input preserves the previous result and labels it “旧预览”; writing stays disabled until a fresh result is generated. Failed or cancelled regeneration preserves the previous result. Entering settings/help preserves the mounted workbench and tracked source. Drafts are not persisted to browser storage.
+
+### Structured document editing
+
+Report previews use native heading, paragraph, list and table semantics. Tables scroll within their own region. Reports, tables and outlines show section/row/page counts before the content. Result content has a 560px maximum height so review and write actions remain reachable.
+
+Visual editors retain the existing labeled-control vocabulary. Report sections expose titles, paragraphs, bullets and table cells. Slides expose title, one-bullet-per-line editing and page order controls. Excel tables use a grid with one keyboard tab stop and arrow-key cell navigation, followed by a typed cell editor; unapplied changes block completion and writing. “取消本轮编辑” restores the result from the start of that editing session. JSON editing remains an explicit alternative; downloads state their actual JSON/text format.
+
+Warnings use the documented amber foreground/background and always include explanatory text. Word document HTML deliberately uses neutral black headings, gray table borders and light blue table headers: document formatting is separate from the green application shell. These colors are intentional output styles, not UI drift.
+
+Slide preview numbers reserve two nonshrinking characters so narrow Office panes keep `01` on one line. Native PowerPoint output estimates a starting font size from text and available space before Office auto-fit; this avoids the line-spacing compression observed with dense Chinese text. Dense-content guidance remains visible because font metrics and templates differ. Structured Word reports start in a new paragraph so their heading styles do not affect existing text.
+
 ### Cards / Containers
 
 The preview is a bordered container using `--radius`. It changes from the empty to the ready surface when content exists and from centered empty guidance to document text and actions. Its keyboard-visible outline uses the selected-border color at 2px with a 3px offset; standard controls instead use the gold 3px outline with a 3px offset.
 
 ### Write confirmation
 
-The native dialog shows the named target and before/after content before the action row. Comparison regions have 100px minimum and 260px maximum heights, reduced to a 170px maximum in narrow panes. Their `tabIndex=0` and gold focus outline make scrollable content reachable from the keyboard. The dialog initially focuses “返回检查”, cycles through its focus targets, and restores focus on close. Busy and error states govern the action buttons.
+The native dialog shows the named target and before/after content before the action row. Structured content is converted to readable text rather than raw JSON. Comparison regions have 100px minimum and 260px maximum heights, reduced to a 170px maximum in narrow panes. Their `tabIndex=0` and gold focus outline make scrollable content reachable from the keyboard. The dialog initially focuses “返回检查”, cycles through its focus targets, and restores focus to the explicit triggering button on close, including WebKit where mouse clicks do not focus buttons. Busy and error states govern the action buttons.
 
 ## Do's and Don'ts
 

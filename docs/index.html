@@ -74,6 +74,7 @@
               <li><strong>Summarize</strong><span>Pull the key points out of longer content</span></li>
               <li><strong>Translate</strong><span>Preserve terminology, numbers, and structure</span></li>
               <li><strong>Draft</strong><span>Create a first draft from your requirements</span></li>
+              <li><strong>Reports</strong><span>Edit sections, bullet points, and tables before inserting</span></li>
             </ul>
             <p class="writeback"><strong>Review before writing</strong>Replace the selection you read, or insert at the cursor.</p>
           </article>
@@ -85,14 +86,15 @@
               <li><strong>Explain</strong><span>Understand functions, references, and calculations</span></li>
               <li><strong>Ask</strong><span>Ask questions about the data you select</span></li>
               <li><strong>Analyze</strong><span>Explore trends, anomalies, and possible next steps</span></li>
+              <li><strong>Tables</strong><span>Create a worksheet with formulas and column formats</span></li>
             </ul>
-            <p class="writeback"><strong>Check the destination</strong>Write one formula cell at a time. Copy analyses and explanations as needed.</p>
+            <p class="writeback"><strong>Check the destination</strong>Write a single formula, or create data and formulas in a separate worksheet. Copy analyses and explanations as needed.</p>
           </article>
           <article class="feature">
             <div class="feature-heading"><span class="app-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 3h20M4 3v13h16V3M12 16v5M8 21l4-5 4 5M8 7h8M8 11h5"/></svg></span><h3>PowerPoint</h3></div>
             <p class="feature-intro">Organize the content, then refine the layout</p>
             <ul class="feature-list">
-              <li><strong>Outlines</strong><span>Organize a topic into slide titles and bullet points</span></li>
+              <li><strong>Outlines</strong><span>Edit slide titles, bullet points, and slide order</span></li>
               <li><strong>Rewrite</strong><span>Make selected text clearer and more concise</span></li>
               <li><strong>Key points</strong><span>Organize scattered ideas into presentation highlights</span></li>
             </ul>
@@ -116,6 +118,8 @@
 
       <section class="section wrap" id="install" aria-labelledby="install-title">
         <div class="section-heading"><h2 id="install-title">Download, double-click, open Office</h2><p>The installer places the manifest for you. No Node.js, local server, or development certificate is needed. Select a provider and enter your API key to connect a model.</p></div>
+        <p class="inline-note">These ZIPs install the hosted edition, with separate model settings in each Office app. To configure once and share multiple models across Word, Excel, and PowerPoint on the same computer and OS account, use the <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md">local shared edition</a>, which requires a running local service and a private installation manifest.</p>
+        <p class="small-note"><strong>v0.3.0:</strong> structured reports, formula tables, editable slide outlines, and local shared models. Real-model Mac Office workflows and recovery paths have been verified; Windows native acceptance is pending. <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/CHANGELOG.md">Release notes</a></p>
         <div class="download-block">
           <div><h3>Install for Word, Excel, and PowerPoint together</h3><p>Mac: extract the ZIP and double-click <code>Install.command</code>.<br />Windows: extract the entire folder, then double-click <code>Install.cmd</code>.</p></div>
           <div class="download-actions"><a class="button primary" href="./install/TrioBridge-AI-Mac.zip" download>Download Mac installer</a><a class="button secondary" href="./install/TrioBridge-AI-Windows.zip" download>Download Windows installer</a></div>
@@ -212,7 +216,7 @@
               </tbody>
             </table>
           </div>
-          <details class="capability-details"><summary>Writing capabilities and limitations</summary><div><ul><li><strong>Word: </strong>Writes plain text and does not guarantee preservation of all rich-text formatting within the original selection.</li><li><strong>Excel: </strong>Writes one formula cell at a time. It does not automatically write formulas in bulk or create charts.</li><li><strong>PowerPoint: </strong>Automatic slide creation requires PowerPointApi 1.4. It creates basic title and bullet-point text boxes, up to 12 slides, without themes, images, or charts. If the required capability is unavailable, outlines can still be generated and copied.</li><li><strong>Write safeguards: </strong>If the host cannot track selection changes, automatic replacement is restricted and copying is offered. Failed slide creation may leave some new slides; inspect them and use Office Undo.</li></ul><p>Available features also depend on the embedded browser, account, and organizational policies. See the <a href="https://github.com/kobe8bryant24lakers/triobridge-ai#compatibility">repository compatibility documentation</a>.</p></div></details>
+          <details class="capability-details"><summary>Writing capabilities and limitations</summary><div><ul><li><strong>Word: </strong>Plain-text replacement may not preserve formatting within the selection. Direct replacement is restricted for selections containing tables, images, or other objects. Structured reports can insert sections, bullet points, and tables; Word determines final pagination.</li><li><strong>Excel: </strong>Single-formula writing is supported. Creating formatted data tables requires ExcelApi 1.2, with a maximum of 2,000 cells including headers. Formula errors are checked after writing. Charts are not created automatically.</li><li><strong>PowerPoint: </strong>Automatic slide creation requires PowerPointApi 1.4. It creates basic title and bullet-point text boxes, up to 12 slides, without themes, images, or charts. If the required capability is unavailable, outlines can still be generated and copied.</li><li><strong>Write safeguards: </strong>If the host cannot track selection changes, automatic replacement is restricted and copying is offered. Failed slide or worksheet creation may leave partial content; follow the prompts to inspect and recover.</li></ul><p>The main report, data table, and slide-creation workflows have passed acceptance testing in local Mac Office, covering layout, formula recalculation, and preservation of original content. Windows and other Office versions still require separate testing on physical machines. Available features also depend on the embedded browser, account, and organizational policies. See the <a href="https://github.com/kobe8bryant24lakers/triobridge-ai#compatibility">repository compatibility documentation</a>.</p></div></details>
         </div>
       </section>
 

@@ -278,4 +278,34 @@ describe('document input and generated output boundaries', () => {
     ])
       expect(() => parseOutline(JSON.stringify(bad))).toThrow();
   });
+  it.each([
+    "=IFERROR(SUMIFS(销售表[金额],销售表[区域],A2)/'年度 目标'!$B$2,0)",
+    '=SUM(Table1[Amount])+Sheet2!A1',
+    '=Table1[@Amount]-Sheet2!A1',
+    '=IF(A1="HYPERLINK(","含括号 ) 和引号 "" 的文本",0)',
+    "=SUM('O''Brien (北区)'!A1:A20)",
+    '=SUM(Table1[金额（含税）])+SUM({1,2;3,4})',
+  ])('accepts complex internal formula %s', (formula) => {
+    expect(parseFormula(formula)).toBe(formula);
+  });
+  it.each([
+    '=SUM(A1:A20',
+    '=SUM(A1:A20))',
+    '=IF(A1="未闭合,1,0)',
+    '=SUM(Table1[Amount)',
+    "='[Budget.xlsx]目标'!B2",
+    '=SUM([Budget.xlsx]Sheet1!A1)',
+    '=IFERROR(_xlfn.WEBSERVICE(A1),0)',
+    '=INDIRECT("[external.xlsx]Sheet1!A1")',
+  ])('blocks malformed or external formula %s before writing', (formula) => {
+    expect(() => parseFormula(formula)).toThrow();
+  });
+  it('identifies the page that needs correction in a long outline', () => {
+    const slides = Array.from({ length: 12 }, (_, i) => ({
+      title: `第 ${i + 1} 页`,
+      bullets: ['有效要点'],
+    }));
+    slides[9].bullets = ['过长'.repeat(81)];
+    expect(() => parseOutline(JSON.stringify({ slides }))).toThrow('第 10 页');
+  });
 });

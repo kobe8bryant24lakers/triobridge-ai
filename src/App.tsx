@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   BookOpen,
   ChevronRight,
@@ -12,9 +12,10 @@ import {
 import { ModelSettings } from './components/ModelSettings';
 import { Workbench } from './components/Workbench';
 import { HOST_NAMES } from './core/tasks';
-import { loadProfiles, saveProfiles, type ProfileState } from './core/profile-store';
+import { createProfileController, type LocalProfileState } from './core/profile-store';
 import type { HostBridge, HostKind } from './core/types';
 import { createDemoBridge } from './office/demo';
+import type { DemoScenario } from './office/complex-samples';
 
 const ICONS = { word: FileText, excel: Grid2X2, powerpoint: Presentation };
 interface Props {
@@ -24,19 +25,28 @@ interface Props {
 export default function App({ officeBridge }: Props) {
   const [host, setHost] = useState<HostKind>(officeBridge?.host || 'word');
   const [page, setPage] = useState<'work' | 'settings' | 'help'>('work');
-  const [profiles, setProfiles] = useState(loadProfiles);
+  const profileController = useMemo(() => createProfileController(), []);
+  const profiles = useSyncExternalStore(profileController.subscribe, profileController.getSnapshot);
+  useEffect(() => {
+    profileController.start();
+    return () => profileController.stop();
+  }, [profileController]);
   const [busy, setBusy] = useState(false);
   const [demoDocument, setDemoDocument] = useState('');
+  const [demoScenario, setDemoScenario] = useState<DemoScenario>('basic');
   const bridge = useMemo(
-    () => officeBridge || createDemoBridge(host, setDemoDocument),
-    [host, officeBridge],
+    () => officeBridge || createDemoBridge(host, setDemoDocument, demoScenario),
+    [host, officeBridge, demoScenario],
   );
   useEffect(() => () => bridge.dispose?.(), [bridge]);
-  function save(next: ProfileState) {
-    saveProfiles(next);
-    setProfiles(next);
+  function save(next: LocalProfileState) {
+    profileController.saveLocal(next);
   }
   function switchHost(next: HostKind) {
+    if (next === host) {
+      setPage('work');
+      return;
+    }
     setHost(next);
     setDemoDocument('');
     setPage('work');
@@ -113,7 +123,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             把选择留在你手里。
           </p>
-          <span>TrioBridge AI · 0.2.0</span>
+          <span>TrioBridge AI · 0.3.0</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -137,7 +147,12 @@ export default function App({ officeBridge }: Props) {
             </div>
           )}
           {page === 'settings' ? (
-            <ModelSettings state={profiles} onSave={save} onBack={() => setPage('work')} />
+            <ModelSettings
+              state={profiles}
+              onSave={save}
+              sharedActions={profileController.actions}
+              onBack={() => setPage('work')}
+            />
           ) : page === 'help' ? (
             <section className="help-page">
               <h1>把 AI 接入你的工作</h1>
@@ -163,23 +178,28 @@ export default function App({ officeBridge }: Props) {
                 <li>
                   <h2>检查后写入</h2>
                   <p>
-                    选择任务并生成预览。可以编辑结果，核对目标位置后确认写入。Excel
-                    公式每次写入一个单元格。
+                    选择任务并生成预览。可以编辑结果，核对目标位置后确认写入。Word
+                    报告支持章节和表格；Excel 可写入单个公式，或创建独立的数据工作表。
                   </p>
                 </li>
               </ol>
               <h2>不同版本，按能力适配</h2>
               <p>
-                基础文本使用通用 Office API；Word 和 Excel 使用 1.1 基础 API。PowerPoint
-                自动建页需要 PowerPointApi 1.4，不满足时仍可生成大纲并复制。旧式 IE / EdgeHTML
-                WebView 不在支持范围内。
+                基础文本使用通用 Office API；Word 和 Excel 单公式使用 1.1 基础 API，Excel
+                新建格式化数据表需要 ExcelApi 1.2。PowerPoint 自动建页需要 PowerPointApi
+                1.4，不满足时仍可生成大纲并复制。旧式 IE / EdgeHTML WebView 不在支持范围内。
               </p>
               <h2>本地模型与隐私</h2>
               <p>
-                模型服务需要允许当前来源的 CORS。若服务不支持，或本地模型只提供 HTTP，可按 README
-                配置本机代理。所有请求直接前往你配置的服务；应用不保存文档或生成历史。
+                在线版直接连接模型，服务需允许当前来源的
+                CORS。本机共享版由本机服务调用已保存的模型，
+                不要求模型服务允许浏览器跨域访问，密钥保存在系统安全存储中。应用不保存文档或生成历史。
               </p>
-              <p>配置和密钥默认不跨 Office 应用自动同步。可导出不含密钥的配置，在其他应用导入。</p>
+              <p>
+                本机共享版需要运行本机服务并安装本机专用清单。在同一台电脑、同一系统账号下，
+                只需配置一次，Word、Excel、PowerPoint 即可共用多个模型并同步切换。
+                在线安装包和纯静态网页使用各应用独立的配置；导出配置不包含密钥。
+              </p>
               <a
                 className="doc-link"
                 href="https://github.com/kobe8bryant24lakers/triobridge-ai#readme"
@@ -189,24 +209,28 @@ export default function App({ officeBridge }: Props) {
                 安装说明与兼容性文档 <ChevronRight size={16} />
               </a>
             </section>
-          ) : (
-            <>
-              <Workbench
-                key={host}
-                bridge={bridge}
-                profiles={profiles}
-                onChooseModel={(id) => save({ ...profiles, activeId: id })}
-                onSettings={() => setPage('settings')}
-                onBusyChange={setBusy}
-              />
-              {demoDocument && (
-                <details className="demo-document">
-                  <summary>查看模拟文档 · 已应用的内容</summary>
-                  <pre>{demoDocument}</pre>
-                </details>
-              )}
-            </>
-          )}
+          ) : null}
+          <div hidden={page !== 'work'}>
+            <Workbench
+              key={`${host}-${demoScenario}`}
+              bridge={bridge}
+              profiles={profiles}
+              onChooseModel={(id) => profileController.activate(id)}
+              onSettings={() => setPage('settings')}
+              onBusyChange={setBusy}
+              demoScenario={demoScenario}
+              onDemoScenarioChange={(next) => {
+                setDemoScenario(next);
+                setDemoDocument('');
+              }}
+            />
+            {demoDocument && (
+              <details className="demo-document">
+                <summary>查看模拟文档 · 已应用的内容</summary>
+                <pre>{demoDocument}</pre>
+              </details>
+            )}
+          </div>
         </main>
         <footer className="main-footer">
           <span>TrioBridge AI · 三桥 AI</span>

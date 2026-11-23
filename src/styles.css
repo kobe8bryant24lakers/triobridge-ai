@@ -74,7 +74,8 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
-.write-comparison pre:focus-visible {
+.write-comparison pre:focus-visible,
+.result-content:focus-visible {
   outline: 3px solid #d0a23f;
   outline-offset: 3px;
 }
@@ -99,6 +100,15 @@ select:disabled,
 textarea:disabled {
   color: var(--muted);
   background: var(--canvas);
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 44px;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364736e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
 }
 textarea {
   resize: vertical;
@@ -451,7 +461,7 @@ pre {
 }
 .model-select select {
   border: 0;
-  background: transparent;
+  background-color: transparent;
   font-size: 13px;
   min-width: 0;
   padding-left: 0;
@@ -535,6 +545,7 @@ pre {
   color: var(--muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
 }
 .source-meta > span:first-child {
   overflow-wrap: anywhere;
@@ -689,6 +700,71 @@ pre {
   line-height: 1.95;
   margin: 0 0 20px;
 }
+.result-content {
+  min-width: 0;
+  max-height: 560px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: 4px;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.result-summary {
+  color: var(--muted);
+  font-size: 12px;
+  margin: -10px 0 14px;
+  font-variant-numeric: tabular-nums;
+}
+.field-error {
+  color: var(--error);
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+[aria-invalid='true'] {
+  border-color: var(--error);
+}
+.write-warning {
+  color: #70551a;
+  font-size: 13px;
+  line-height: 1.75;
+  margin: 12px 0;
+}
+.slide-editor {
+  border-top: 1px solid var(--line);
+  padding: 12px 0 20px;
+}
+.slide-editor legend {
+  padding-right: 8px;
+  font-weight: 600;
+}
+.slide-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.slide-editor label {
+  font-size: 13px;
+}
+.slide-editor textarea {
+  margin-top: 7px;
+}
+.slide-editor .field-help {
+  display: block;
+  margin-bottom: 12px;
+}
+.slide-outline > li > div {
+  min-width: 0;
+}
+.demo-scenario {
+  margin: 16px 0 24px;
+}
+.demo-scenario label {
+  font-size: 13px;
+}
+.demo-scenario p {
+  margin-bottom: 0;
+}
 .formula-text {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 16px;
@@ -735,10 +811,15 @@ pre {
   margin-bottom: 20px;
 }
 .slide-number {
+  flex: 0 0 2ch;
+  white-space: nowrap;
   color: #718a76;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   padding-top: 2px;
+}
+.slide-outline > li > div {
+  min-width: 0;
 }
 .slide-outline h3 {
   font-size: 14px;
@@ -766,6 +847,102 @@ pre {
 .notice.error {
   background: var(--error-bg);
   color: var(--error);
+}
+.notice.warning {
+  background: #fff8e8;
+  color: #70551a;
+}
+.report-preview {
+  line-height: 1.9;
+  font-size: 14px;
+}
+.report-preview > h3 {
+  font-size: 20px;
+}
+.report-preview h4 {
+  margin: 22px 0 10px;
+  font-size: 16px;
+}
+.report-preview p {
+  white-space: pre-wrap;
+}
+.table-scroll {
+  max-width: 100%;
+  overflow: auto;
+  margin: 14px 0;
+}
+.table-scroll:focus-visible {
+  outline: 3px solid #d0a23f;
+  outline-offset: 2px;
+}
+.table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.table-scroll th,
+.table-scroll td {
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  text-align: start;
+  vertical-align: top;
+  min-width: 90px;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.table-scroll th {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.table-scroll tbody tr:nth-child(even) td {
+  background: var(--canvas);
+}
+.table-scroll .formula-cell {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-width: 160px;
+}
+.report-editor > label,
+.report-editor .slide-editor label,
+.table-editor > label {
+  margin-bottom: 16px;
+}
+.report-editor .table-scroll input,
+.report-editor .table-scroll textarea {
+  min-width: 130px;
+}
+.cell-inspector {
+  padding: 16px 0;
+  border-block: 1px solid var(--line);
+  margin-top: 18px;
+}
+.table-editor .table-scroll {
+  max-height: 220px;
+}
+.cell-inspector legend {
+  font-weight: 600;
+}
+.cell-inspector label {
+  margin: 10px 0;
+}
+.cell-inspector textarea {
+  margin-top: 7px;
+}
+.cell-button {
+  background: transparent;
+  color: var(--ink);
+  min-height: 44px;
+  padding: 8px;
+  width: 100%;
+  text-align: start;
+  justify-content: flex-start;
+  overflow-wrap: anywhere;
+}
+.cell-button:hover,
+.cell-button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent);
 }
 .notice svg {
   margin-top: 2px;
@@ -803,6 +980,59 @@ pre {
   margin-bottom: 23px;
   border-bottom: 1px solid var(--line);
 }
+.model-scope-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  margin-bottom: 22px;
+}
+.shared-migration {
+  padding-block: 18px;
+  margin-bottom: 22px;
+  border-block: 1px solid var(--line);
+}
+.shared-migration h2 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.shared-migration .field-help {
+  margin-bottom: 14px;
+}
+.legacy-model-options legend {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.legacy-model-option {
+  align-items: flex-start;
+}
+.legacy-model-option input {
+  margin-top: 3px;
+}
+.legacy-model-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.legacy-model-option span span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.shared-key-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.shared-conflict {
+  display: block;
+}
+.shared-conflict p {
+  margin-bottom: 8px;
+}
 .settings-page fieldset > label,
 .advanced-settings > label {
   margin-bottom: 18px;
@@ -818,6 +1048,24 @@ pre {
 }
 .connection-summary {
   overflow-wrap: anywhere;
+}
+.api-key-field {
+  margin-bottom: 18px;
+}
+.api-key-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+}
+.api-key-controls input {
+  min-width: 0;
+}
+.api-key-controls .text-button {
+  min-height: 44px;
+  padding-inline: 8px;
+  white-space: nowrap;
 }
 .advanced-toggle {
   margin-bottom: 18px;
@@ -1216,6 +1464,19 @@ summary {
   }
   .source-input {
     min-height: 165px;
+  }
+  .source-input,
+  .instruction-input,
+  .result-editor,
+  .slide-editor input,
+  .slide-editor textarea,
+  .table-editor input,
+  .table-editor textarea {
+    font-size: 16px;
+  }
+  select,
+  .model-select select {
+    font-size: 16px;
   }
   .inline-label .muted {
     margin-left: 0;

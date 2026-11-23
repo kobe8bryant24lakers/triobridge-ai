@@ -1,6 +1,6 @@
 {
   "name": "triobridge-ai",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,18 +15,20 @@
     "preview": "vite preview --host 127.0.0.1",
     "start": "node scripts/serve.mjs",
     "typecheck": "tsc -b",
-    "test": "vitest run && node --test tests/server.test.mjs tests/pages.test.mjs tests/installers.test.mjs",
+    "test": "vitest run && node --test tests/*.test.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:pages": "npm run build:pages && playwright test --config playwright.pages.config.ts",
     "manifest:validate": "office-addin-manifest validate manifest.xml",
     "sideload:mac": "node scripts/sideload.mjs install",
     "sideload:mac:remove": "node scripts/sideload.mjs remove",
+    "manifest:local": "node scripts/export-local-manifest.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "format": "prettier --write src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json",
     "format:check": "prettier --check src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json"
   },
   "dependencies": {
+    "@napi-rs/keyring": "2.1.2",
     "lucide-react": "^1.77.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

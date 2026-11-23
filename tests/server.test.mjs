@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { createServer as createHttp2Server, connect } from 'node:http2';
 import { once } from 'node:events';
 import { createProxy } from '../scripts/server-utils.mjs';
 
@@ -115,4 +116,49 @@ test('proxy configuration rejects remote plaintext and URL credentials', () => {
     'file:///tmp/test',
   ])
     assert.throws(() => createProxy(target, 'http://localhost:3000'));
+});
+
+test('HTTP/2 proxy accepts local authority while preserving origin and host boundaries', async () => {
+  let forwarded = 0;
+  const upstream = createServer((req, res) => {
+    forwarded++;
+    req.resume();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ choices: [{ message: { content: 'OK' } }] }));
+  });
+  const upstreamPort = await listen(upstream);
+  let proxy;
+  const server = createHttp2Server((req, res) => proxy(req, res, () => res.end()));
+  const port = await listen(server);
+  const origin = `http://localhost:${port}`;
+  proxy = createProxy(`http://127.0.0.1:${upstreamPort}`, origin);
+  const client = connect(`http://127.0.0.1:${port}`);
+  const request = async (headers = {}) => {
+    const stream = client.request({
+      ':method': 'POST',
+      ':path': '/model-proxy/v1/chat/completions',
+      ':authority': `localhost:${port}`,
+      origin,
+      'content-type': 'application/json',
+      ...headers,
+    });
+    const response = once(stream, 'response');
+    stream.end(JSON.stringify({ stream: false, messages: [{ role: 'user', content: 'OK' }] }));
+    const [result] = await response;
+    for await (const chunk of stream) void chunk;
+    return result[':status'];
+  };
+  try {
+    assert.equal(await request(), 200);
+    assert.equal(await request({ ':authority': `127.0.0.1:${port}` }), 200);
+    assert.equal(await request({ ':authority': 'untrusted.example' }), 403);
+    assert.equal(await request({ host: 'untrusted.example' }), 403);
+    assert.equal(await request({ origin: 'https://untrusted.example' }), 403);
+    assert.equal(await request({ origin: undefined }), 403);
+    assert.equal(forwarded, 2);
+  } finally {
+    client.destroy();
+    await new Promise((resolve) => server.close(resolve));
+    await close(upstream);
+  }
 });

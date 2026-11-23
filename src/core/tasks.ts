@@ -7,6 +7,7 @@ export const HOST_NAMES: Record<HostKind, string> = {
 };
 export const MAX_SOURCE_LENGTH = 30_000;
 export const MAX_INSTRUCTION_LENGTH = 4_000;
+export const MAX_RESULT_LENGTH = 100_000;
 
 export const TASKS: Record<HostKind, TaskSpec[]> = {
   word: [
@@ -43,6 +44,16 @@ export const TASKS: Record<HostKind, TaskSpec[]> = {
       needsInstruction: true,
       output: 'text',
     },
+    {
+      id: 'report',
+      label: '结构化报告',
+      description: '生成分节正文、要点与表格，保留结构插入 Word。',
+      instruction:
+        '根据要求起草报告，只返回 JSON：{"title":"文档标题","sections":[{"heading":"章节标题","paragraphs":["正文"],"bullets":["要点"],"table":{"headers":["列名"],"rows":[["单元格文本"]]}}]}。报告 1–12 节；标题最多 120 字符，章节标题最多 100 字符。每节 paragraphs、bullets、table 可选，但至少提供一项。每节最多 8 段，每段 4000 字符；最多 12 条要点，每条 500 字符。表格最多 8 列、60 行，单元格用字符串且最多 500 字符。不输出 HTML、代码围栏或额外说明。保留提供的事实、单位和数字，未提供的信息写“待补充”，不编造实际业绩。',
+      needsSource: false,
+      needsInstruction: true,
+      output: 'document',
+    },
   ],
   excel: [
     {
@@ -69,7 +80,7 @@ export const TASKS: Record<HostKind, TaskSpec[]> = {
       label: '表格问答',
       description: '围绕选中的数据提出问题。',
       instruction:
-        '只根据给定表格回答用户问题，引用相关行列，区分事实和推断。数据不足时明确说明，不得编造计算结果。',
+        '只根据给定表格回答用户问题，引用相关行列，区分事实和推断。values 是原始值，displayValues 是格式化显示值；计算使用原始值，日期与百分比结合显示值理解。选区外引用未提供时明确指出，不得假设已读取其他工作表，不得编造计算结果。',
       needsSource: true,
       needsInstruction: true,
       output: 'text',
@@ -79,9 +90,19 @@ export const TASKS: Record<HostKind, TaskSpec[]> = {
       label: '分析建议',
       description: '发现趋势，找到下一步分析方向。',
       instruction:
-        '分析给定表格，概括可观察到的趋势、异常和下一步建议；清楚区分观察和推测，不编造数据。',
+        '分析给定表格，概括可观察到的趋势、异常和下一步建议；values 是原始值，displayValues 是格式化显示值，计算使用原始值并结合显示值理解单位。检查空白、错误值、合计行与重复记录，避免重复求和。选区外引用未提供时说明数据不足。清楚区分观察和推测，不编造数据。',
       needsSource: true,
       output: 'text',
+    },
+    {
+      id: 'table',
+      label: '创建数据表',
+      description: '生成带公式的数据表，确认后写入独立的新工作表。',
+      instruction:
+        '根据要求生成可编辑的 Excel 数据表，只返回 JSON：{"name":"工作表名","headers":["任务","计划","实际","差异"],"formats":["text","number","number","number"],"rows":[["示例任务",8,6,{"formula":"=C2-B2"}]]}。工作表名最多31字符，不含 \\ / * ? : [ ]。表头1–12列，列名唯一，数据1–200行，含表头最多2000格，每行列数一致。单元格只用字符串、数值、布尔值、null 或 {"formula":"=英文函数公式"}；计算项用公式对象，其他文本保持字符串。数据始终写入新工作表，表头从A1开始，首行数据为第2行，公式据此引用。formats每列一个，可选general、text、integer、number、percent；百分比用0到1之间的数值，公式列不用text。默认使用Office 2016兼容函数；不使用外部工作簿、外部调用、动态数组。缺失数据用null或“待补充”，不要编造真实数据；选区外引用未提供时不得猜测。',
+      needsSource: false,
+      needsInstruction: true,
+      output: 'table',
     },
   ],
   powerpoint: [

@@ -2,7 +2,10 @@ import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { initializeOffice } from './office/runtime';
+import { bootstrapLocalCapability } from './core/local-capability';
 import './styles.css';
+
+bootstrapLocalCapability();
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };

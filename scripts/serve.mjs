@@ -2,6 +2,7 @@ import { createServer } from 'node:https';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { tlsOptions, createProxy } from './server-utils.mjs';
+import { createSharedModelRuntime } from './shared-model-runtime.mjs';
 
 try {
   process.loadEnvFile('.env');
@@ -16,6 +17,7 @@ try {
 }
 const port = 3000;
 const proxy = createProxy(process.env.MODEL_PROXY_TARGET, `https://localhost:${port}`);
+const shared = await createSharedModelRuntime(`https://localhost:${port}`);
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript',
@@ -25,37 +27,41 @@ const types = {
   '.json': 'application/json',
 };
 const server = createServer(tlsOptions(), (req, res) => {
-  proxy(req, res, async () => {
-    try {
-      if (!['localhost:3000', '127.0.0.1:3000'].includes(req.headers.host)) {
-        res.writeHead(403);
-        res.end();
-        return;
-      }
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
-        res.writeHead(405);
-        res.end();
-        return;
-      }
-      const path = decodeURIComponent(new URL(req.url, 'https://localhost').pathname);
-      const file = resolve(root, `.${path === '/' ? '/index.html' : path}`);
-      if (!file.startsWith(root + sep)) {
-        res.writeHead(403);
-        res.end();
-        return;
-      }
-      const content = await readFile(file);
-      res.writeHead(200, {
-        'Content-Type': types[extname(file)] || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': file.endsWith('.html') ? 'no-cache' : 'public, max-age=3600',
-      });
-      res.end(req.method === 'HEAD' ? undefined : content);
-    } catch {
-      res.writeHead(404);
-      res.end('Not found');
-    }
-  }).catch(() => {
+  Promise.resolve(
+    shared(req, res, () =>
+      proxy(req, res, async () => {
+        try {
+          if (!['localhost:3000', '127.0.0.1:3000'].includes(req.headers.host)) {
+            res.writeHead(403);
+            res.end();
+            return;
+          }
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.writeHead(405);
+            res.end();
+            return;
+          }
+          const path = decodeURIComponent(new URL(req.url, 'https://localhost').pathname);
+          const file = resolve(root, `.${path === '/' ? '/index.html' : path}`);
+          if (!file.startsWith(root + sep)) {
+            res.writeHead(403);
+            res.end();
+            return;
+          }
+          const content = await readFile(file);
+          res.writeHead(200, {
+            'Content-Type': types[extname(file)] || 'application/octet-stream',
+            'X-Content-Type-Options': 'nosniff',
+            'Cache-Control': file.endsWith('.html') ? 'no-cache' : 'public, max-age=3600',
+          });
+          res.end(req.method === 'HEAD' ? undefined : content);
+        } catch {
+          res.writeHead(404);
+          res.end('Not found');
+        }
+      }),
+    ),
+  ).catch(() => {
     if (!res.headersSent) res.writeHead(500);
     res.end();
   });

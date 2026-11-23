@@ -28,6 +28,8 @@ export async function buildInstallers(root, destination, manifest, manifestId) {
             : '先解压整个文件夹，再双击 Install.cmd。按系统提示批准创建仅当前账号可访问的共享目录。请正常双击运行，不要用另一个账号运行整个安装程序。\n卸载安装文件和共享目录：双击 Uninstall.cmd，同样可能要求管理员确认。\n') +
           '\n保存文档并完全退出 Office，然后重新打开。在「主页 → 加载项」中添加三桥 AI 在线版；Windows 需进入「高级 / 更多加载项 → 共享文件夹」。\n' +
           '在模型设置中选择服务、填入 API Key、点击「连接并保存」。无需 Node.js、本机服务或开发证书。\n' +
+          '此安装包是在线版，三个 Office 应用各自保存模型配置。同机配置一次与跨应用共享需另行安装本机共享版并保持本机服务运行。\n' +
+          '本机共享版说明：https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md\n' +
           '这是未签名的个人测试旁加载包，组织策略可能禁止安装。Windows 需要可用的文件共享服务；不会自动修改防火墙或组织策略。\n' +
           '卸载不会清空 Office 缓存、模型配置或密钥；需要清除模型配置时，请先在插件内删除。\n' +
           '安装与故障处理：https://kobe8bryant24lakers.github.io/triobridge-ai/#install\n',
