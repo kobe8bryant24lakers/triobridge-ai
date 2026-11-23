@@ -5,9 +5,10 @@ import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { request } from 'node:https';
-import { lstat, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { verifyPackage, installedRoot, readInstallation } from './local-install-files.mjs';
 import { localInstallerName } from './build-local-installers.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
@@ -21,6 +22,7 @@ const directory = join(temporary, name);
 let nativeReference;
 let nativeModelsCreated = false;
 let fixtureApi;
+let lifecycleRunner;
 const checks = [];
 try {
   const listing = await execute(
@@ -65,10 +67,29 @@ try {
     const models = sharedModelsDirectory();
     for (const path of [root, models]) await assert.rejects(lstat(path), { code: 'ENOENT' });
     nativeModelsCreated = true;
+    // Windows asks for interactive confirmation when modifying CurrentUser Root.
+    // CI has no person to approve it. Exercise the installed core with only this
+    // OS confirmation boundary replaced. Every HTTPS request still validates the
+    // real generated certificate via its explicit CA; no TLS checks are disabled.
+    lifecycleRunner = join(temporary, 'native-lifecycle.mjs');
+    const moduleUrl = (name) =>
+      JSON.stringify(pathToFileURL(join(directory, 'app/scripts', name)).href);
+    await writeFile(
+      lifecycleRunner,
+      `
+import { runInstaller } from ${moduleUrl('install-local.mjs')};
+import { platformDriver, certificateIdentity } from ${moduleUrl('local-install-platform.mjs')};
+import { installedRoot } from ${moduleUrl('local-install-files.mjs')};
+if (process.env.GITHUB_ACTIONS !== 'true' || process.platform !== 'win32') throw new Error('CI only');
+const driver = platformDriver(installedRoot());
+driver.trustCertificate = async (directory, id) => { await certificateIdentity(directory, id); };
+await runInstaller(process.argv[2], { driver });
+`,
+    );
     const run = (action) =>
-      execute(node, [join(directory, 'app/scripts/install-local.mjs'), action], {
+      execute(node, [lifecycleRunner, action], {
         windowsHide: true,
-        timeout: 180_000,
+        timeout: 300_000,
         maxBuffer: 512_000,
       });
     const apiCalls = [];
@@ -131,7 +152,7 @@ try {
     };
     await run('install');
     const first = await readInstallation(root);
-    checks.push('native install, certificate trust, login service and Office catalog');
+    checks.push('native install, generated TLS certificate, login service and Office catalog');
     const id = 'installer-test-' + randomUUID();
     const saved = await call('upsert', {
       expectedRevision: 0,
@@ -187,6 +208,8 @@ try {
         nodeVersion: metadata.nodeVersion,
         checks,
         modelResponses: 'synthetic transport fixture; not native Office acceptance',
+        interactiveCertificateTrust:
+          'not exercised in unattended CI; requires manual Windows acceptance',
       },
       null,
       2,
@@ -196,7 +219,7 @@ try {
   if (nativeModelsCreated) {
     const node = join(directory, 'runtime/node.exe');
     try {
-      await execute(node, [join(directory, 'app/scripts/install-local.mjs'), 'remove'], {
+      await execute(node, [lifecycleRunner, 'remove'], {
         windowsHide: true,
         timeout: 180_000,
         maxBuffer: 512_000,

@@ -309,7 +309,7 @@ async function install(root, driver) {
   }
 }
 
-export async function runInstaller(action) {
+export async function runInstaller(action, { driver: injectedDriver } = {}) {
   if (!['install', 'remove', 'restart'].includes(action))
     throw new Error('支持 install、remove 或 restart。');
   const root = installedRoot();
@@ -318,7 +318,7 @@ export async function runInstaller(action) {
     console.log('未找到本机共享版安装。模型配置和密钥未修改。');
     return;
   } else await readInstallation(root);
-  const driver = platformDriver(root);
+  const driver = injectedDriver || platformDriver(root);
   await withInstallationLock(root, async () => {
     await recoverInstallation(root, driver);
     if (action === 'install') return install(root, driver);

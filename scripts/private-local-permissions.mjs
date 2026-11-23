@@ -104,7 +104,7 @@ export async function protectWindowsPath(
           TRIOBRIDGE_PRIVATE_CREATED: created ? '1' : '0',
         },
         windowsHide: true,
-        timeout: 15_000,
+        timeout: 60_000,
         maxBuffer: 8192,
       },
     );

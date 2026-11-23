@@ -44,7 +44,7 @@ test('Windows private ACL invocation uses a fixed script and passes only a liter
   assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_KIND, 'directory');
   assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_CREATED, '0');
   assert.equal(calls[0][2].windowsHide, true);
-  assert.equal(calls[0][2].timeout, 15_000);
+  assert.equal(calls[0][2].timeout, 60_000);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /GetCurrent\(\)/);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /SetAccessRuleProtection\(\$true, \$false\)/);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /'S-1-5-18', 'S-1-5-32-544'/);
