@@ -86,7 +86,15 @@ async function requestLocal(root, path, token) {
   });
 }
 
-export async function waitForHealth(root, state, version, timeout = 30_000) {
+// Windows may initialize its PowerShell permission modules on the first launch.
+// On ARM64 the service was healthy shortly after the old 30-second deadline.
+// Keep checking the real TLS/installation identity, with a bounded cold-start grace.
+export async function waitForHealth(
+  root,
+  state,
+  version,
+  timeout = process.platform === 'win32' ? 120_000 : 30_000,
+) {
   const until = Date.now() + timeout;
   do {
     try {
@@ -248,6 +256,7 @@ async function install(root, driver) {
       await driver.trustCertificate(next, previous.id);
     } else await driver.trustCertificate(certificate, previous.id);
     console.log('3/5 正在启动随登录运行的本机服务…');
+    if (process.platform === 'win32') console.log('首次启动可能需要约两分钟，请保持窗口打开。');
     await stopAndWait(driver);
     if (renew) {
       if (hadCertificate) await rename(certificate, join(root, journal.previousCertificate));
