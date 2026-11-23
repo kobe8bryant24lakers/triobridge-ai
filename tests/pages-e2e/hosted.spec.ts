@@ -68,9 +68,12 @@ test('quick setup works in the hosted pane and installer links download real ZIP
   page,
 }) => {
   await page.goto('');
+  await page.locator('.hosted-edition > summary').click();
   for (const platform of ['Mac', 'Windows']) {
     const download = page.waitForEvent('download');
-    await page.getByRole('link', { name: `Download ${platform} installer`, exact: true }).click();
+    await page
+      .getByRole('link', { name: `Download ${platform} hosted installer`, exact: true })
+      .click();
     expect((await download).suggestedFilename()).toBe(`TrioBridge-AI-${platform}.zip`);
   }
   await page.setViewportSize({ width: 360, height: 800 });
@@ -118,12 +121,40 @@ test('site defaults to English and supports Chinese navigation, reloads, and dir
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
   await page.goto('zh-CN.html#install');
   await expect(page.locator('#install')).toBeInViewport();
-  await expect(page.getByRole('link', { name: '下载 Mac 安装包', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: '下载 Mac Apple 芯片版', exact: true }),
+  ).toBeVisible();
 
   await languages.getByRole('link', { name: 'English', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page).toHaveTitle(englishTitle);
   await expect(page.locator('#hero-title')).toHaveText(englishHero, { useInnerText: true });
+});
+
+test('both languages offer four distinct local packages before the hosted edition', async ({
+  page,
+}) => {
+  for (const path of ['', 'zh-CN.html']) {
+    await page.goto(path + '#install');
+    const links = page.locator('.local-downloads a');
+    await expect(links).toHaveCount(4);
+    for (const [index, asset] of [
+      'Windows-x64',
+      'Windows-arm64',
+      'Mac-arm64',
+      'Mac-x64',
+    ].entries()) {
+      await expect(links.nth(index)).toBeVisible();
+      await expect(links.nth(index)).toHaveAttribute(
+        'href',
+        `https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-${asset}.zip`,
+      );
+    }
+    await expect(page.locator('.hosted-edition')).not.toHaveAttribute('open');
+    await page.locator('.hosted-edition > summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.hosted-downloads')).toBeVisible();
+  }
 });
 
 test.describe('site without JavaScript', () => {

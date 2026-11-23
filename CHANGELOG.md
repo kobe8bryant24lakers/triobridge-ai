@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — 2026-11-23
+
+Self-contained local shared installers are provided for Windows and macOS, each in x64 and ARM64 builds. They bundle a pinned Node.js runtime and the native credential-store binding, create a private localhost certificate and Office manifest on the target computer, and start the service at sign-in. No separate Node.js or npm setup is required. Upgrade, repair, restart, and uninstall preserve existing model profiles and OS-stored keys.
+
+Local HTTP APIs such as `http://127.0.0.1:8001/v1` work through the shared service without requiring model API CORS. Connection diagnostics distinguish a stopped local service, refused API connection, DNS, timeout, and certificate failures. A missing shared installation credential does not silently fall back to per-app keys.
+
+The English and Chinese website and README now prioritize local shared downloads and identify the hosted edition separately. Native Windows Office acceptance remains pending; installer automation and synthetic transport checks are distinct from real-model Office acceptance.
+
+### 简体中文
+
+- 新增 Windows / Mac、x64 / ARM64 本机共享安装包，自带运行环境，双击安装并按系统提示完成配置。
+- 自动配置当前账号的证书、后台服务和三应用入口；升级、修复及卸载保留模型配置和系统密钥。
+- 本地 HTTP API 通过本机服务调用；连接报错明确区分插件到本机服务、服务到模型 API 的故障。
+- README 与 GitHub Pages 优先提供本机共享下载，在线版独立说明。Windows 原生 Office 验收仍由使用者后续完成。
+
 ## 0.3.0 — 2026-11-23
 
 Word can now insert structured reports with sections and native tables, Excel can create formatted data tables with explicit formulas, and PowerPoint outlines can be edited and reordered before creating slides. Previews retain drafts through settings changes, identify outdated results, and protect write targets from intervening changes.
