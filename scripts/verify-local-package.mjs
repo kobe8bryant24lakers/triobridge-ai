@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { request } from 'node:https';
-import { cp, lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +13,7 @@ import { verifyPackage, installedRoot, readInstallation } from './local-install-
 import { localInstallerName, packageFiles } from './build-local-installers.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
 import { createNativeModelVault } from './shared-model-vault.mjs';
+import { windowsPowerShellEnvironment } from './private-local-permissions.mjs';
 
 const execute = promisify(execFile);
 const archive = resolve(process.argv[2]);
@@ -23,6 +24,15 @@ let nativeReference;
 let nativeModelsCreated = false;
 let fixtureApi;
 let lifecycleRunner;
+let simulatedOffice;
+async function closeSimulatedOffice() {
+  if (simulatedOffice && simulatedOffice.exitCode === null && simulatedOffice.signalCode === null) {
+    const exited = once(simulatedOffice, 'exit');
+    simulatedOffice.kill();
+    await exited;
+  }
+  simulatedOffice = undefined;
+}
 const checks = [];
 try {
   const listing = await execute(
@@ -185,12 +195,37 @@ await runInstaller(process.argv[2], { driver });
         req.end(JSON.stringify(body));
       });
     };
+    // A renamed bundled Node simulates only the Windows process name/session.
+    // It is not Office and never opens a document. Setup must leave it running.
+    const officeExecutable = join(temporary, 'WINWORD.exe');
+    await copyFile(node, officeExecutable);
+    const openSimulatedOffice = async () => {
+      simulatedOffice = spawn(
+        officeExecutable,
+        ['-e', "console.log('SYNTHETIC_OFFICE_READY');setInterval(()=>{},1000)"],
+        { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      await Promise.race([
+        once(simulatedOffice.stdout, 'data'),
+        once(simulatedOffice, 'exit').then(() => {
+          throw new Error('Synthetic Office process exited before readiness.');
+        }),
+      ]);
+    };
+    await openSimulatedOffice();
+    await assert.rejects(run('install'), /OFFICE_OPEN/);
+    assert.deepEqual([simulatedOffice.exitCode, simulatedOffice.signalCode], [null, null]);
+    assert.equal((await readInstallation(root)).active, null);
+    await assert.rejects(lstat(models), { code: 'ENOENT' });
+    await closeSimulatedOffice();
+    checks.push('catalog installation refuses an open simulated Office process without closing it');
     await run('install');
     const first = await readInstallation(root);
     checks.push('native install, generated TLS certificate, login service and Office catalog');
     // A stale or replaced PID record must never terminate an unrelated process.
     // Point it at this verifier, whose executable is outside the installed app.
     const processRecordPath = join(root, 'service-process.json');
+    await openSimulatedOffice();
     const originalProcessRecord = await readFile(processRecordPath, 'utf8');
     await writeFile(
       processRecordPath,
@@ -204,7 +239,10 @@ await runInstaller(process.argv[2], { driver });
       await run('restart');
     }
     assert.equal((await call('state', {})).profiles.length, 0);
+    assert.deepEqual([simulatedOffice.exitCode, simulatedOffice.signalCode], [null, null]);
+    await closeSimulatedOffice();
     checks.push('stale PID protection leaves an unrelated process alive');
+    checks.push('service restart remains available with a simulated Office process open');
     const id = 'installer-test-' + randomUUID();
     const saved = await call('upsert', {
       expectedRevision: 0,
@@ -224,6 +262,40 @@ await runInstaller(process.argv[2], { driver });
     nativeReference = JSON.parse(await readFile(join(models, 'profiles.json'), 'utf8')).profiles[0]
       .credentialRef;
     checks.push('connect and save through HTTP with native credential storage');
+    const diagnosis = await execute(
+      join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        join(directory, 'app/scripts/windows-office-discovery.ps1'),
+        '-Diagnose',
+      ],
+      { env: windowsPowerShellEnvironment(), windowsHide: true, timeout: 120_000 },
+    );
+    const report = JSON.parse(diagnosis.stdout.replace(/^\uFEFF/, ''));
+    assert.deepEqual(Object.keys(report).sort(), [
+      'catalogs',
+      'detectedVersions',
+      'format',
+      'runningOffice',
+    ]);
+    assert.deepEqual(
+      report.catalogs.find((catalog) => catalog.edition === 'local'),
+      {
+        edition: 'local',
+        registered: true,
+        urlMatches: true,
+        showInMenu: true,
+        reachable: true,
+        manifest: { validXml: true, matchesId: true, Word: true, Excel: true, PowerPoint: true },
+      },
+    );
+    assert.ok(!diagnosis.stdout.includes('synthetic-installer-api-key'));
+    assert.ok(!diagnosis.stdout.includes(root));
+    assert.ok(!diagnosis.stdout.includes(models));
+    checks.push('read-only discovery confirms the reachable catalog and all three manifest hosts');
     await run('install');
     assert.equal((await readInstallation(root)).active, first.active);
     assert.equal((await call('state', {})).profiles[0].id, id);
@@ -289,6 +361,7 @@ await runInstaller(process.argv[2], { driver });
     ),
   );
 } finally {
+  await closeSimulatedOffice();
   if (nativeModelsCreated) {
     const node = join(directory, 'runtime/node.exe');
     try {

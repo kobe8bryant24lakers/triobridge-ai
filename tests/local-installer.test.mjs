@@ -33,6 +33,9 @@ async function fixture(t) {
     'app/scripts/install-local.mjs',
     'app/manifest.xml',
     process.platform === 'win32' ? 'runtime/node.exe' : 'runtime/node',
+    ...(process.platform === 'win32'
+      ? ['app/scripts/start-installed.ps1', 'app/scripts/windows-office-discovery.ps1']
+      : []),
   ]) {
     await mkdir(dirname(join(source, name)), { recursive: true });
     await writeFile(join(source, name), 'synthetic payload');

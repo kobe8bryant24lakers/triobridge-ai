@@ -331,7 +331,7 @@ export async function runInstaller(action, { driver: injectedDriver } = {}) {
   await withInstallationLock(root, async () => {
     await recoverInstallation(root, driver);
     if (action === 'install') return install(root, driver);
-    await driver.preflight();
+    await driver.preflight(action);
     const state = await readInstallation(root);
     if (action === 'restart') {
       if (!state.active) throw new Error('安装尚未完成，请重新双击 Install。');

@@ -92,8 +92,9 @@ export function platformDriver(root, platform = process.platform) {
     }
   }
   return {
-    async preflight() {
-      if (platform === 'win32') return native('Preflight');
+    async preflight(action = 'install') {
+      if (platform === 'win32')
+        return native('Preflight', { RequireClosedOffice: action === 'restart' ? '0' : '1' });
       await checkPlist();
       for (const app of ['Word', 'Excel', 'Powerpoint'])
         await preflightLocalManifest(

@@ -8,12 +8,15 @@ Local HTTP APIs such as `http://127.0.0.1:8001/v1` work through the shared servi
 
 The English and Chinese website and README now prioritize local shared downloads and identify the hosted edition separately. Native Windows Office acceptance remains pending; installer automation and synthetic transport checks are distinct from real-model Office acceptance.
 
+Windows packages check for running Office apps before changing the catalog and include a read-only `Diagnose.cmd` for per-app discovery problems. Reports contain application versions and catalog/manifest status, without document content or model credentials.
+
 ### 简体中文
 
 - 新增 Windows / Mac、x64 / ARM64 本机共享安装包，自带运行环境，双击安装并按系统提示完成配置。
 - 自动配置当前账号的证书、后台服务和三应用入口；升级、修复及卸载保留模型配置和系统密钥。
 - 本地 HTTP API 通过本机服务调用；连接报错明确区分插件到本机服务、服务到模型 API 的故障。
 - README 与 GitHub Pages 优先提供本机共享下载，在线版独立说明。Windows 原生 Office 验收仍由使用者后续完成。
+- Windows 安装前检查三应用是否关闭，并提供只读 `Diagnose.cmd`，定位目录注册、可达性及宿主声明，不读取密钥或文档。
 
 ## 0.3.0 — 2026-11-23
 

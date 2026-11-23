@@ -3,10 +3,12 @@ param(
     [Parameter(Mandatory = $true)][string]$Root,
     [string]$CertificateDirectory,
     [string]$InstallationId,
-    [string]$ManifestPath
+    [string]$ManifestPath,
+    [ValidateSet(0, 1)][int]$RequireClosedOffice = 0
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'windows-office-discovery.ps1')
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $sid = $identity.User.Value
 $account = $identity.Name
@@ -136,6 +138,7 @@ function Get-OwnedCertificate {
 
 switch ($Action) {
     'Preflight' {
+        if ($RequireClosedOffice) { Assert-TrioBridgeOfficeClosed }
         Assert-OrdinaryPath $Root
         Assert-Catalog
         $null = Get-OwnedTask
@@ -197,6 +200,7 @@ switch ($Action) {
         Start-ScheduledTask -TaskName $taskName
     }
     'Catalog' {
+        Assert-TrioBridgeOfficeClosed
         Assert-Catalog
         if (-not $ManifestPath -or -not ([IO.File]::ReadAllText($ManifestPath)).Contains('<Id>d7cf6e8b-6d03-4a54-9c31-5b7d5427618e</Id>')) { throw 'Missing generated private manifest.' }
         Protect-Directory $catalog
@@ -210,6 +214,7 @@ switch ($Action) {
         New-ItemProperty -LiteralPath $catalogRegistry -Name Flags -Value 1 -PropertyType DWord -Force | Out-Null
     }
     'RemoveCatalog' {
+        Assert-TrioBridgeOfficeClosed
         Assert-Catalog
         Invoke-Share 'Remove'
         if (Test-Path -LiteralPath $catalogRegistry) { Remove-Item -LiteralPath $catalogRegistry }

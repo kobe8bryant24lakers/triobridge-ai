@@ -25,7 +25,7 @@ export async function buildInstallers(root, destination, manifest, manifestId) {
         `TrioBridge AI · 三桥 AI（在线版）\n\n` +
           (platform === 'Mac'
             ? '解压后双击 Install.command。若系统阻止打开，请在系统设置的「隐私与安全性」中按提示允许，或使用网页中的手动安装步骤。\n卸载安装文件：双击 Uninstall.command。\n'
-            : '先解压整个文件夹，再双击 Install.cmd。按系统提示批准创建仅当前账号可访问的共享目录。请正常双击运行，不要用另一个账号运行整个安装程序。\n卸载安装文件和共享目录：双击 Uninstall.cmd，同样可能要求管理员确认。\n') +
+            : '先保存文档并完全退出 Word、Excel、PowerPoint，再解压整个文件夹，双击 Install.cmd。按系统提示批准创建仅当前账号可访问的共享目录。请正常双击运行，不要用另一个账号运行整个安装程序。\n卸载安装文件和共享目录：双击 Uninstall.cmd，同样可能要求管理员确认。\n只有部分应用显示入口时，运行 Diagnose.cmd 只读检查目录和三应用声明；报告不含模型密钥或文档。\n') +
           '\n保存文档并完全退出 Office，然后重新打开。在「主页 → 加载项」中添加三桥 AI 在线版；Windows 需进入「高级 / 更多加载项 → 共享文件夹」。\n' +
           '在模型设置中选择服务、填入 API Key、点击「连接并保存」。无需 Node.js、本机服务或开发证书。\n' +
           '此安装包是在线版，三个 Office 应用各自保存模型配置。同机配置一次与跨应用共享需另行安装本机共享版并保持本机服务运行。\n' +
@@ -56,13 +56,24 @@ export async function buildInstallers(root, destination, manifest, manifestId) {
             '\uFEFF' + render(template).replaceAll('\n', '\r\n'),
           );
         }
+        await writeFile(
+          join(directory, 'windows-office-discovery.ps1'),
+          '\uFEFF' +
+            (await readFile(join(root, 'scripts/windows-office-discovery.ps1'), 'utf8'))
+              .replaceAll('\r\n', '\n')
+              .replaceAll('\n', '\r\n'),
+        );
+        await writeFile(
+          join(directory, 'Diagnose.cmd'),
+          '@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\necho Read-only Office discovery check. No model settings or keys are read.\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0windows-office-discovery.ps1" -Diagnose\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n',
+        );
         for (const [file, action] of [
           ['Install.cmd', 'Install'],
           ['Uninstall.cmd', 'Remove'],
         ])
           await writeFile(
             join(directory, file),
-            `@echo off\r\nsetlocal\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Manage.ps1" -Action ${action}\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n`,
+            `@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Manage.ps1" -Action ${action}\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n`,
           );
       }
       const output = resolve(destination, `${name}.zip`);

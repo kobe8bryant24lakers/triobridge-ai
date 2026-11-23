@@ -15,11 +15,13 @@ Connect Word, Excel, and PowerPoint to your own AI models.
 | Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
 | Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
-1. Extract the entire folder and double-click `Install.cmd` on Windows or `Install.command` on Mac. No separate Node.js or commands required. The installer sets up the local service, HTTPS certificate, and all three add-in entries. Windows requests administrator authorization for a dedicated catalog share.
-2. Follow system prompts, save documents, and quit and reopen Office. Select **三桥 AI（本机共享）** under Home → Add-ins; on Windows use Advanced / More Add-ins → Shared Folder. Model settings should show **本机共享** (local shared).
+1. Save documents and completely close Word, Excel and PowerPoint. Extract the entire folder and double-click `Install.cmd` on Windows or `Install.command` on Mac. No separate Node.js or commands required. The installer sets up the local service, HTTPS certificate, and all three add-in entries. Windows requests administrator authorization for a dedicated catalog share.
+2. Follow system prompts, then reopen Office. Add **三桥 AI（本机共享）** separately in each app under Home → Add-ins; on Windows use Advanced / More Add-ins → Shared Folder. Model settings should show **本机共享** (local shared).
 3. Add a model in any app and choose Connect and save (连接并保存). For a local API without authentication, choose No key (不使用密钥). Other Office apps reuse the profile and its OS-stored key.
 
 The service starts at sign-in; close the installation window after setup. Run a new package’s `Install` to upgrade or repair, `Restart` to restart, or `Uninstall` to remove the installed service, certificate, and entries. **Uninstall preserves model profiles and keys**; delete models inside the add-in when needed.
+
+If a Windows app cannot see the entry, run `Diagnose.cmd` for a read-only check of Office versions, catalog registration/access and all three manifest hosts. It does not read model keys or documents. [Per-app discovery troubleshooting](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项).
 
 Packages are unsigned and may require system confirmation. On Mac, follow System Settings → Privacy & Security if execution is blocked, and handle macOS Office-data access and certificate prompts. Organizational policies may restrict sideloading. Native Windows Office acceptance remains pending. [Setup and troubleshooting](docs/LOCAL-MODELS.md).
 

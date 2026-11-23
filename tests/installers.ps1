@@ -9,7 +9,7 @@ foreach ($file in @('Manage.ps1', 'Share.ps1')) {
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $templates $file), [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 }
-foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1', 'start-installed.ps1')) {
+foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1', 'start-installed.ps1', 'windows-office-discovery.ps1')) {
     $tokens = $null
     $parseErrors = $null
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root ('scripts/' + $file)), [ref]$tokens, [ref]$parseErrors)
@@ -41,6 +41,37 @@ function Remove-SmbShare {
 function Assert([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
+
+. (Join-Path $root 'scripts/windows-office-discovery.ps1')
+$session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+$testOfficeProcesses = @{}
+function Get-Process {
+    [CmdletBinding()]param([string]$Name)
+    if ($testOfficeProcesses.ContainsKey($Name)) { $testOfficeProcesses[$Name] }
+}
+Assert-TrioBridgeOfficeClosed
+foreach ($process in @('WINWORD', 'EXCEL', 'POWERPNT')) {
+    $testOfficeProcesses[$process] = [PSCustomObject]@{SessionId = $session}
+}
+Assert ((@(Get-TrioBridgeRunningOfficeApps) -join ',') -eq 'Word,Excel,PowerPoint') 'All three running hosts must be detected.'
+$rejected = $false
+try { Assert-TrioBridgeOfficeClosed } catch { $rejected = $_.Exception.Message -like '*OFFICE_OPEN*' }
+Assert $rejected 'Catalog changes must wait until Office has closed.'
+foreach ($process in @('WINWORD', 'EXCEL', 'POWERPNT')) { $testOfficeProcesses[$process].SessionId = $session + 1 }
+Assert-TrioBridgeOfficeClosed
+Remove-Item Function:\Get-Process
+
+$manifest = Get-TrioBridgeManifestStatus (Join-Path $root 'manifest.xml') 'd7cf6e8b-6d03-4a54-9c31-5b7d5427618e'
+Assert ($manifest.validXml -and $manifest.matchesId -and $manifest.Word -and $manifest.Excel -and $manifest.PowerPoint) 'The shipped manifest must declare all three hosts.'
+$fixture = Join-Path ([IO.Path]::GetTempPath()) ('triobridge-manifest-' + [Guid]::NewGuid() + '.xml')
+try {
+    $text = [IO.File]::ReadAllText((Join-Path $root 'manifest.xml'))
+    [IO.File]::WriteAllText($fixture, $text.Replace('<Host Name="Workbook" />', ''))
+    $missing = Get-TrioBridgeManifestStatus $fixture 'd7cf6e8b-6d03-4a54-9c31-5b7d5427618e'
+    Assert ($missing.Word -and -not $missing.Excel -and $missing.PowerPoint) 'Diagnostics must identify a missing Excel declaration.'
+    [IO.File]::WriteAllText($fixture, '<!DOCTYPE x [<!ENTITY private SYSTEM "file:///synthetic-private">]><x>&private;</x>')
+    Assert (-not (Get-TrioBridgeManifestStatus $fixture 'synthetic').validXml) 'Manifest diagnostics must reject external entities.'
+} finally { Remove-Item -LiteralPath $fixture -Force }
 
 $helper = Join-Path $templates 'Share.ps1'
 $arguments = @{Directory = 'C:\Users\Test User\OnlineCatalog'; Account = 'PC\Test User'; Name = 'TrioBridgeAI-S-1-5-21-123$'}

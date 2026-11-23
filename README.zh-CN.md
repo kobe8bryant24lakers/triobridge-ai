@@ -15,11 +15,13 @@
 | Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
 | Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
-1. 解压完整文件夹，双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`。无需另外安装 Node.js 或输入命令。安装器配置本机服务、HTTPS 证书和三应用清单；Windows 创建当前账号专用共享目录时请求管理员授权。
-2. 按系统提示完成安装，保存文档并完全退出、重开 Office。在“主页 → 加载项”选择 **三桥 AI（本机共享）**；Windows 从“高级 / 更多加载项 → 共享文件夹”添加。模型设置页应显示 **本机共享**。
+1. 先保存文档并完全退出 Word、Excel、PowerPoint，再解压完整文件夹，双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`。无需另外安装 Node.js 或输入命令。安装器配置本机服务、HTTPS 证书和三应用清单；Windows 创建当前账号专用共享目录时请求管理员授权。
+2. 按系统提示完成安装，重开 Office。在每个应用的“主页 → 加载项”分别添加 **三桥 AI（本机共享）**；Windows 从“高级 / 更多加载项 → 共享文件夹”添加。模型设置页应显示 **本机共享**。
 3. 在任一应用新增模型并“连接并保存”。本地 API 无需鉴权时选择“不使用密钥”。其余应用可复用，无需重复填写，密钥保存在系统安全存储。
 
 服务随当前账号登录启动，安装完成后可以关闭安装窗口。再次运行新版 `Install` 可升级或修复；`Restart` 重启服务；`Uninstall` 移除本次安装的服务、证书和入口，**保留模型配置与密钥**。需要删除模型时在插件内操作。
+
+Windows 只有部分应用显示加载项时，运行 `Diagnose.cmd`，只读检查应用版本、目录注册 / 可达性和三应用声明，不读取模型密钥或文档。[按应用排查入口](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项)。
 
 安装包尚未签名，首次运行可能需要系统确认。Mac 可按“系统设置 → 隐私与安全性”提示允许；Office 数据访问和证书信任需按系统提示处理。组织策略可能限制旁加载。Windows 原生 Office 验收仍待完成。[完整安装与故障处理](docs/LOCAL-MODELS.md)。
 

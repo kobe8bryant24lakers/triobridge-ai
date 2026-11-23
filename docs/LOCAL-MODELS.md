@@ -6,11 +6,11 @@
 
 ## 安装本机共享版
 
-从[下载页面](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)选择与你的电脑和芯片匹配的 **Local / 本机共享版** ZIP，解压整个文件夹。Windows 双击 `Install.cmd`，Mac 双击 `Install.command`，按系统提示完成安装。无需另外安装 Node.js、npm 或开发工具。
+从[下载页面](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)选择与你的电脑和芯片匹配的 **Local / 本机共享版** ZIP，解压整个文件夹。先保存文档并完全退出 Word、Excel、PowerPoint，再双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`，按系统提示完成安装。无需另外安装 Node.js、npm 或开发工具。
 
 安装程序为当前账号配置本机 HTTPS 服务、证书和三应用清单；Windows 为当前账号建立专用共享目录，只有创建 / 移除共享目录这一步请求管理员授权。服务随当前账号登录启动，安装完成后可以关闭窗口。包内不含个人密钥或证书，每台电脑安装时分别生成。
 
-保存文档并完全退出、重开 Office，选择 **三桥 AI（本机共享）**。Windows 在“高级 / 更多加载项 → 共享文件夹”添加。模型设置必须显示 **本机共享**；在线版入口仍然存在时，请核对名称。
+重开 Office，在每个应用内分别添加 **三桥 AI（本机共享）**。Windows 在“主页 → 加载项 → 高级 / 更多加载项 → 共享文件夹”添加。模型设置必须显示 **本机共享**；在线版入口仍然存在时，请核对名称。
 
 - **升级 / 修复**：下载新版 ZIP，解压后再次运行 `Install`。保留已有模型和密钥；失败会尝试恢复原服务。
 - **重启**：运行包内 `Restart`。同一电脑的开发服务与安装版都使用 3000 端口，切换前停止旧服务。
@@ -19,6 +19,24 @@
 - **目录**：程序位于 Mac 的 `~/Library/Application Support/TrioBridge AI/local-app/` 或 Windows 的 `%LOCALAPPDATA%\TrioBridgeAI\LocalApp\`。`logs/` 保存服务启动日志，不保存模型密钥或文档正文。
 
 安装完成后参考下方“配置与迁移”。以下源码方式只供开发和自行构建使用。
+
+### Windows 只有部分应用显示加载项
+
+共享目录与模型配置可复用，但首次添加加载项需要在 Word、Excel、PowerPoint 中分别操作。请打开普通空白文档，在“主页 → 加载项 → 高级 / 更多加载项”查看“共享文件夹”；“文件 → 选项 → 加载项”中的 COM 加载项列表不是此入口。
+
+若某个应用仍没有“共享文件夹”，在该应用打开“文件 → 选项 → 信任中心 → 信任中心设置 → 受信任的加载项目录”，检查是否存在与可用应用相同的目录，并勾选“显示在菜单中”。注册目录前须保存文档并关闭所有 Office 应用；新版安装器会检查当前会话中仍运行的三个宿主，不强制关闭文档。`Restart` 只重启本机服务，可在 Office 开着时使用。参见[微软共享目录旁加载步骤](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins)。
+
+包内 `Diagnose.cmd` 可在 Office 打开时运行，不需要管理员授权，也不改动目录、缓存、策略或模型配置。报告只包含检测到的 Office 版本、运行中的应用名称，以及在线版 / 本机共享版的以下状态，不包含用户名、计算机名、共享路径、模型密钥或文档内容：
+
+| 字段 | 含义 |
+| --- | --- |
+| `registered` / `urlMatches` | 当前账号的目录 ID、路径是否与本安装匹配 |
+| `showInMenu` | 注册项是否启用了目录菜单显示 |
+| `reachable` | 当前账号能否读取本机共享目录中的清单 |
+| `manifest.Word` / `Excel` / `PowerPoint` | 实际安装的清单是否声明了对应应用 |
+| `detectedVersions` | 从应用注册信息读取的文件版本；`not detected` 表示未能自动识别，不等于没有安装 |
+
+目录字段均通过，仍不能证明 Office 界面已加载成功。若重开后仍不可见，保留这份诊断结果及应用内“关于”的产品版本，继续核对对应宿主的目录页面与策略；不要把该情况记录为验收通过。
 
 ### 从源码运行（开发者）
 
@@ -71,7 +89,7 @@ npm run manifest:local
 
 **Windows 的“共享文件夹”不等于“本机共享模型”。** 它只是加载项安装目录，在线版也能通过它安装。判断依据是模型设置页显示“本机共享”，而不是“仅此应用”。
 
-若连接时报“无法连接模型服务……CORS……本机代理”，表示当前使用浏览器直连流程。请在运行 Office 的同一电脑、同一系统账号下安装上方本机共享 ZIP，并重新选择“本机共享”入口。源码开发者可执行 `npm run manifest:local`（Windows）或 `npm run sideload:mac`（Mac）。不要安装仓库原始清单、在线版清单或另一台电脑生成的私有清单。保存文档并完全退出、重开 Office，选择名称含“本机共享”的加载项，；安装版服务自动随登录启动，源码开发者需保持 `npm start` 运行。
+若连接时报“无法连接模型服务……CORS……本机代理”，表示当前使用浏览器直连流程。请在运行 Office 的同一电脑、同一系统账号下安装上方本机共享 ZIP，并重新选择“本机共享”入口。源码开发者可执行 `npm run manifest:local`（Windows）或 `npm run sideload:mac`（Mac）。不要安装仓库原始清单、在线版清单或另一台电脑生成的私有清单。保存文档并完全退出、重开 Office，选择名称含“本机共享”的加载项；安装版服务自动随登录启动，源码开发者需保持 `npm start` 运行。
 
 确认共享模式后，可在运行 TrioBridge 本机服务的电脑上用 Node.js 检查 API 是否可达（不发送密钥，不修改配置）：
 
