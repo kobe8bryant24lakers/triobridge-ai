@@ -64,10 +64,11 @@ function Protect-NewManifest([string]$Path) {
 function Get-OwnedTask {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($task) {
+        $prefix = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $Root 'versions\')
+        $argumentsPattern = '^' + [Regex]::Escape($prefix) + '\d+\.\d+\.\d+-[a-f0-9]{12}(-[a-f0-9]{8})?' + [Regex]::Escape('\app\scripts\start-installed.ps1"') + '$'
         if ($task.Description -ne $taskDescription -or @($task.Actions).Count -ne 1 -or
-            -not $task.Actions[0].Execute.StartsWith((Join-Path $Root 'versions\'), [StringComparison]::OrdinalIgnoreCase) -or
-            -not $task.Actions[0].Execute.EndsWith('\runtime\node.exe', [StringComparison]::OrdinalIgnoreCase) -or
-            -not $task.Actions[0].Arguments.EndsWith('\app\scripts\serve-installed.mjs"', [StringComparison]::OrdinalIgnoreCase)) {
+            $task.Actions[0].Execute -ne (Join-Path $PSHOME 'powershell.exe') -or
+            $task.Actions[0].Arguments -notmatch $argumentsPattern) {
             throw 'An unrelated scheduled task uses the TrioBridge name. No changes were made.'
         }
     }
@@ -159,9 +160,9 @@ switch ($Action) {
         $null = Get-OwnedTask
         if ($state.active -notmatch '^\d+\.\d+\.\d+-[a-f0-9]{12}(-[a-f0-9]{8})?$') { throw 'Invalid active release.' }
         $version = Join-Path $Root ('versions\' + $state.active)
-        $executable = Join-Path $version 'runtime\node.exe'
-        $entry = Join-Path $version 'app\scripts\serve-installed.mjs'
-        $actionDefinition = New-ScheduledTaskAction -Execute $executable -Argument ('"' + $entry + '"') -WorkingDirectory (Join-Path $version 'app')
+        $executable = Join-Path $PSHOME 'powershell.exe'
+        $entry = Join-Path $version 'app\scripts\start-installed.ps1'
+        $actionDefinition = New-ScheduledTaskAction -Execute $executable -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $entry + '"') -WorkingDirectory (Join-Path $version 'app')
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $account
         $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
         $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew

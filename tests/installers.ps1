@@ -9,7 +9,7 @@ foreach ($file in @('Manage.ps1', 'Share.ps1')) {
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $templates $file), [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 }
-foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1')) {
+foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1', 'start-installed.ps1')) {
     $tokens = $null
     $parseErrors = $null
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root ('scripts/' + $file)), [ref]$tokens, [ref]$parseErrors)

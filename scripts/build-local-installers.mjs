@@ -38,6 +38,7 @@ const runtimeScripts = [
   'native-local.ps1',
   'local-catalog-share.ps1',
   'uninstall-local.ps1',
+  'start-installed.ps1',
 ];
 
 export const localInstallerName = (platform, arch) =>
