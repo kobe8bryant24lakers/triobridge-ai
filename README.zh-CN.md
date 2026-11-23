@@ -4,21 +4,30 @@
 
 让 Word、Excel、PowerPoint 连接你自己的 AI 模型。
 
-**v0.3.0** 新增 Word 结构化报告、Excel 数据表、PowerPoint 大纲编辑，以及本机三应用共享的多模型配置。[更新记录](CHANGELOG.md#030--2026-11-23) · [同机配置一次](docs/LOCAL-MODELS.md)
+**v0.4.0** 提供自带运行环境的本机共享安装包。同一电脑、同一系统账号配置一次，Word、Excel、PowerPoint 复用多模型及默认选择；支持 `http://127.0.0.1:8001/v1` 等本地 API。[更新记录](CHANGELOG.md#040--2026-11-23) · [共享与迁移](docs/LOCAL-MODELS.md)
 
-TrioBridge AI 是面向 **Mac 和 Windows** 的 Office 任务窗格加载项，使用 React、TypeScript 和 Office.js。具备所需 WebView 和 API 的 Office 永久授权版也可以使用，无需 Microsoft 365 订阅。
+## 下载与安装
 
-[功能介绍与 Mac / Windows 安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html) · [免密钥浏览器演示](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [下载在线版清单](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/latest/download/manifest.xml)
+| 电脑 | 本机共享版安装包 |
+| --- | --- |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
-**快速安装在线版**（个人测试旁加载，无需 Node.js、本机服务或开发证书）：
+1. 先保存文档并完全退出 Word、Excel、PowerPoint，再解压完整文件夹，双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`。无需另外安装 Node.js 或输入命令。安装器配置本机服务、HTTPS 证书和三应用清单；Windows 创建当前账号专用共享目录时请求管理员授权。
+2. 按系统提示完成安装，重开 Office。在每个应用的“主页 → 加载项”分别添加 **三桥 AI（本机共享）**；Windows 从“高级 / 更多加载项 → 共享文件夹”添加。模型设置页应显示 **本机共享**。
+3. 在任一应用新增模型并“连接并保存”。本地 API 无需鉴权时选择“不使用密钥”。其余应用可复用，无需重复填写，密钥保存在系统安全存储。
 
-1. 在[安装页](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)下载对应系统的 ZIP，解压后双击 Mac 的 `Install.command` 或 Windows 的 `Install.cmd`。Windows 需解压整个文件夹，按系统提示批准创建专用共享目录。
-2. 保存文档并完全退出 Office。重新打开后，在「主页 → 加载项」选择「TrioBridge AI · 三桥 AI（在线版）」；Windows 从「高级 / 更多加载项 → 共享文件夹」添加。
-3. 在「模型设置」选择服务、填入 API Key，点击「连接并保存」。常用服务自动填写地址与模型，其他参数在高级设置中。
+服务随当前账号登录启动，安装完成后可以关闭安装窗口。再次运行新版 `Install` 可升级或修复；`Restart` 重启服务；`Uninstall` 移除本次安装的服务、证书和入口，**保留模型配置与密钥**。需要删除模型时在插件内操作。
 
-安装包尚未签名，首次运行可能被系统拦截。Mac 可按「系统设置 → 隐私与安全性」中的提示允许；受组织策略限制时使用[手动安装指南](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)或联系管理员。Windows 自动安装仍待实机验证。共享目录旁加载是微软的测试方式，正式分发应采用 Office 商店或组织部署。
+Windows 只有部分应用显示加载项时，运行 `Diagnose.cmd`，只读检查应用版本、目录注册 / 可达性和三应用声明，不读取模型密钥或文档。[按应用排查入口](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项)。
 
-移除安装文件：运行包内的 `Uninstall.command` / `Uninstall.cmd`。只移除三桥在线版自己的清单和目录登记，不清理其他加载项、Office 缓存或模型数据。需要清除密钥时，请先在插件内删除配置。开发版和在线版使用不同清单文件名，可并存。
+安装包尚未签名，首次运行可能需要系统确认。Mac 可按“系统设置 → 隐私与安全性”提示允许；Office 数据访问和证书信任需按系统提示处理。首次使用已存密钥或升级后，macOS 也可能请求允许本机服务访问钥匙串；在系统窗口确认后重试，无需重新填写密钥。组织策略可能限制旁加载。Windows 原生 Office 验收仍待完成。[完整安装与故障处理](docs/LOCAL-MODELS.md)。
+
+[浏览器演示（无需密钥）](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [功能与下载页面](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)
+
+**在线版仍可选用**：下载页单独提供在线 ZIP 与 XML 清单，从网站加载工作台，各应用独立保存配置，模型 API 需允许 CORS。Windows 的“共享文件夹”只是安装入口，不代表配置共享。访问本地 HTTP API 或复用模型配置，请选择上面的本机共享版。
 
 ## 已实现功能
 
@@ -64,6 +73,8 @@ TrioBridge AI 是面向 **Mac 和 Windows** 的 Office 任务窗格加载项，�
 **实机验证**覆盖 Mac 版 Word、Excel 和 PowerPoint 的选区读取、生成预览和写入。三类 Mac 应用均已使用配置的真实 OpenAI 模型完成复杂内容生成、原生写入、保存文件核对与重开；早期固定回包检查单独记录。Windows 和不同永久授权版本仍待实机验证。见[版本与测试记录](docs/TESTING.md)。
 
 2026-11-21 至 11-23 完成 Mac 原生验收：真实模型生成六节两表的 Word 报告、含 41 个公式且经过原生重算的 Excel 工作簿，以及在三页原稿后追加十页的 PowerPoint。另有固定回包压力案例覆盖 Excel 48 行、96 个公式和 PPT 12 页密集中文。共享版也验证了跨应用切换、并发冲突、离线恢复与正式构建重开。记录包含 284 项回归检查、810 项保存文件检查，复杂 Word/PPT 的 PDF 全部逐页复核。详见[验证范围与证据](docs/TESTING.md)。Windows 原生验收仍待完成；其他版本、受保护文件和模板需独立验证。
+
+v0.4.0 安装包另完成三款原生 Mac 应用的真实模型验收：两页报告、24 行且含 96 个原生计算公式的订单表、保留六页原稿并追加五页演示。三个文件均成功重开，337 项保存文件检查通过；当前自动回归共 303 项通过。[安装包验收与 Windows 待验范围](docs/TESTING.md)。
 
 ## 复杂文档工作流
 
@@ -135,7 +146,9 @@ npm run sideload:mac
 1. 运行 `npm run manifest:local`，将命令生成的私有清单放入专用目录，例如 `C:\OfficeAddins\TrioBridge`。这份文件只用于本机当前账号，不应分发；见[同机共享配置](docs/LOCAL-MODELS.md)。
 2. 在文件夹属性中设置网络共享，仅向自己的账号授予所需读写权限，取得 UNC 地址，例如 `\\YOUR-PC\TrioBridge`。
 3. 在 Office 的 **文件 → 选项 → 信任中心 → 信任中心设置 → 受信任的加载项目录** 中添加 UNC 地址，勾选“在菜单中显示”。
-4. 重启 Office，在 **插入 → 我的加载项 → 共享文件夹** 中选择 TrioBridge AI。入口文字可能因版本而异。
+4. 保存文档并完全退出、重开 Office，在 **插入 → 我的加载项 → 共享文件夹** 中选择 **TrioBridge AI · 三桥 AI（本机共享）**。模型设置页应显示 **本机共享**。
+
+Windows 的“共享文件夹”只是加载项安装目录，不等于模型配置共享。在线版 ZIP 也使用此入口。请安装上一步生成的 `triobridge-ai.xml`，不要使用仓库根目录的原始 `manifest.xml` 或在线版清单。若连接本地 API 时仍出现包含 CORS 的直连报错，请检查是否打开了旧入口；见[本地 API 排查](docs/LOCAL-MODELS.md#本地-http-api-与连接排查)。
 
 清单中的 `localhost` 指运行 Office 的电脑，HTTPS 服务和证书必须配置在同一台电脑。共享文件夹目录用于开发测试，不是正式生产分发渠道。
 
@@ -185,7 +198,7 @@ npm run test:pages        # 构建并验证静态站点、在线工作台及清�
 npm run manifest:validate  # 微软验证器，需要网络
 ```
 
-GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.1.0.0`，应用版本为 `0.3.0`。
+GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.1.0.0`，应用版本为 `0.4.0`。
 
 ```text
 src/core/          任务、模型客户端、结果校验、配置存储
@@ -197,6 +210,8 @@ manifest.xml       三应用共用 XML 清单
 ```
 
 ## 部署与限制
+
+本机共享包通过 GitHub Releases 分发。在对应操作系统上运行 `npm run build:local`，在 `dist-local/` 生成当前架构的包。CI 分别构建 Mac / Windows 的 x64 / ARM64；运行时来自带固定校验值的 Node.js 官方下载，原生凭据模块按锁文件完整性校验。发布包不含用户证书、密钥、私有清单或 `.env`，这些数据在目标电脑生成。
 
 在线版通过本仓库的 GitHub Pages 分发。运行 `npm run build:pages` 可在 `dist-pages/` 生成安装指南、`app/` 工作台、在线清单，以及 `install/TrioBridge-AI-Mac.zip` 和 `install/TrioBridge-AI-Windows.zip`。安装包构建需在配有 `zip` 命令的 macOS / Linux 上运行（CI 已具备）；终端用户无需这些构建工具。每个包仅包含安装 / 卸载脚本、说明和固定在线清单，不含密钥、证书或 `.env`。合并到 `main` 后，检查通过的构建由 GitHub Actions 部署到 Pages。版本清单见 [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases)。
 

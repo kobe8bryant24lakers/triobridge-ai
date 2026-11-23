@@ -32,12 +32,14 @@ test('downloadable packages install, update and remove only the hosted Mac add-i
     assert.ok((await stat(join(mac, 'Uninstall.command'))).mode & 0o111);
     const windows = join(temporary, 'TrioBridge-AI-Windows');
     assert.deepEqual((await readdir(windows)).sort(), [
+      'Diagnose.cmd',
       'Install.cmd',
       'Manage.ps1',
       'README.txt',
       'Share.ps1',
       'Uninstall.cmd',
       'manifest.xml',
+      'windows-office-discovery.ps1',
     ]);
     assert.equal(await readFile(join(windows, 'manifest.xml'), 'utf8'), manifest);
     assert.doesNotMatch(

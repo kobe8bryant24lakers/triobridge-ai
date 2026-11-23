@@ -61,11 +61,12 @@ export async function preflightLocalManifest(destination) {
 /** These files contain an installation capability, not a model key; keep them private. */
 export async function writePrivateLocalManifest(destination, manifest) {
   await preflightLocalManifest(destination);
-  await mkdir(dirname(destination), { recursive: true });
-  await enforcePrivatePath(dirname(destination), 'directory');
+  const created = await mkdir(dirname(destination), { recursive: true });
+  await enforcePrivatePath(dirname(destination), 'directory', { created: created !== undefined });
   const temporary = join(dirname(destination), `.triobridge-${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, manifest, { mode: 0o600, flag: 'wx' });
+    await enforcePrivatePath(temporary, 'file', { created: true });
     await rename(temporary, destination);
     await enforcePrivatePath(destination, 'file');
   } finally {

@@ -5,7 +5,7 @@ import type {
   SharedModelProfile,
 } from './types';
 import { validateProfile } from './model-client';
-import { getLocalCapability } from './local-capability';
+import { getLocalCapability, requiresLocalSharedMode } from './local-capability';
 import {
   createSharedModelClient,
   SharedModelClientError,
@@ -188,6 +188,7 @@ interface ControllerOptions {
   local?: Storage;
   session?: Storage;
   pollMilliseconds?: number;
+  requireShared?: boolean;
 }
 
 function availableStorage(name: 'localStorage' | 'sessionStorage'): Storage {
@@ -216,10 +217,12 @@ export function createProfileController(options: ControllerOptions = {}) {
   const local = options.local ?? availableStorage('localStorage');
   const session = options.session ?? availableStorage('sessionStorage');
   const capability = options.capability ?? getLocalCapability;
+  const requireShared = options.requireShared ?? requiresLocalSharedMode();
   const client = createSharedModelClient(options.fetcher ?? fetch, capability);
-  let state: ProfileState = capability()
-    ? { mode: 'checking', profiles: [], activeId: '' }
-    : loadProfiles(local, session);
+  let state: ProfileState =
+    capability() || requireShared
+      ? { mode: 'checking', profiles: [], activeId: '' }
+      : loadProfiles(local, session);
   const subscribers = new Set<() => void>();
   let lifetime: AbortController | undefined;
   let interval: ReturnType<typeof setInterval> | undefined;
@@ -256,7 +259,10 @@ export function createProfileController(options: ControllerOptions = {}) {
       storage: previous?.storage,
       connection: 'offline',
       legacyAvailable: hasLegacyProfiles(local),
-      warning: '本机共享服务暂时未连接。已保留共享配置，请恢复本机服务后重试；未切换到旧本地密钥。',
+      warning:
+        error instanceof SharedModelClientError && ['capability', 'local_auth'].includes(error.code)
+          ? '本机共享入口缺少有效的安装凭证。请重新运行本机共享安装包中的 Install，保存文档并完全退出、重开 Office。旧模型配置未修改。'
+          : '本机共享服务暂时未连接。请双击本机共享安装包中的 Restart，恢复后重试。已保留共享配置，未切换到旧本地密钥。',
     });
   }
   async function refresh(signal?: AbortSignal): Promise<SharedProfileState> {
@@ -268,7 +274,7 @@ export function createProfileController(options: ControllerOptions = {}) {
     }
   }
   function backgroundRefresh() {
-    if (!capability() || refreshing) return;
+    if ((!capability() && !requireShared) || refreshing) return;
     const pending = refresh().finally(() => {
       if (refreshing === pending) refreshing = undefined;
     });
@@ -288,7 +294,14 @@ export function createProfileController(options: ControllerOptions = {}) {
       if (error instanceof SharedModelClientError && error.state) apply(error.state);
       else if (
         !(error instanceof SharedModelClientError) ||
-        ['storage', 'unavailable', 'local_auth', 'local_timeout'].includes(error.code)
+        [
+          'storage',
+          'unavailable',
+          'local_auth',
+          'local_timeout',
+          'local_network',
+          'capability',
+        ].includes(error.code)
       )
         offline(error);
       throw error;
@@ -398,7 +411,7 @@ export function createProfileController(options: ControllerOptions = {}) {
     start() {
       if (lifetime) return;
       lifetime = new AbortController();
-      if (!capability()) return;
+      if (!capability() && !requireShared) return;
       backgroundRefresh();
       interval = setInterval(backgroundRefresh, options.pollMilliseconds ?? 5000);
       document.addEventListener('visibilitychange', onVisible);

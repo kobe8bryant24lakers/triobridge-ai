@@ -4,21 +4,30 @@
 
 Connect Word, Excel, and PowerPoint to your own AI models.
 
-**v0.3.0** adds structured Word reports, Excel data tables, editable PowerPoint outlines, and multiple models shared across local Office apps. [Release notes](CHANGELOG.md#030--2026-11-23) · [Configure once on this computer](docs/LOCAL-MODELS.md)
+**v0.4.0** adds self-contained local shared installers. Configure multiple models once for Word, Excel, and PowerPoint on the same computer and OS account, including local APIs such as `http://127.0.0.1:8001/v1`. [Release notes](CHANGELOG.md#040--2026-11-23) · [Sharing and migration](docs/LOCAL-MODELS.md)
 
-TrioBridge AI is an Office task pane add-in for **Mac and Windows**, built with React, TypeScript, and Office.js. Perpetually licensed Office editions with the required WebView and APIs can also use it; a Microsoft 365 subscription is not required.
+## Download and install
 
-[Features and Mac / Windows installation guide](https://kobe8bryant24lakers.github.io/triobridge-ai/) · [Browser demo without an API key](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [Download the hosted manifest](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/latest/download/manifest.xml)
+| Computer | Local shared package |
+| --- | --- |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
-**Quick installation of the hosted version** (sideloading for personal testing; no Node.js, local server, or development certificate required):
+1. Save documents and completely close Word, Excel and PowerPoint. Extract the entire folder and double-click `Install.cmd` on Windows or `Install.command` on Mac. No separate Node.js or commands required. The installer sets up the local service, HTTPS certificate, and all three add-in entries. Windows requests administrator authorization for a dedicated catalog share.
+2. Follow system prompts, then reopen Office. Add **三桥 AI（本机共享）** separately in each app under Home → Add-ins; on Windows use Advanced / More Add-ins → Shared Folder. Model settings should show **本机共享** (local shared).
+3. Add a model in any app and choose Connect and save (连接并保存). For a local API without authentication, choose No key (不使用密钥). Other Office apps reuse the profile and its OS-stored key.
 
-1. Download the ZIP for your operating system from the [installation page](https://kobe8bryant24lakers.github.io/triobridge-ai/#install), extract it, and double-click `Install.command` on Mac or `Install.cmd` on Windows. On Windows, extract the entire folder and approve the system prompt to create a dedicated shared directory.
-2. Save your documents and quit Office completely. Reopen Office and select **TrioBridge AI · 三桥 AI（在线版）** under **Home → Add-ins**. On Windows, add it through **Advanced / More Add-ins → Shared Folder**.
-3. In **Model settings (模型设置)**, select a provider, enter your API key, and click **Connect and save (连接并保存)**. Common providers have preset URLs and models; other options are available in advanced settings.
+The service starts at sign-in; close the installation window after setup. Run a new package’s `Install` to upgrade or repair, `Restart` to restart, or `Uninstall` to remove the installed service, certificate, and entries. **Uninstall preserves model profiles and keys**; delete models inside the add-in when needed.
 
-The installers are unsigned and may be blocked on first launch. On Mac, follow the prompt in **System Settings → Privacy & Security** to allow execution. If organizational policies restrict installation, use the [manual installation guide](https://kobe8bryant24lakers.github.io/triobridge-ai/#install) or contact your administrator. The Windows automatic installer still requires verification on a physical machine. Shared-folder sideloading is a Microsoft testing method; production distribution should use the Office Store or organizational deployment.
+If a Windows app cannot see the entry, run `Diagnose.cmd` for a read-only check of Office versions, catalog registration/access and all three manifest hosts. It does not read model keys or documents. [Per-app discovery troubleshooting](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项).
 
-To remove the installation, run `Uninstall.command` / `Uninstall.cmd` from the package. This removes only TrioBridge's hosted manifest and directory registration; it does not clear other add-ins, Office caches, or model data. To remove saved keys, delete the configuration inside the add-in first. The development and hosted versions use different manifest filenames and can coexist.
+Packages are unsigned and may require system confirmation. On Mac, follow System Settings → Privacy & Security if execution is blocked, and handle macOS Office-data access and certificate prompts. First use of a saved key or an upgrade may also prompt for Keychain access by the local service; complete that system prompt and retry without entering the key again. Organizational policies may restrict sideloading. Native Windows Office acceptance remains pending. [Setup and troubleshooting](docs/LOCAL-MODELS.md).
+
+[Browser demo without a key](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [Features and downloads](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)
+
+**The hosted edition remains available** in a separate section of the installation page. Its ZIPs and XML load the workbench from the website, keep separate settings in each app, and require model APIs to allow CORS. Windows “Shared Folder” is an installation catalog, not proof of shared settings. Use the local shared package above for local HTTP APIs or shared models.
 
 ## Features
 
@@ -64,6 +73,8 @@ The baseline engine target is ES2020 / Safari 15.4+, with modern WebView2 requir
 **Testing in native Office applications** covers selection reading, generated previews, and writing in Mac versions of Word, Excel, and PowerPoint. All three Mac applications have now been tested end to end with the configured real OpenAI model, including structured output, native write-back, saved-file verification, and reopening. The earlier fixed-response checks remain separately identified. Windows and different perpetual-license editions still require testing on physical machines. See the [version and testing records](docs/TESTING.md).
 
 Native Mac acceptance completed on November 21–23, 2026. Real-model cases include a six-section Word report with two tables, an Excel workbook with 41 formulas and native recalculation, and ten PowerPoint slides appended to a three-slide original. Separate fixed-response stress cases cover 48 Excel rows with 96 formulas and twelve dense PowerPoint slides. The shared edition was also checked for cross-app switching, conflicting edits, offline recovery, and production-build reopening. The recorded regression suite has 284 passing checks, with 810 additional saved-file assertions and every page of the complex Word/PPT PDFs reviewed. See the [test scope and evidence](docs/TESTING.md). Windows native acceptance remains pending; other versions, protected files, and templates require separate verification.
+
+The v0.4.0 installer was additionally tested in all three native Mac apps with saved real-model settings: a two-page report, a 24-row order sheet with 96 checked native formula results, and five slides appended while retaining six originals. All files reopened successfully; 337 saved-file assertions passed. The current automated suite passes 303 checks. [Installer acceptance and remaining Windows validation](docs/TESTING.md).
 
 ## Complex document workflows
 
@@ -135,7 +146,9 @@ Official instructions: [Sideload on Mac](https://learn.microsoft.com/en-us/offic
 1. Run `npm run manifest:local`, then copy the generated private manifest into a dedicated directory such as `C:\OfficeAddins\TrioBridge`. Keep this installation-specific file private; see [shared model setup](docs/LOCAL-MODELS.md).
 2. Enable network sharing in the folder's properties, grant only your own account the required read/write permissions, and obtain the UNC address, such as `\\YOUR-PC\TrioBridge`.
 3. In Office, go to **File → Options → Trust Center → Trust Center Settings → Trusted Add-in Catalogs**, add the UNC address, and enable **Show in Menu**.
-4. Restart Office and select TrioBridge AI under **Insert → My Add-ins → Shared Folder**. Labels may vary by version.
+4. Save your documents and fully quit and reopen Office. Select **TrioBridge AI · 三桥 AI（本机共享）** under **Insert → My Add-ins → Shared Folder**. Model settings must show **本机共享** (shared on this computer).
+
+Windows **Shared Folder** is an add-in installation catalog, not a model-sharing mode. The online ZIP also uses this catalog. Install the generated `triobridge-ai.xml`, not the repository's raw `manifest.xml` or the hosted manifest. A local API failure mentioning browser CORS indicates a direct-call entry; check for an old entry and follow [local API troubleshooting](docs/LOCAL-MODELS.md#本地-http-api-与连接排查).
 
 The manifest's `localhost` refers to the computer running Office. The HTTPS server and certificate must be configured on that same computer. Shared-folder catalogs are for development testing, not production distribution.
 
@@ -185,7 +198,7 @@ npm run test:pages         # Build and verify the static site, hosted workbench,
 npm run manifest:validate # Microsoft validator; requires network access
 ```
 
-GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest version is `1.1.0.0`; the application version is `0.3.0`.
+GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest version is `1.1.0.0`; the application version is `0.4.0`.
 
 ```text
 src/core/          Tasks, model client, result validation, configuration storage
@@ -197,6 +210,8 @@ manifest.xml       Shared XML manifest for all three applications
 ```
 
 ## Deployment and limitations
+
+Local shared packages are distributed through GitHub Releases. Run `npm run build:local` on the target operating system to create the current architecture’s package in `dist-local/`. CI builds x64 and ARM64 for Mac and Windows. The bundled Node.js runtime uses pinned official checksums; native credential modules are verified against the lockfile. Packages exclude user certificates, keys, private manifests, and `.env`; private installation data is generated on the target computer.
 
 The hosted version is distributed through this repository's GitHub Pages site. Run `npm run build:pages` to generate the installation guide, `app/` workbench, hosted manifest, `install/TrioBridge-AI-Mac.zip`, and `install/TrioBridge-AI-Windows.zip` in `dist-pages/`. Installer builds require macOS / Linux with the `zip` command available (as configured in CI); end users do not need these build tools. Each package contains only installation / uninstallation scripts, instructions, and the fixed hosted manifest, without keys, certificates, or `.env`. After merging into `main`, GitHub Actions deploys builds that pass the checks to Pages. See [GitHub Releases](https://github.com/kobe8bryant24lakers/triobridge-ai/releases) for release manifests.
 

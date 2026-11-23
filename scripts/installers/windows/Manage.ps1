@@ -1,6 +1,7 @@
 param([ValidateSet('Install', 'Remove')][string]$Action = 'Install')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'windows-office-discovery.ps1')
 
 function Assert-OwnManifest([string]$Path) {
     if (Test-Path -LiteralPath $Path) {
@@ -30,6 +31,7 @@ function Invoke-ShareSetup([string]$ShareAction) {
 }
 
 try {
+    Assert-TrioBridgeOfficeClosed
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $account = $identity.Name
     $shareName = 'TrioBridgeAI-' + $identity.User.Value + '$'
@@ -83,7 +85,7 @@ try {
         New-ItemProperty -LiteralPath $registryPath -Name Id -Value $catalogId -PropertyType String -Force | Out-Null
         New-ItemProperty -LiteralPath $registryPath -Name Url -Value $catalogUrl -PropertyType String -Force | Out-Null
         New-ItemProperty -LiteralPath $registryPath -Name Flags -Value 1 -PropertyType DWord -Force | Out-Null
-        Write-Host 'Installed. Save your documents and restart Word, Excel or PowerPoint.'
+        Write-Host 'Installed. Reopen Word, Excel and PowerPoint; add the entry separately in each application.'
         Write-Host 'Go to Home > Add-ins > More Add-ins / Advanced > Shared Folder, then add TrioBridge AI (Online).'
         Write-Host 'In Model settings, choose a provider, paste your API key, and connect.'
     }

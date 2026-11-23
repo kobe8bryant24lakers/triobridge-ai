@@ -225,11 +225,17 @@ export function createSharedModelClient(
             : 'network';
       if (timedOut)
         throw new SharedModelClientError(
-          '本机共享服务响应超时，请检查服务后重试。',
+          connection
+            ? '连接等待超时。若系统正在请求密钥访问，请在系统窗口确认后重试；否则检查本机服务。本次修改尚未确认保存，请重新连接后核对配置。'
+            : '本机共享服务响应超时，请检查服务后重试。',
           'local_timeout',
         );
       if (signal?.aborted) throw new DOMException('已取消操作。', 'AbortError');
-      throw error;
+      if (error instanceof SharedModelClientError) throw error;
+      throw new SharedModelClientError(
+        '无法连接 TrioBridge 本机共享服务。请双击本机共享安装包中的 Restart，重启后重试。本次修改尚未确认保存，请重新连接后核对配置。',
+        'local_network',
+      );
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);

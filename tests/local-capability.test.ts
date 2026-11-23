@@ -3,6 +3,7 @@ import {
   bootstrapLocalCapability,
   getLocalCapability,
   isLocalSharedOrigin,
+  requiresLocalSharedMode,
 } from '../src/core/local-capability';
 
 const token = 'synthetic_capability_'.padEnd(43, 'x');
@@ -15,6 +16,17 @@ function context(origin = 'https://localhost:3000', fragment = `#local-token=${t
 }
 
 describe('per-user local capability bootstrap', () => {
+  it('requires shared mode for local Office entries even when their token is missing', () => {
+    for (const origin of ['https://localhost:3000', 'https://127.0.0.1:3000', 'https://[::1]:3000'])
+      expect(requiresLocalSharedMode({ origin, search: '?office=1' })).toBe(true);
+    for (const location of [
+      { origin: 'https://example.com', search: '?office=1' },
+      { origin: 'https://localhost.evil.test', search: '?office=1' },
+      { origin: 'http://localhost:3000', search: '?office=1' },
+      { origin: 'https://localhost:3000', search: '' },
+    ])
+      expect(requiresLocalSharedMode(location)).toBe(false);
+  });
   it('consumes the fragment before use and only retains it in session storage', () => {
     const target = context();
     bootstrapLocalCapability(target);

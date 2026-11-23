@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
 
 export async function ensurePrivateModelDirectory(directory) {
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  await enforcePrivatePath(directory, 'directory');
+  const created = await mkdir(directory, { recursive: true, mode: 0o700 });
+  await enforcePrivatePath(directory, 'directory', { created: created !== undefined });
 }
 
 /** Provision once per OS-user installation. Never place this token in logs or command arguments. */
@@ -28,6 +28,7 @@ export async function getOrCreateLocalCapability(directory) {
       await handle.sync();
       await handle.close();
       handle = undefined;
+      await enforcePrivatePath(temporary, 'file', { created: true });
       // Atomic create-without-replace: another process never observes a half-written capability.
       try {
         await link(temporary, file);

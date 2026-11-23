@@ -5,6 +5,13 @@ import { join } from 'node:path';
 export function tlsOptions(env = process.env) {
   const certDir = join(homedir(), '.office-addin-dev-certs');
   try {
+    if (env.TLS_PFX_PATH)
+      return {
+        pfx: readFileSync(env.TLS_PFX_PATH),
+        ...(env.TLS_PFX_PASSWORD_PATH
+          ? { passphrase: readFileSync(env.TLS_PFX_PASSWORD_PATH, 'utf8').trim() }
+          : {}),
+      };
     return {
       key: readFileSync(env.TLS_KEY_PATH || join(certDir, 'localhost.key')),
       cert: readFileSync(env.TLS_CERT_PATH || join(certDir, 'localhost.crt')),

@@ -1,8 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-export function tlsOptions(env?: NodeJS.ProcessEnv): {
-  key: Buffer;
-  cert: Buffer;
-};
+import type { ServerOptions } from 'node:https';
+export function tlsOptions(env?: NodeJS.ProcessEnv): ServerOptions;
 export function createProxy(
   target: string | undefined,
   allowedOrigin: string,

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createNativeModelVault } from './shared-model-vault.mjs';
 import { ensurePrivateModelDirectory } from './local-capability.mjs';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
+import { modelConnectionError } from './model-connection-error.mjs';
 
 export class SharedModelError extends Error {
   constructor(code, message, status = 400, state) {
@@ -280,7 +281,7 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
       fail('timeout', `请求超过 ${profile.timeoutSeconds} 秒，请重试或增加超时时间。`, 504);
     if (signal?.aborted) fail('cancelled', '已取消生成。', 499);
     if (error instanceof SharedModelError) throw error;
-    fail('network', '无法连接已保存的模型服务，请检查网络和服务地址。', 502);
+    fail('network', redact(modelConnectionError(error, endpoint), secret), 502);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', abort);
@@ -389,6 +390,7 @@ export function createSharedModelStore({
       await handle.sync();
       await handle.close();
       handle = undefined;
+      await enforcePrivatePath(temporary, 'file', { created: true });
       await rename(temporary, file);
     } catch {
       fail('storage', '无法保存共享配置，请检查本机目录权限和可用空间。', 503);

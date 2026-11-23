@@ -81,6 +81,105 @@ async function fixture(
   return { store, keys, request, origin, port };
 }
 
+test('connect-and-save and generation reach a real loopback HTTP API without browser CORS', async (t) => {
+  const requests = [];
+  const api = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push({
+      path: req.url,
+      headers: req.headers,
+      body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+    });
+    res.setHeader('Content-Type', 'application/json');
+    // Deliberately no CORS headers: only the local Node service should call this API.
+    res.end(JSON.stringify({ choices: [{ message: { content: 'synthetic transport OK' } }] }));
+  });
+  api.listen(0, '127.0.0.1');
+  await once(api, 'listening');
+  t.after(async () => {
+    api.closeAllConnections();
+    await new Promise((resolve) => api.close(resolve));
+  });
+  const baseUrl = `http://127.0.0.1:${api.address().port}/v1`;
+  for (const withKey of [false, true]) {
+    await t.test(
+      withKey ? 'with a saved key and full endpoint' : 'without authentication',
+      async (t) => {
+        const { request, keys } = await fixture(t, fetch);
+        const saved = await request('upsert', {
+          expectedRevision: 0,
+          profile: { ...profile, baseUrl: withKey ? `${baseUrl}/chat/completions/` : baseUrl },
+          credential: withKey
+            ? { action: 'replace', value: 'synthetic-api-key' }
+            : { action: 'remove' },
+          testConnection: true,
+          activate: true,
+        });
+        assert.equal(saved.status, 200);
+        const state = await saved.json();
+        assert.equal(state.profiles[0].hasKey, withKey);
+        assert.equal(keys.size, withKey ? 1 : 0);
+        assert.equal(JSON.stringify(state).includes('synthetic-api-key'), false);
+        const completion = await request('complete', {
+          profileId: profile.id,
+          profileRevision: state.profiles[0].revision,
+          messages: [{ role: 'user', content: 'synthetic document' }],
+        });
+        assert.equal(completion.status, 200);
+        assert.equal(
+          (await completion.json()).choices[0].message.content,
+          'synthetic transport OK',
+        );
+        const recent = requests.slice(-2);
+        assert.deepEqual(
+          recent.map((r) => r.path),
+          ['/v1/chat/completions', '/v1/chat/completions'],
+        );
+        assert.deepEqual(
+          recent.map((r) => r.body.model),
+          [profile.model, profile.model],
+        );
+        assert.deepEqual(
+          recent.map((r) => r.body.stream),
+          [false, false],
+        );
+        assert.equal(recent[0].body.messages[0].content, 'Reply with OK.');
+        assert.equal(recent[1].body.messages[0].content, 'synthetic document');
+        for (const r of recent) {
+          assert.equal(r.headers.authorization, withKey ? 'Bearer synthetic-api-key' : undefined);
+          assert.equal(r.headers['x-triobridge-local-token'], undefined);
+          assert.equal(r.headers.origin, undefined);
+        }
+      },
+    );
+  }
+  assert.equal(requests.length, 4);
+});
+
+test('a refused local API connection explains the port and never saves the proposed key', async (t) => {
+  const api = createServer();
+  api.listen(0, '127.0.0.1');
+  await once(api, 'listening');
+  const port = api.address().port;
+  await new Promise((resolve) => api.close(resolve));
+  const { request, keys, store } = await fixture(t, fetch);
+  const response = await request('upsert', {
+    expectedRevision: 0,
+    profile: { ...profile, baseUrl: `http://127.0.0.1:${port}/v1` },
+    credential: { action: 'replace', value: 'synthetic-unsaved-key' },
+    testConnection: true,
+  });
+  assert.equal(response.status, 502);
+  const data = await response.json();
+  assert.equal(data.error.code, 'network');
+  assert.match(data.error.message, /ECONNREFUSED/);
+  assert.ok(data.error.message.includes(`127.0.0.1:${port}`));
+  assert.doesNotMatch(data.error.message, /CORS|synthetic-unsaved-key/);
+  assert.equal(keys.size, 0);
+  assert.equal((await store.state()).revision, 0);
+});
+
 test('same-origin shared API returns metadata and completion evidence without credentials', async (t) => {
   const { request } = await fixture(t);
   assert.equal((await request()).status, 200);

@@ -7,7 +7,22 @@ import {
   enforcePrivatePath,
   protectWindowsPath,
   WINDOWS_PRIVATE_ACL_SCRIPT,
+  windowsPowerShellEnvironment,
 } from '../scripts/private-local-permissions.mjs';
+
+test('Windows PowerShell reconstructs module paths inherited through Node from PowerShell 7', () => {
+  const environment = {
+    SystemRoot: 'C:\\Windows',
+    PSModulePath: 'incompatible-v7',
+    psMODULEpath: 'v7',
+    OTHER: 'keep',
+  };
+  assert.deepEqual(windowsPowerShellEnvironment(environment), {
+    SystemRoot: 'C:\\Windows',
+    OTHER: 'keep',
+  });
+  assert.equal(environment.PSModulePath, 'incompatible-v7');
+});
 
 test('Windows private ACL invocation uses a fixed script and passes only a literal path through environment', async () => {
   const path = "C:\\Users\\Synthetic User\\a'; Write-Host PWNED; #\\模型配置";
@@ -21,14 +36,15 @@ test('Windows private ACL invocation uses a fixed script and passes only a liter
   assert.deepEqual(calls[0][1], [
     '-NoProfile',
     '-NonInteractive',
-    '-Command',
-    WINDOWS_PRIVATE_ACL_SCRIPT,
+    '-EncodedCommand',
+    Buffer.from(WINDOWS_PRIVATE_ACL_SCRIPT, 'utf16le').toString('base64'),
   ]);
   assert.equal(calls[0][1].join(' ').includes(path), false);
   assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_PATH, path);
   assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_KIND, 'directory');
+  assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_CREATED, '0');
   assert.equal(calls[0][2].windowsHide, true);
-  assert.equal(calls[0][2].timeout, 15_000);
+  assert.equal(calls[0][2].timeout, 60_000);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /GetCurrent\(\)/);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /SetAccessRuleProtection\(\$true, \$false\)/);
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /'S-1-5-18', 'S-1-5-32-544'/);
@@ -36,6 +52,18 @@ test('Windows private ACL invocation uses a fixed script and passes only a liter
   assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /GetAccessRules/);
   assert.equal(WINDOWS_PRIVATE_ACL_SCRIPT.includes('apiKey'), false);
   assert.equal(WINDOWS_PRIVATE_ACL_SCRIPT.includes('local-token'), false);
+});
+
+test('only explicitly new files may adopt the elevated Windows creator group', async () => {
+  const calls = [];
+  const environment = { SystemRoot: 'C:\\Windows', TRIOBRIDGE_PRIVATE_CREATED: '1' };
+  const runner = async (...args) => calls.push(args);
+  await protectWindowsPath('C:\\existing', 'file', { environment, runner });
+  await protectWindowsPath('C:\\new', 'file', { environment, runner, created: true });
+  assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_CREATED, '0');
+  assert.equal(calls[1][2].env.TRIOBRIDGE_PRIVATE_CREATED, '1');
+  assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /\$fresh -and \$owner -eq 'S-1-5-32-544'/);
+  assert.match(WINDOWS_PRIVATE_ACL_SCRIPT, /IsInRole/);
 });
 
 test('Windows permission failures are sanitized and never silently fall back to chmod', async () => {

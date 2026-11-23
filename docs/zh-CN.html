@@ -120,21 +120,22 @@
       </section>
 
       <section class="section wrap" id="install" aria-labelledby="install-title">
-        <div class="section-heading"><h2 id="install-title">下载、双击，再打开 Office</h2><p>快速安装包自动放好清单。无需 Node.js、本机服务或开发证书，连接模型时选择服务并填入 API Key 即可。</p></div>
-        <p class="inline-note">这些 ZIP 安装的是在线版，三个 Office 应用各自保存模型配置。需要同一台电脑、同一系统账号配置一次并共享多模型时，请安装<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md">本机共享版</a>，并保持本机服务运行、使用本机专用清单。</p>
-        <p class="small-note"><strong>v0.3.0：</strong>结构化报告、公式数据表、逐页大纲编辑及本机共享多模型。已完成真实模型的 Mac Office 流程与恢复验收；Windows 原生验收仍待完成。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/CHANGELOG.md">查看更新记录</a></p>
-        <div class="download-block">
-          <div><h3>为 Word、Excel、PowerPoint 一起安装</h3><p>Mac：解压后双击 <code>Install.command</code>。<br />Windows：先解压整个文件夹，再双击 <code>Install.cmd</code>。</p></div>
-          <div class="download-actions"><a class="button primary" href="./install/TrioBridge-AI-Mac.zip" download>下载 Mac 安装包</a><a class="button secondary" href="./install/TrioBridge-AI-Windows.zip" download>下载 Windows 安装包</a></div>
+        <div class="section-heading"><p class="eyebrow">本机共享版 · v0.4.0</p><h2 id="install-title">安装一次，三款 Office 共用模型</h2><p>安装包自带运行环境，自动配置本机服务、证书和加载项入口。无需安装 Node.js 或输入命令，支持云端模型及本地 HTTP API。</p></div>
+        <div class="local-downloads">
+          <div class="download-block"><div><h3>Windows 本机共享版</h3><p>普通 Intel / AMD 电脑选择 x64；搭载 Snapdragon 等 ARM 处理器的电脑选择 ARM64。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-x64.zip">下载 Windows x64</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-arm64.zip">下载 Windows ARM64</a></div></div>
+          <div class="download-block"><div><h3>Mac 本机共享版</h3><p>搭载 Apple M 系列芯片选择 Apple 芯片版；较早的 Intel Mac 选择 Intel 版。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip">下载 Mac Apple 芯片版</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip">下载 Mac Intel 版</a></div></div>
         </div>
-        <p class="install-prerequisite">个人测试包，尚未签名，首次运行需系统确认；Windows 需管理员权限，自动安装仍待实机验证。遇到系统拦截或安装失败，可展开下方对应系统的说明。</p>
+        <p class="install-prerequisite">安装包尚未签名。首次运行可能需要系统确认；证书信任由系统提示，Windows 创建当前账号专用共享目录时会请求管理员授权。需要已安装 Office，且组织策略允许加载项。Mac 首次使用或升级后可能请求钥匙串访问，请在系统窗口确认后重试。Windows 原生 Office 验收仍待完成。</p>
         <ol class="instruction-list quick-install-steps">
-          <li><h3>运行对应安装包</h3><p>安装程序自动处理清单位置；Windows 同时添加当前用户的受信任目录。需要已安装 Microsoft Office，且允许使用加载项。</p></li>
-          <li><h3>重新打开 Office，添加三桥 AI</h3><p>先保存文档并完全退出 Office。重开后在<strong>主页 → 加载项</strong>选择<strong>三桥 AI（在线版）</strong>；Windows 进入<strong>高级 / 更多加载项 → 共享文件夹</strong>后添加。</p></li>
-          <li><h3>选择模型服务，填入密钥</h3><p>在“模型设置”选择服务、粘贴 API Key，点击<strong>连接并保存</strong>。服务地址和默认模型自动填写，仍可在高级设置中调整。使用时需要联网。</p></li>
+          <li><h3>解压完整文件夹，双击 Install</h3><p>先保存文档并完全退出 Word、Excel、PowerPoint。Windows 打开 <code>Install.cmd</code>，Mac 打开 <code>Install.command</code>，按系统提示完成安装。服务随当前账号登录启动，安装完成后可以关闭安装窗口。</p></li>
+          <li><h3>重开 Office，选择“本机共享”</h3><p>在每个应用的<strong>主页 → 加载项</strong>分别添加<strong>三桥 AI（本机共享）</strong>；Windows 从<strong>高级 / 更多加载项 → 共享文件夹</strong>添加。模型设置页应显示<strong>本机共享</strong>。</p></li>
+          <li><h3>配置模型，三个应用复用</h3><p>在任一应用新增模型并<strong>连接并保存</strong>。可填写 <code>http://127.0.0.1:8001/v1</code> 这样的本地地址；无需鉴权时选择<strong>不使用密钥</strong>。模型列表、默认模型与系统安全存储中的密钥供同一账号下的三个应用复用。</p></li>
         </ol>
-        <p class="small-note">移除安装文件：运行包内的 <code>Uninstall.command</code> 或 <code>Uninstall.cmd</code>。模型配置和密钥需在插件内删除。若安装包不可用，可<a href="./manifest.xml" download="triobridge-ai-online.xml">下载 XML 清单</a>并按下方手动安装。</p>
-
+        <p class="inline-note">Windows 的“共享文件夹”只是加载项安装入口。请确认选择的是<strong>本机共享</strong>，旧的<strong>在线版</strong>仍使用各应用独立配置。</p>
+        <p class="small-note">升级或修复：下载新版并再次运行 <code>Install</code>。<code>Restart</code> 重启服务；<code>Uninstall</code> 卸载服务、入口和本次安装的证书，保留模型配置与密钥。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md">本机安装与故障处理</a> · <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/CHANGELOG.md">更新记录</a></p>
+        <details class="platform-guide hosted-edition"><summary><span class="platform-title">在线版与手动旁加载</span><span class="platform-subtitle">各应用独立配置，不安装本机服务</span><span class="disclosure-mark" aria-hidden="true"></span></summary><div class="platform-body">
+          <p>在线版从网站加载工作台，模型服务需要允许浏览器跨域访问。需要访问本地 HTTP API 或跨应用复用模型时，请使用上方本机共享版。</p>
+          <div class="actions hosted-downloads"><a class="button secondary" href="./install/TrioBridge-AI-Mac.zip" download>下载 Mac 在线安装包</a><a class="button secondary" href="./install/TrioBridge-AI-Windows.zip" download>下载 Windows 在线安装包</a><a href="./manifest.xml" download="triobridge-ai-online.xml">下载在线 XML 清单</a></div>
         <div class="platform-guides">
           <details class="platform-guide">
             <summary><span class="platform-title">Mac 手动安装</span><span class="platform-subtitle">安装包不可用时展开</span><span class="disclosure-mark" aria-hidden="true"></span></summary>
@@ -170,6 +171,7 @@
             </div>
           </details>
         </div>
+        </div></details>
       </section>
 
       <section class="guide-section" id="guide" aria-labelledby="guide-title">
@@ -190,16 +192,16 @@
           <div>
             <dl class="configuration-list">
               <div><dt>模型服务</dt><dd>常用服务自动填写名称、地址与默认模型，按你持有的 API Key 选择。千问预设使用北京地域；其他地域可在高级设置中修改地址。</dd></div>
-              <div><dt>API Key</dt><dd>按服务要求填写。无需鉴权的本地服务可以留空。</dd></div>
-              <div><dt>高级设置</dt><dd>需要时修改服务名称、完整接口地址、模型 ID 或超时。更换服务地址会清空原密钥；离线准备配置可选择“仅保存配置”。</dd></div>
+              <div><dt>API Key</dt><dd>按服务要求填写。无需鉴权时，本机共享版选择“不使用密钥”；在线版可留空。</dd></div>
+              <div><dt>高级设置</dt><dd>需要时修改服务名称、完整接口地址、模型 ID 或超时。更换服务地址后需重新填写密钥或明确选择不使用密钥，不会自动携带旧密钥；离线准备配置可选择“仅保存配置”。</dd></div>
             </dl>
             <p class="small-note">连接测试会发送一句简短测试文字，可能产生少量模型调用费用。应用支持设置超时和取消请求。</p>
           </div>
           <div class="connection-notes">
             <h3>连接失败时，优先检查这些条件</h3>
-            <details open><summary>线上模型需要 HTTPS 和跨域许可</summary><div><p>远程服务地址需要使用 HTTPS。模型服务还需允许来自本页域名的跨域请求（CORS）。GitHub Pages 默认部署的来源为：</p><code class="block-code">https://kobe8bryant24lakers.github.io</code><p>来源只包含协议和域名，不包含 <code>/triobridge-ai/</code> 路径。服务需正确处理 OPTIONS 预检，并允许 POST 请求及 <code>Authorization</code>、<code>Content-Type</code> 请求头。</p></div></details>
+            <details open><summary>在线版需要模型 API 允许跨域</summary><div><p>两种版本的远程服务地址都需要 HTTPS。只有在线版需要模型服务允许来自本页域名的跨域请求（CORS）。GitHub Pages 默认部署的来源为：</p><code class="block-code">https://kobe8bryant24lakers.github.io</code><p>来源只包含协议和域名，不包含 <code>/triobridge-ai/</code> 路径。服务需正确处理 OPTIONS 预检，并允许 POST 请求及 <code>Authorization</code>、<code>Content-Type</code> 请求头。</p></div></details>
             <details><summary>确认接口类型与地址路径</summary><div><p>支持 OpenAI 兼容的 Chat Completions 接口，也接受完整的 <code>/chat/completions</code> 地址。仅提供 Responses 或 Anthropic 原生接口的服务不能直接使用。当前不支持流式响应。</p></div></details>
-            <details><summary>本地模型与代理需要自托管</summary><div><p>GitHub Pages 只托管静态页面，不提供 <code>/model-proxy/v1</code> 代理。线上 HTTPS 页面连接 HTTP 本地模型，可能受到浏览器的混合内容或私有网络限制。</p><p>需要固定目标的本机代理时，请按仓库的<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/README.zh-CN.md#本地模型与-cors">自托管说明</a>运行本机服务。该代理路径只在对应的自托管服务中可用，不能直接填给线上版。</p></div></details>
+            <details><summary>使用本机共享版连接本地 HTTP API</summary><div><p>安装<a href="#install">本机共享包</a>后，可直接填写 <code>http://127.0.0.1:8001/v1</code> 等地址。本机服务负责调用，无需模型 API 开放浏览器 CORS。模型 API 必须在这台电脑运行；容器中的 API 需要映射端口。</p><p>若报错仍提到 CORS，请确认选择的是“本机共享”加载项。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md">查看连接排查</a></p></div></details>
           </div>
         </div>
       </section>
@@ -227,8 +229,8 @@
         <div class="privacy-heading"><p class="eyebrow">内容与凭据</p><h2 id="privacy-title">发送什么，<br />由你决定</h2><p>模型请求前往你配置的服务。插件不保存文档、生成历史或遥测，模型服务如何处理请求以其规则为准。</p></div>
         <dl class="privacy-list">
           <div><dt>按需读取与发送</dt><dd>读取和生成分别由你触发。真实请求只携带可见参考内容、任务和要求。</dd></div>
-          <div><dt>密钥默认仅当前会话</dt><dd>只有明确勾选“在本机记住 API Key”，密钥才会以明文保存在当前 Office / 浏览器的本地存储中。</dd></div>
-          <div><dt>配置导出不含密钥</dt><dd>Office 各应用可能隔离存储。导入配置后，需要在对应应用中重新填写密钥。</dd></div>
+          <div><dt>共享版使用系统安全存储</dt><dd>本机共享版将密钥存入 Mac 钥匙串或 Windows 凭据管理器。在线版默认仅当前会话有效；勾选“记住密钥”后明文保存在当前应用的本地存储。</dd></div>
+          <div><dt>配置导出不含密钥</dt><dd>本机共享版在同一系统账号下复用配置和密钥。导出文件不含密钥及本机安装凭证；换电脑后需重新配置凭据。</dd></div>
           <div><dt>操作前保留检查机会</dt><dd>生成结果可编辑，写入前会展示目标和内容。你可以返回检查，也可以复制后自行处理。</dd></div>
         </dl>
       </section>
@@ -238,8 +240,9 @@
         <div class="faq-list">
           <details><summary>浏览器演示会调用真实 AI 吗？</summary><div><p>选择“演示模型”时使用固定样例，不会调用模型，也不会修改 Office 文件。演示页面同样支持你配置真实模型，这时会把可见输入实际发送给所选服务，但文档仍是浏览器中的模拟文档。</p></div></details>
           <details><summary>下载清单后，为什么还看不到加载项？</summary><div><p>下载不会自动完成安装。请按<a href="#install">对应系统的安装步骤</a>将 XML 放入正确目录，然后完全退出并重新打开 Office。Windows 还需添加受信任的共享目录并勾选“在菜单中显示”。组织策略禁用加载项时，需要联系管理员。</p></div></details>
+          <details><summary>Windows 只有一个应用能看到加载项？</summary><div><p>三个应用需各自在“主页 → 加载项 → 高级 / 更多加载项 → 共享文件夹”中添加入口。重开后仍没有“共享文件夹”时，核对该应用的“受信任的加载项目录”与可用应用是否一致。运行包内 <code>Diagnose.cmd</code> 可只读检查版本、目录可达性和三应用声明，不读取模型密钥或文档。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项">查看具体排查步骤</a></p></div></details>
           <details><summary>模型生成成功，为什么没有自动写入？</summary><div><p>生成只产生预览。你需要选择写回操作并再次确认。如果当前宿主、选区或任务不支持自动写回，工作台会提供复制方式。Excel 的分析和解释本来就是供复制使用的文字结果。</p></div></details>
-          <details><summary>插件更新后，需要重新安装吗？</summary><div><p>托管工作台更新后，重新打开加载项即可加载新版本。如果 Release 说明要求更新清单，请下载新的 XML，替换原目录中的清单并重启 Office。组织分发的版本请遵循管理员安排。</p></div></details>
+          <details><summary>插件更新后，需要重新安装吗？</summary><div><p>本机共享版下载新版安装包并再次运行 Install，配置与密钥会保留。在线工作台更新后，重新打开加载项即可加载新版本。如果 Release 说明要求更新清单，请下载新的 XML，替换原目录中的清单并重启 Office。组织分发的版本请遵循管理员安排。</p></div></details>
         </div>
         <div class="support-row"><p>还有问题？附上 Office 版本、操作步骤和不含密钥的错误信息。</p><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/issues">在 GitHub 反馈</a></div>
       </section>

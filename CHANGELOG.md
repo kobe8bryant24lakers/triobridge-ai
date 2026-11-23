@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 — 2026-11-23
+
+Self-contained local shared installers are provided for Windows and macOS, each in x64 and ARM64 builds. They bundle a pinned Node.js runtime and the native credential-store binding, create a private localhost certificate and Office manifest on the target computer, and start the service at sign-in. No separate Node.js or npm setup is required. Upgrade, repair, restart, and uninstall preserve existing model profiles and OS-stored keys.
+
+Local HTTP APIs such as `http://127.0.0.1:8001/v1` work through the shared service without requiring model API CORS. Connection diagnostics distinguish a stopped local service, refused API connection, DNS, timeout, and certificate failures. A missing shared installation credential does not silently fall back to per-app keys.
+
+The English and Chinese website and README now prioritize local shared downloads and identify the hosted edition separately. Native Windows Office acceptance remains pending; installer automation and synthetic transport checks are distinct from real-model Office acceptance.
+
+Windows packages check for running Office apps before changing the catalog and include a read-only `Diagnose.cmd` for per-app discovery problems. Reports contain application versions and catalog/manifest status, without document content or model credentials.
+
+PowerPoint generation instructions now describe append-only behavior, so preserving existing slides does not request placeholder copies in the generated outline. Generated Excel percentage columns display two decimal places. Mac setup and model settings also explain first-use Keychain prompts.
+
+The installed Mac build passed real configured-model generation, writing, saving and reopening in all three native Office apps. Saved outputs passed 337 field assertions, including 96 native Excel formula results and unchanged original PowerPoint slides; Word pages and new slides were visually reviewed. See [validation scope and remaining Windows work](docs/TESTING.md).
+
+### 简体中文
+
+- 新增 Windows / Mac、x64 / ARM64 本机共享安装包，自带运行环境，双击安装并按系统提示完成配置。
+- 自动配置当前账号的证书、后台服务和三应用入口；升级、修复及卸载保留模型配置和系统密钥。
+- 本地 HTTP API 通过本机服务调用；连接报错明确区分插件到本机服务、服务到模型 API 的故障。
+- README 与 GitHub Pages 优先提供本机共享下载，在线版独立说明。Windows 原生 Office 验收仍由使用者后续完成。
+- Windows 安装前检查三应用是否关闭，并提供只读 `Diagnose.cmd`，定位目录注册、可达性及宿主声明，不读取密钥或文档。
+- 明确 PowerPoint 只生成待新增页面，避免把保留原页误生成为占位页；Excel 百分比列默认显示两位小数；Mac 安装及模型设置补充钥匙串访问提示。
+
 ## 0.3.0 — 2026-11-23
 
 Word can now insert structured reports with sections and native tables, Excel can create formatted data tables with explicit formulas, and PowerPoint outlines can be edited and reordered before creating slides. Previews retain drafts through settings changes, identify outdated results, and protect write targets from intervening changes.

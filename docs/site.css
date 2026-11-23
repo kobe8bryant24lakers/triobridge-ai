@@ -108,6 +108,9 @@ summary { cursor: pointer; }
 .workflow-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 30px; border-top: 1px solid #477f6f; padding-top: 26px; }
 .workflow-footer a { color: var(--white); font-weight: 600; }
 .workflow-footer p { color: #c2ded1; font-size: .875rem; }
+.local-downloads { display: grid; gap: 18px; }
+.hosted-edition { margin-top: 32px; }
+.hosted-downloads { margin-block: 24px; }
 .download-block { padding: 29px 32px; display: flex; justify-content: space-between; align-items: center; gap: 32px; border: 1px solid #bfd5c7; background: var(--green-soft); border-radius: var(--radius); }
 .download-block h3 { font-size: 1.25rem; }
 .download-block p { color: var(--muted); margin-top: 9px; max-width: 39em; }

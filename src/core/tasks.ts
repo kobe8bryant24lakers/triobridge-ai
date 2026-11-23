@@ -109,9 +109,9 @@ export const TASKS: Record<HostKind, TaskSpec[]> = {
     {
       id: 'outline',
       label: '演示大纲',
-      description: '把主题组织成有条理的演示结构。',
+      description: '生成要新增的页面大纲，原有幻灯片保留。',
       instruction:
-        '根据主题输出演示大纲，只返回 JSON：{"slides":[{"title":"页面标题","bullets":["要点"]}]}。默认 5 页，最多 12 页。每页标题不超过 60 字，要点 1–5 条，每条不超过 160 字。不要代码围栏。',
+        '根据主题输出演示大纲，只返回 JSON：{"slides":[{"title":"页面标题","bullets":["要点"]}]}。插件会将返回的全部页面追加到现有演示文稿末尾，不会修改或删除原页。只返回本次需要新增的页面；用户要求保留原页时，不得把原页、原页的保留占位或未提供的原页内容放入 slides。用户指定的新增页数就是本次返回的页数。未指定时默认新增 5 页，最多新增 12 页。每页标题不超过 60 字，要点 1–5 条，每条不超过 160 字。保留提供的事实和数字，缺失的信息明确写待补充。不要代码围栏。',
       needsSource: false,
       needsInstruction: true,
       output: 'outline',

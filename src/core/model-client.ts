@@ -135,9 +135,11 @@ export async function complete(
               ? 'timeout'
               : error.code === 'cancelled'
                 ? 'cancelled'
-                : response.status === 409 || error.code === 'config'
-                  ? 'config'
-                  : 'response',
+                : error.code === 'network'
+                  ? 'network'
+                  : response.status === 409 || error.code === 'config'
+                    ? 'config'
+                    : 'response',
       );
     }
     if (!response.ok)
@@ -194,6 +196,16 @@ export async function complete(
       throw new ModelError(error.message, error.code === 'capability' ? 'config' : 'response');
     if (error instanceof SyntaxError)
       throw new ModelError('服务返回了无效 JSON，请检查接口地址。', 'response');
+    if (isSharedProfile(profile))
+      throw new ModelError(
+        '无法连接 TrioBridge 本机共享服务。请双击本机共享安装包中的 Restart，重启服务后重新连接。',
+        'network',
+      );
+    if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?=[:/])/i.test(endpoint))
+      throw new ModelError(
+        '当前加载项正在直连本地 API，连接失败。请打开「三桥 AI（本机共享）」并确认模型设置显示「本机共享」；共享版通过本机服务调用，不要求 API 开放浏览器 CORS。',
+        'network',
+      );
     throw new ModelError(
       '无法连接模型服务。请检查地址、网络和 CORS；本地 HTTP 模型可配置本机代理。',
       'network',

@@ -1018,6 +1018,12 @@ function SharedModelSettings({
               ? '保存后会删除此模型的共享密钥，三个应用都会受到影响。'
               : '已保存的密钥不会显示或返回到 Office 页面。'}
           </p>
+          {state.storage === 'macos-keychain' && credential !== 'remove' && (
+            <p className="field-help">
+              首次使用或升级后，macOS
+              可能请求允许本机服务访问钥匙串。请在系统窗口确认，无需在插件中重新填写已保存的密钥。
+            </p>
+          )}
           <button
             type="button"
             className="text-button advanced-toggle"

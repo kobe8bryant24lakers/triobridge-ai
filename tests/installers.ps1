@@ -9,6 +9,12 @@ foreach ($file in @('Manage.ps1', 'Share.ps1')) {
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $templates $file), [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 }
+foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1', 'start-installed.ps1', 'windows-office-discovery.ps1')) {
+    $tokens = $null
+    $parseErrors = $null
+    $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root ('scripts/' + $file)), [ref]$tokens, [ref]$parseErrors)
+    if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+}
 
 $testState = @{existingShare = $null; created = 0; removed = 0; grantedAccount = ''; shareAccess = @()}
 function Import-Module { [CmdletBinding()]param([string]$Name) }
@@ -36,6 +42,37 @@ function Assert([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+. (Join-Path $root 'scripts/windows-office-discovery.ps1')
+$session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+$testOfficeProcesses = @{}
+function Get-Process {
+    [CmdletBinding()]param([string]$Name)
+    if ($testOfficeProcesses.ContainsKey($Name)) { $testOfficeProcesses[$Name] }
+}
+Assert-TrioBridgeOfficeClosed
+foreach ($process in @('WINWORD', 'EXCEL', 'POWERPNT')) {
+    $testOfficeProcesses[$process] = [PSCustomObject]@{SessionId = $session}
+}
+Assert ((@(Get-TrioBridgeRunningOfficeApps) -join ',') -eq 'Word,Excel,PowerPoint') 'All three running hosts must be detected.'
+$rejected = $false
+try { Assert-TrioBridgeOfficeClosed } catch { $rejected = $_.Exception.Message -like '*OFFICE_OPEN*' }
+Assert $rejected 'Catalog changes must wait until Office has closed.'
+foreach ($process in @('WINWORD', 'EXCEL', 'POWERPNT')) { $testOfficeProcesses[$process].SessionId = $session + 1 }
+Assert-TrioBridgeOfficeClosed
+Remove-Item Function:\Get-Process
+
+$manifest = Get-TrioBridgeManifestStatus (Join-Path $root 'manifest.xml') 'd7cf6e8b-6d03-4a54-9c31-5b7d5427618e'
+Assert ($manifest.validXml -and $manifest.matchesId -and $manifest.Word -and $manifest.Excel -and $manifest.PowerPoint) 'The shipped manifest must declare all three hosts.'
+$fixture = Join-Path ([IO.Path]::GetTempPath()) ('triobridge-manifest-' + [Guid]::NewGuid() + '.xml')
+try {
+    $text = [IO.File]::ReadAllText((Join-Path $root 'manifest.xml'))
+    [IO.File]::WriteAllText($fixture, $text.Replace('<Host Name="Workbook" />', ''))
+    $missing = Get-TrioBridgeManifestStatus $fixture 'd7cf6e8b-6d03-4a54-9c31-5b7d5427618e'
+    Assert ($missing.Word -and -not $missing.Excel -and $missing.PowerPoint) 'Diagnostics must identify a missing Excel declaration.'
+    [IO.File]::WriteAllText($fixture, '<!DOCTYPE x [<!ENTITY private SYSTEM "file:///synthetic-private">]><x>&private;</x>')
+    Assert (-not (Get-TrioBridgeManifestStatus $fixture 'synthetic').validXml) 'Manifest diagnostics must reject external entities.'
+} finally { Remove-Item -LiteralPath $fixture -Force }
+
 $helper = Join-Path $templates 'Share.ps1'
 $arguments = @{Directory = 'C:\Users\Test User\OnlineCatalog'; Account = 'PC\Test User'; Name = 'TrioBridgeAI-S-1-5-21-123$'}
 & $helper -Action Install @arguments
@@ -62,4 +99,24 @@ foreach ($conflict in @(
         Assert ($testState.existingShare -eq $conflict) 'An unrelated share must remain untouched.'
     }
 }
-Write-Host 'PASS: PowerShell syntax, share idempotence, account scope, ACL drift and collision handling. Windows integration still needs a real host.'
+$testState.existingShare = $null
+$testState.created = 0
+$testState.removed = 0
+$helper = Join-Path $root 'scripts/local-catalog-share.ps1'
+$arguments = @{Directory = 'C:\Users\Test User\LocalCatalog'; Account = 'PC\Test User'; Name = 'TrioBridgeAI-Local-S-1-5-21-123$'}
+& $helper -Action Install @arguments
+& $helper -Action Install @arguments
+Assert ($testState.created -eq 1) 'Local setup must reuse its own share.'
+Assert ($testState.grantedAccount -eq 'PC\Test User') 'Local catalog must only grant the original account access.'
+$testState.shareAccess += [PSCustomObject]@{AccountName = 'Everyone'; AccessControlType = 'Allow'; AccessRight = 'Read'}
+$rejected = $false
+try { & $helper -Action Install @arguments } catch { $rejected = $true }
+Assert $rejected 'Local catalog must reject expanded permissions.'
+& $helper -Action Remove @arguments
+& $helper -Action Remove @arguments
+Assert ($testState.removed -eq 1) 'Repeated local removal must be harmless.'
+$testState.existingShare = [PSCustomObject]@{Path = 'C:\Unrelated'; Description = 'Another application'}
+$rejected = $false
+try { & $helper -Action Remove @arguments } catch { $rejected = $true }
+Assert $rejected 'Local removal must not delete an unrelated share.'
+Write-Host 'PASS: PowerShell syntax, both catalog helpers, account scope, ACL drift and collision handling.'
