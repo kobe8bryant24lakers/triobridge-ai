@@ -11,13 +11,20 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $path = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_PATH', 'Process')
 $kind = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_KIND', 'Process')
+$fresh = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_CREATED', 'Process') -eq '1'
 if ([String]::IsNullOrWhiteSpace($path) -or $kind -notin @('file', 'directory')) { throw 'Invalid private path request.' }
 $item = Get-Item -LiteralPath $path -Force
 if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Linked private paths are not supported.' }
 if (($kind -eq 'directory') -ne [bool]$item.PSIsContainer) { throw 'Private path type mismatch.' }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $current = Get-Acl -LiteralPath $path
-if ($current.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.User.Value) { throw 'Private path belongs to another OS account.' }
+$owner = $current.GetOwner([Security.Principal.SecurityIdentifier]).Value
+if ($owner -ne $identity.User.Value) {
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  if (-not ($fresh -and $owner -eq 'S-1-5-32-544' -and $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
+    throw 'TBACL_OWNER: Private path belongs to another OS account.'
+  }
+}
 if ($kind -eq 'directory') { $acl = New-Object Security.AccessControl.DirectorySecurity }
 else { $acl = New-Object Security.AccessControl.FileSecurity }
 $acl.SetOwner($identity.User)
@@ -43,7 +50,7 @@ foreach ($rule in $verified.GetAccessRules($true, $true, [Security.Principal.Sec
 export async function protectWindowsPath(
   path,
   kind,
-  { runner = execute, environment = process.env } = {},
+  { runner = execute, environment = process.env, created = false } = {},
 ) {
   if (typeof path !== 'string' || !path || !['file', 'directory'].includes(kind))
     throw new Error('Invalid private path request.');
@@ -62,7 +69,12 @@ export async function protectWindowsPath(
       executable,
       ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_PRIVATE_ACL_SCRIPT],
       {
-        env: { ...environment, TRIOBRIDGE_PRIVATE_PATH: path, TRIOBRIDGE_PRIVATE_KIND: kind },
+        env: {
+          ...environment,
+          TRIOBRIDGE_PRIVATE_PATH: path,
+          TRIOBRIDGE_PRIVATE_KIND: kind,
+          TRIOBRIDGE_PRIVATE_CREATED: created ? '1' : '0',
+        },
         windowsHide: true,
         timeout: 15_000,
         maxBuffer: 8192,
@@ -75,7 +87,7 @@ export async function protectWindowsPath(
 
 const protectedWindowsPaths = new Map();
 /** POSIX modes on Mac; protected user/SYSTEM/Administrators DACL on Windows. */
-export async function enforcePrivatePath(path, kind) {
+export async function enforcePrivatePath(path, kind, { created = false } = {}) {
   const info = await lstat(path);
   if (
     (kind === 'directory' ? !info.isDirectory() : !info.isFile()) ||
@@ -86,7 +98,7 @@ export async function enforcePrivatePath(path, kind) {
   if (process.platform === 'win32') {
     const identity = `${info.dev}:${info.ino}:${info.birthtimeMs}`;
     if (protectedWindowsPaths.get(path) !== identity) {
-      await protectWindowsPath(path, kind);
+      await protectWindowsPath(path, kind, { created });
       protectedWindowsPaths.set(path, identity);
     }
   } else {

@@ -99,8 +99,8 @@ export function platformDriver(root, platform = process.platform) {
         );
     },
     async generateCertificate(directory, id) {
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      await enforcePrivatePath(directory, 'directory');
+      const created = await mkdir(directory, { recursive: true, mode: 0o700 });
+      await enforcePrivatePath(directory, 'directory', { created: created !== undefined });
       if (platform === 'win32')
         return native('Certificate', { CertificateDirectory: directory, InstallationId: id });
       const config = join(directory, 'openssl.cnf');

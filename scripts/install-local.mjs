@@ -130,8 +130,8 @@ async function exists(path) {
 
 async function writeJournal(root, journal) {
   const path = join(root, 'transaction.json');
-  await writeFile(path, JSON.stringify(journal) + '\n', { mode: 0o600 });
-  await enforcePrivatePath(path, 'file');
+  await writeFile(path, JSON.stringify(journal) + '\n', { mode: 0o600, flag: 'wx' });
+  await enforcePrivatePath(path, 'file', { created: true });
 }
 
 export async function recoverInstallation(root, driver, waitReady = waitForHealth) {

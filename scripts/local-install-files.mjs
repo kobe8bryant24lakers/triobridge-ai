@@ -54,6 +54,7 @@ export async function writeInstallation(root, state) {
   const temporary = join(root, `.installation-${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, JSON.stringify(state, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+    await enforcePrivatePath(temporary, 'file', { created: true });
     await rename(temporary, join(root, 'installation.json'));
     await enforcePrivatePath(join(root, 'installation.json'), 'file');
   } finally {
@@ -86,7 +87,7 @@ export async function initializeInstallation(root) {
     }
   }
   await mkdir(root, { recursive: true, mode: 0o700 });
-  await enforcePrivatePath(root, 'directory');
+  await enforcePrivatePath(root, 'directory', { created: true });
   const state = { format: 1, product: INSTALL_PRODUCT, id: randomUUID(), active: null };
   await writeInstallation(root, state);
   return state;
@@ -142,8 +143,8 @@ export async function verifyPackage(directory, platform = process.platform, arch
 
 export async function stagePackage(source, root, metadata) {
   const versions = join(root, 'versions');
-  await mkdir(versions, { recursive: true, mode: 0o700 });
-  await enforcePrivatePath(versions, 'directory');
+  const created = await mkdir(versions, { recursive: true, mode: 0o700 });
+  await enforcePrivatePath(versions, 'directory', { created: created !== undefined });
   let name = `${metadata.version}-${metadata.digest.slice(0, 12)}`;
   try {
     const previous = await verifyPackage(join(versions, name));

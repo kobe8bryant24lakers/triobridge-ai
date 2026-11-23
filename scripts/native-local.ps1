@@ -47,6 +47,20 @@ function Protect-Directory([string]$Path) {
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
+function Protect-NewManifest([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked manifests are not supported.' }
+    $acl = New-Object Security.AccessControl.FileSecurity
+    $acl.SetOwner($identity.User)
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($value in @($sid, 'S-1-5-18', 'S-1-5-32-544')) {
+        $principal = New-Object Security.Principal.SecurityIdentifier($value)
+        $rule = New-Object Security.AccessControl.FileSystemAccessRule($principal, 'FullControl', 'Allow')
+        $acl.AddAccessRule($rule)
+    }
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Get-OwnedTask {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($task) {
@@ -159,6 +173,7 @@ switch ($Action) {
         if (-not $ManifestPath -or -not ([IO.File]::ReadAllText($ManifestPath)).Contains('<Id>d7cf6e8b-6d03-4a54-9c31-5b7d5427618e</Id>')) { throw 'Missing generated private manifest.' }
         Protect-Directory $catalog
         Copy-Item -LiteralPath $ManifestPath -Destination (Join-Path $catalog 'triobridge-ai.xml') -Force
+        Protect-NewManifest (Join-Path $catalog 'triobridge-ai.xml')
         Invoke-Share 'Install'
         if (-not (Test-Path -LiteralPath (Join-Path $catalogUrl 'triobridge-ai.xml'))) { throw 'The local catalog share is not reachable.' }
         New-Item -Path $catalogRegistry -Force | Out-Null

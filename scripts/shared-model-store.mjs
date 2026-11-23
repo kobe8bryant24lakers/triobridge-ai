@@ -390,6 +390,7 @@ export function createSharedModelStore({
       await handle.sync();
       await handle.close();
       handle = undefined;
+      await enforcePrivatePath(temporary, 'file', { created: true });
       await rename(temporary, file);
     } catch {
       fail('storage', '无法保存共享配置，请检查本机目录权限和可用空间。', 503);
