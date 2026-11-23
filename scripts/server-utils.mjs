@@ -51,8 +51,12 @@ export function createProxy(target, allowedOrigin) {
     };
     // Reject cross-site requests, non-JSON simple requests and DNS rebinding hosts.
     const allowed = new URL(allowedOrigin);
-    const requestHost = req.headers.host;
+    // Office on Mac negotiates HTTP/2 with the HTTPS dev server. In that
+    // transport the destination is :authority, and Host is normally absent.
+    const authority = req.headers[':authority'];
+    const requestHost = authority ?? req.headers.host;
     if (
+      (authority && req.headers.host && authority !== req.headers.host) ||
       ![allowed.host, `127.0.0.1:${allowed.port}`].includes(requestHost) ||
       ![allowedOrigin, `${allowed.protocol}//127.0.0.1:${allowed.port}`].includes(
         req.headers.origin,

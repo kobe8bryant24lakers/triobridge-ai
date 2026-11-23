@@ -42,6 +42,7 @@ test('PowerPoint: structured outline, edit validation, and slide creation', asyn
   await page.getByRole('button', { name: '生成演示预览' }).click();
   await expect(page.locator('.slide-outline > li')).toHaveCount(4);
   await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await page.getByRole('button', { name: '编辑 JSON', exact: true }).click();
   const original = await page.getByLabel('编辑结果').inputValue();
   await page.getByLabel('编辑结果').fill('{"slides":[]}');
   await expect(page.getByRole('button', { name: '创建幻灯片' })).toBeDisabled();

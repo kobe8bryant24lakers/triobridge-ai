@@ -1,5 +1,13 @@
 import { parseFormula, parseOutline } from '../core/output';
 import type { HostBridge, HostKind, TaskSpec } from '../core/types';
+import { parseReport, parseTable, reportToText, tableToText } from '../core/structured-output';
+import {
+  COMPLEX_REPORT,
+  COMPLEX_TABLE,
+  COMPLEX_SLIDES,
+  COMPLEX_SOURCES,
+  type DemoScenario,
+} from './complex-samples';
 
 export const DEMO_SOURCES: Record<HostKind, string> = {
   word: '本季度，我们的团队在三个方面取得了进展。首先，客户反馈的平均响应时间从 24 小时缩短至 8 小时。其次，新版入门指南已上线，帮助新用户更快完成配置。最后，我们计划在下季度进一步优化跨团队协作流程，让信息传递更加顺畅。',
@@ -27,8 +35,12 @@ export const DEMO_SOURCES: Record<HostKind, string> = {
   powerpoint: '季度工作回顾\n客户响应效率提升\n新版入门指南上线\n下季度优化跨团队协作流程',
 };
 
-export function createDemoBridge(host: HostKind, onWrite: (text: string) => void): HostBridge {
-  let content = DEMO_SOURCES[host];
+export function createDemoBridge(
+  host: HostKind,
+  onWrite: (text: string) => void,
+  scenario: DemoScenario = 'basic',
+): HostBridge {
+  let content = scenario === 'complex' ? COMPLEX_SOURCES[host] : DEMO_SOURCES[host];
   return {
     host,
     mode: 'demo',
@@ -38,12 +50,19 @@ export function createDemoBridge(host: HostKind, onWrite: (text: string) => void
       insert: host === 'word',
       formula: host === 'excel',
       slides: host === 'powerpoint',
+      document: host === 'word',
+      table: host === 'excel',
     },
     readSelection: async () => {
       const original = content;
       return {
         text: original,
-        label: host === 'excel' ? '演示 · 销售汇总!A1:D5' : '演示 · 示例选区',
+        label:
+          scenario === 'complex'
+            ? '演示 · 复杂文档选区'
+            : host === 'excel'
+              ? '演示 · 销售汇总!A1:D5'
+              : '演示 · 示例选区',
         replace: async (text) => {
           if (content !== original) throw new Error('示例内容已经变化，请重新读取。');
           content = text;
@@ -51,7 +70,7 @@ export function createDemoBridge(host: HostKind, onWrite: (text: string) => void
         },
       };
     },
-    prepareWrite: async (kind, source) => {
+    prepareWrite: async (kind, source, output) => {
       if (kind === 'replace' && source?.replace)
         return {
           label: '替换演示选区',
@@ -60,16 +79,26 @@ export function createDemoBridge(host: HostKind, onWrite: (text: string) => void
         };
       return {
         label:
-          kind === 'formula'
-            ? '写入演示单元格 B6'
-            : kind === 'slides'
-              ? '添加到演示幻灯片'
-              : '插入演示文档末尾',
+          kind === 'table'
+            ? `新建演示工作表「${parseTable(output || '').name}」`
+            : kind === 'document'
+              ? '在演示文档末尾插入排版报告'
+              : kind === 'formula'
+                ? '写入演示单元格 B6'
+                : kind === 'slides'
+                  ? '添加到演示幻灯片'
+                  : '插入演示文档末尾',
         before: kind === 'formula' ? '（空单元格）' : '仅修改此页面中的模拟文档',
         commit: async (text) => {
           if (kind === 'formula') parseFormula(text);
           if (kind === 'slides') parseOutline(text);
-          content = `${content}\n\n${text}`;
+          const display =
+            kind === 'document'
+              ? reportToText(parseReport(text))
+              : kind === 'table'
+                ? tableToText(parseTable(text))
+                : text;
+          content = `${content}\n\n${display}`;
           onWrite(content);
         },
       };
@@ -82,6 +111,7 @@ export async function demoComplete(
   source: string,
   instruction: string,
   signal: AbortSignal,
+  scenario: DemoScenario = 'basic',
 ): Promise<string> {
   await new Promise<void>((resolve, reject) => {
     if (signal.aborted) {
@@ -98,6 +128,21 @@ export async function demoComplete(
     }, 650);
     signal.addEventListener('abort', abort, { once: true });
   });
+  if (task.output === 'document') return JSON.stringify(COMPLEX_REPORT, null, 2);
+  if (task.output === 'table') return JSON.stringify(COMPLEX_TABLE, null, 2);
+  if (scenario === 'complex') {
+    if (task.output === 'outline') return JSON.stringify({ slides: COMPLEX_SLIDES }, null, 2);
+    if (task.output === 'formula')
+      return "=IFERROR(SUMIFS('区域运营演示'!$F$2:$F$49,'区域运营演示'!$B$2:$B$49,\"华东\")/SUMIFS('区域运营演示'!$D$2:$D$49,'区域运营演示'!$B$2:$B$49,\"华东\"),0)";
+    if (task.id === 'summarize' || task.id === 'organize')
+      return '演示验收摘要\n\n48 项检查中有 42 项通过，通过率为 87.5%。其余 4 项待复核，2 项待外部资料。\n\n下一步先补齐资料和验收证据，再复算指标、更新结论。此结果为固定合成样例。';
+    if (task.id === 'analyze' || task.id === 'ask')
+      return '合成数据检查\n\n表格包含 12 个月、4 个区域，共 48 行。差额 = 收入 − 成本；差额率 = 差额 ÷ 收入。\n\n首行收入 1200，成本 800，差额 400，差额率约 33.3%。不要把百分比直接相加；比较总体比例时应以收入加权。\n\n备注包含空值和换行，不代表数据丢失。这是固定演示分析，未调用 AI。';
+    if (task.id === 'explain')
+      return '演示公式使用 SUMIFS 按区域汇总差额与收入，再计算比率。IFERROR 在分母为零或引用发生错误时返回 0；正式分析应区分真实零值与被掩盖的错误。\n\n此说明为固定演示内容。';
+    if (task.id === 'rewrite')
+      return `复杂文档演示预览\n\n${source}\n\n以上保留合成样稿内容，用于验证长文编辑与写回，未调用 AI。`;
+  }
   if (task.output === 'formula') return '=SUM(B2:B4)';
   if (task.output === 'outline')
     return JSON.stringify(

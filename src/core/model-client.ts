@@ -1,4 +1,15 @@
-import type { ChatMessage, ModelProfile } from './types';
+import type { ChatMessage, RuntimeModelProfile, SharedModelProfile } from './types';
+import { MAX_RESULT_LENGTH } from './tasks';
+import { startModelAudit } from './model-audit';
+import {
+  localModelHeaders,
+  sharedResponseError,
+  SharedModelClientError,
+} from './shared-model-client';
+
+export function isSharedProfile(profile: RuntimeModelProfile): profile is SharedModelProfile {
+  return 'kind' in profile && profile.kind === 'shared';
+}
 
 export class ModelError extends Error {
   constructor(
@@ -35,12 +46,18 @@ export function completionUrl(baseUrl: string): string {
   return `${base.replace(/\/chat\/completions$/, '')}/chat/completions`;
 }
 
-export function validateProfile(profile: ModelProfile): void {
+export function validateProfile(profile: RuntimeModelProfile): void {
   if (!profile.name.trim() || !profile.model.trim())
     throw new ModelError('请填写服务名称和模型 ID。', 'config');
-  if (profile.name.length > 100 || profile.model.length > 200 || profile.apiKey.length > 4096)
+  if (
+    profile.name.length > 100 ||
+    profile.model.length > 200 ||
+    (!isSharedProfile(profile) && profile.apiKey.length > 4096)
+  )
     throw new ModelError('模型配置字段过长，请检查输入。', 'config');
   completionUrl(profile.baseUrl);
+  if (isSharedProfile(profile) && (!Number.isSafeInteger(profile.revision) || profile.revision < 0))
+    throw new ModelError('共享模型版本无效，请刷新配置后重试。', 'config');
   if (
     !Number.isFinite(profile.timeoutSeconds) ||
     profile.timeoutSeconds < 5 ||
@@ -58,13 +75,17 @@ const HTTP_ERRORS: Record<number, string> = {
 };
 
 export async function complete(
-  profile: ModelProfile,
+  profile: RuntimeModelProfile,
   messages: ChatMessage[],
   signal?: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<string> {
   validateProfile(profile);
   if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
+  const endpoint = completionUrl(profile.baseUrl);
+  const secret = isSharedProfile(profile) ? '' : profile.apiKey.trim();
+  const audit = startModelAudit(endpoint, profile.model.trim(), messages, secret);
+  let auditOutcome = 'network';
   const controller = new AbortController();
   let timedOut = false;
   const abort = () => controller.abort();
@@ -74,22 +95,51 @@ export async function complete(
     controller.abort();
   }, profile.timeoutSeconds * 1000);
   try {
-    const response = await fetcher(completionUrl(profile.baseUrl), {
+    const shared = isSharedProfile(profile);
+    const response = await fetcher(shared ? '/local-models/complete' : endpoint, {
       method: 'POST',
       signal: controller.signal,
       redirect: 'error',
       credentials: 'omit',
       cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(profile.apiKey.trim() ? { Authorization: `Bearer ${profile.apiKey.trim()}` } : {}),
-      },
-      body: JSON.stringify({
-        model: profile.model.trim(),
-        messages,
-        stream: false,
-      }),
+      headers: shared
+        ? localModelHeaders()
+        : {
+            'Content-Type': 'application/json',
+            ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+          },
+      body: JSON.stringify(
+        shared
+          ? {
+              profileId: profile.id,
+              profileRevision: profile.revision,
+              messages,
+            }
+          : {
+              model: profile.model.trim(),
+              messages,
+              stream: false,
+            },
+      ),
     });
+    audit?.response(response);
+    if (!response.ok && shared) {
+      const error = await sharedResponseError(response);
+      throw new ModelError(
+        error.message,
+        response.status === 401 || response.status === 403
+          ? 'auth'
+          : response.status === 429
+            ? 'rate'
+            : error.code === 'timeout'
+              ? 'timeout'
+              : error.code === 'cancelled'
+                ? 'cancelled'
+                : response.status === 409 || error.code === 'config'
+                  ? 'config'
+                  : 'response',
+      );
+    }
     if (!response.ok)
       throw new ModelError(
         HTTP_ERRORS[response.status] ?? `模型服务返回 HTTP ${response.status}，请稍后重试。`,
@@ -105,6 +155,7 @@ export async function complete(
         finish_reason?: string;
       }[];
     };
+    audit?.payload(data);
     if (!data || typeof data !== 'object')
       throw new ModelError('服务返回的数据格式无效，请确认兼容 Chat Completions。', 'response');
     const choice = data.choices?.[0];
@@ -118,10 +169,20 @@ export async function complete(
     const content = choice?.message?.content;
     if (typeof content !== 'string' || !content.trim())
       throw new ModelError('服务未返回可用文本，请确认接口兼容 Chat Completions。', 'response');
-    if (content.length > 100_000)
+    if (content.length > MAX_RESULT_LENGTH)
       throw new ModelError('模型返回内容过长，请缩小任务范围。', 'response');
+    auditOutcome = 'success';
     return content.trim();
   } catch (error) {
+    auditOutcome = timedOut
+      ? 'timeout'
+      : signal?.aborted
+        ? 'cancelled'
+        : error instanceof ModelError
+          ? error.code
+          : error instanceof SyntaxError
+            ? 'response'
+            : 'network';
     if (timedOut)
       throw new ModelError(
         `请求超过 ${profile.timeoutSeconds} 秒，请重试或增加超时时间。`,
@@ -129,6 +190,8 @@ export async function complete(
       );
     if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
     if (error instanceof ModelError) throw error;
+    if (error instanceof SharedModelClientError)
+      throw new ModelError(error.message, error.code === 'capability' ? 'config' : 'response');
     if (error instanceof SyntaxError)
       throw new ModelError('服务返回了无效 JSON，请检查接口地址。', 'response');
     throw new ModelError(
@@ -138,9 +201,13 @@ export async function complete(
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', abort);
+    await audit?.finish(auditOutcome);
   }
 }
 
-export async function testConnection(profile: ModelProfile, signal?: AbortSignal): Promise<void> {
+export async function testConnection(
+  profile: RuntimeModelProfile,
+  signal?: AbortSignal,
+): Promise<void> {
   await complete(profile, [{ role: 'user', content: 'Reply with OK.' }], signal);
 }

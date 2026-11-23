@@ -77,6 +77,7 @@
               <li><strong>提炼摘要</strong><span>把长内容整理成重点</span></li>
               <li><strong>翻译文本</strong><span>保留术语、数字与结构</span></li>
               <li><strong>起草内容</strong><span>根据具体要求写出第一稿</span></li>
+              <li><strong>结构化报告</strong><span>编辑章节、要点和表格后插入</span></li>
             </ul>
             <p class="writeback"><strong>检查后写回</strong>替换已读取的选区，或插入到光标处。</p>
           </article>
@@ -88,14 +89,15 @@
               <li><strong>解释公式</strong><span>看懂函数、引用与计算过程</span></li>
               <li><strong>表格问答</strong><span>围绕选中的数据提出问题</span></li>
               <li><strong>分析建议</strong><span>查看趋势、异常与下一步方向</span></li>
+              <li><strong>创建数据表</strong><span>新建含公式和列格式的工作表</span></li>
             </ul>
-            <p class="writeback"><strong>核对目标后写入</strong>每次写入一个公式单元格。分析与解释可复制。</p>
+            <p class="writeback"><strong>核对目标后写入</strong>写入单个公式，或在独立新表创建数据与公式。分析与解释可复制。</p>
           </article>
           <article class="feature">
             <div class="feature-heading"><span class="app-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 3h20M4 3v13h16V3M12 16v5M8 21l4-5 4 5M8 7h8M8 11h5"/></svg></span><h3>PowerPoint</h3></div>
             <p class="feature-intro">先组织内容，再完成排版</p>
             <ul class="feature-list">
-              <li><strong>演示大纲</strong><span>把主题组织为页面标题和要点</span></li>
+              <li><strong>演示大纲</strong><span>逐页编辑标题、要点与页面顺序</span></li>
               <li><strong>改写文案</strong><span>让选中文字更简洁清晰</span></li>
               <li><strong>整理要点</strong><span>把零散内容整理为演示重点</span></li>
             </ul>
@@ -119,6 +121,8 @@
 
       <section class="section wrap" id="install" aria-labelledby="install-title">
         <div class="section-heading"><h2 id="install-title">下载、双击，再打开 Office</h2><p>快速安装包自动放好清单。无需 Node.js、本机服务或开发证书，连接模型时选择服务并填入 API Key 即可。</p></div>
+        <p class="inline-note">这些 ZIP 安装的是在线版，三个 Office 应用各自保存模型配置。需要同一台电脑、同一系统账号配置一次并共享多模型时，请安装<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md">本机共享版</a>，并保持本机服务运行、使用本机专用清单。</p>
+        <p class="small-note"><strong>v0.3.0：</strong>结构化报告、公式数据表、逐页大纲编辑及本机共享多模型。已完成真实模型的 Mac Office 流程与恢复验收；Windows 原生验收仍待完成。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/CHANGELOG.md">查看更新记录</a></p>
         <div class="download-block">
           <div><h3>为 Word、Excel、PowerPoint 一起安装</h3><p>Mac：解压后双击 <code>Install.command</code>。<br />Windows：先解压整个文件夹，再双击 <code>Install.cmd</code>。</p></div>
           <div class="download-actions"><a class="button primary" href="./install/TrioBridge-AI-Mac.zip" download>下载 Mac 安装包</a><a class="button secondary" href="./install/TrioBridge-AI-Windows.zip" download>下载 Windows 安装包</a></div>
@@ -215,7 +219,7 @@
               </tbody>
             </table>
           </div>
-          <details class="capability-details"><summary>各应用的写回边界</summary><div><ul><li><strong>Word：</strong>以纯文本写回，不保证保留原选区内部的全部富文本样式。</li><li><strong>Excel：</strong>每次写入一个公式单元格，不自动批量写公式或创建图表。</li><li><strong>PowerPoint：</strong>自动建页需要 PowerPointApi 1.4。生成的是基础标题和要点文本框，最多 12 页，不自动生成主题、图片或图表。能力不足时仍可生成并复制大纲。</li><li><strong>安全写回：</strong>若宿主无法追踪选区变化，会限制自动替换并提供复制。建页出错时可能留下部分新增页，请检查后使用 Office 撤销。</li></ul><p>实际可用功能还受内置浏览器版本、账号和组织策略影响。更多说明见<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/README.zh-CN.md#兼容范围">仓库兼容性文档</a>。</p></div></details>
+          <details class="capability-details"><summary>各应用的写回边界</summary><div><ul><li><strong>Word：</strong>纯文本替换不保证保留选区内部样式；包含表格、图片等对象的选区限制直接替换。结构化报告支持插入章节、要点和表格，最终分页由 Word 决定。</li><li><strong>Excel：</strong>支持单公式写入；新建格式化数据表需要 ExcelApi 1.2，含表头最多 2,000 格，写入后检查公式错误。不自动创建图表。</li><li><strong>PowerPoint：</strong>自动建页需要 PowerPointApi 1.4。生成的是基础标题和要点文本框，最多 12 页，不自动生成主题、图片或图表。能力不足时仍可生成并复制大纲。</li><li><strong>写入保护：</strong>若宿主无法追踪选区变化，会限制自动替换并提供复制。建页或建表失败可能留下部分内容，请按提示检查并恢复。</li></ul><p>新增报告、数据表和建页已在本机 Mac Office 完成主要流程验收，覆盖排版、公式重算与原文保留。Windows 及其他 Office 版本仍需独立实机验收。实际可用功能还受内置浏览器版本、账号和组织策略影响。更多说明见<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/README.zh-CN.md#兼容范围">仓库兼容性文档</a>。</p></div></details>
         </div>
       </section>
 

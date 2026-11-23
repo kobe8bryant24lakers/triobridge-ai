@@ -1,6 +1,16 @@
 import { MAX_SOURCE_LENGTH } from '../core/tasks';
 import { parseFormula, parseOutline } from '../core/output';
+import { slideFontSize } from '../core/slide-layout';
 import type { HostBridge, HostKind, SelectionSnapshot, WritePlan } from '../core/types';
+import { wordSelectionWarning } from './word-safety';
+import {
+  columnName,
+  NUMBER_FORMATS,
+  parseReport,
+  parseTable,
+  reportToHtml,
+  tableMatrix,
+} from '../core/structured-output';
 
 const CHANGED = '目标内容或选区已经变化。请重新读取选区，再预览并确认写入。';
 const MAX_CELLS = 2000;
@@ -41,8 +51,11 @@ async function readWord(): Promise<SelectionSnapshot> {
   return Word.run(async (context) => {
     const range = context.document.getSelection();
     range.load('text');
+    const ooxml = range.getOoxml();
     await context.sync();
     const text = requireText(range.text);
+    const warning = wordSelectionWarning(ooxml.value);
+    if (warning) return { text, label: 'Word · 已读取的文字选区', warning };
     context.trackedObjects.add(range);
     await context.sync();
     return {
@@ -51,8 +64,11 @@ async function readWord(): Promise<SelectionSnapshot> {
       replace: async (value: string) =>
         Word.run(range, async (ctx) => {
           range.load('text');
+          const currentOoxml = range.getOoxml();
           await ctx.sync();
           if (range.text !== text) throw new Error(CHANGED);
+          const structureWarning = wordSelectionWarning(currentOoxml.value);
+          if (structureWarning) throw new Error(structureWarning);
           range.insertText(value, Word.InsertLocation.replace);
           await ctx.sync();
         }),
@@ -64,7 +80,7 @@ async function readWord(): Promise<SelectionSnapshot> {
   });
 }
 
-async function prepareWordInsertion(): Promise<WritePlan> {
+async function prepareWordInsertion(structured = false): Promise<WritePlan> {
   return Word.run(async (context) => {
     const range = context.document.getSelection();
     range.load('text');
@@ -73,14 +89,25 @@ async function prepareWordInsertion(): Promise<WritePlan> {
     context.trackedObjects.add(range);
     await context.sync();
     return {
-      label: before ? '在当前选区后插入（保留原文）' : '在当前光标处插入',
+      label: structured
+        ? '在已确认光标或选区后新起段落插入报告（保留原文）'
+        : before
+          ? '在已确认选区末尾插入（保留原文）'
+          : '在已确认光标处插入',
       before,
       commit: async (text: string) =>
         Word.run(range, async (ctx) => {
+          const html = structured ? reportToHtml(parseReport(text)) : undefined;
           range.load('text');
           await ctx.sync();
           if (range.text !== before) throw new Error(CHANGED);
-          range.insertText(text, Word.InsertLocation.end);
+          // A heading inserted directly at a paragraph's end can merge into
+          // that paragraph and restyle the user's existing text in Word.
+          if (html)
+            range
+              .insertParagraph('', Word.InsertLocation.after)
+              .insertHtml(html, Word.InsertLocation.replace);
+          else range.insertText(text, Word.InsertLocation.end);
           await ctx.sync();
         }),
       dispose: async () => {
@@ -91,6 +118,106 @@ async function prepareWordInsertion(): Promise<WritePlan> {
   });
 }
 
+async function prepareExcelTable(raw: string): Promise<WritePlan> {
+  const table = parseTable(raw);
+  const signature = JSON.stringify(table);
+  const address = `A1:${columnName(table.headers.length - 1)}${table.rows.length + 1}`;
+  const sheetName = await Excel.run(async (context) => {
+    const sheets = context.workbook.worksheets;
+    sheets.load('items/name');
+    await context.sync();
+    const names = new Set(sheets.items.map((sheet) => sheet.name.toLocaleLowerCase()));
+    let name = table.name;
+    for (let i = 2; names.has(name.toLocaleLowerCase()); i += 1) {
+      const suffix = ` (${i})`;
+      name = `${table.name.slice(0, 31 - suffix.length)}${suffix}`;
+    }
+    return name;
+  });
+  return {
+    label: `新建工作表「${sheetName}」 · ${address}`,
+    before: `新工作表，${table.rows.length + 1} 行 × ${table.headers.length} 列（含表头）。现有工作表不会被覆盖。`,
+    warning: '公式将在 Excel 中计算。创建失败时可能留下新工作表，请按错误提示检查后再试。',
+    commit: async (value) => {
+      if (JSON.stringify(parseTable(value)) !== signature)
+        throw new Error('数据表与确认时的内容不同，请返回检查后重新确认。');
+      let creationStarted = false;
+      let created = false;
+      try {
+        return await Excel.run(async (context) => {
+          const sheets = context.workbook.worksheets;
+          sheets.load('items/name');
+          await context.sync();
+          if (
+            sheets.items.some(
+              (sheet) => sheet.name.toLocaleLowerCase() === sheetName.toLocaleLowerCase(),
+            )
+          )
+            throw new Error('目标工作表名称已被使用，请返回检查后重新创建。');
+          creationStarted = true;
+          const sheet = sheets.add(sheetName);
+          await context.sync();
+          created = true;
+          const range = sheet.getRange(address);
+          range.formulas = tableMatrix(table);
+          range.numberFormat = [
+            table.headers.map(() => '@'),
+            ...table.rows.map(() => table.formats.map((format) => NUMBER_FORMATS[format])),
+          ];
+          range.format.wrapText = true;
+          range.format.columnWidth = 110;
+          const nativeTable = sheet.tables.add(address, true);
+          nativeTable.style = 'TableStyleMedium2';
+          if (supports('ExcelApi', '1.2')) range.format.autofitRows();
+          await context.sync();
+          range.load('text');
+          const application = context.workbook.application;
+          const canReadCalculationState = supports('ExcelApi', '1.9');
+          application.load(
+            canReadCalculationState ? ['calculationMode', 'calculationState'] : ['calculationMode'],
+          );
+          sheet.activate();
+          await context.sync();
+          if (table.rows.some((row) => row.some((cell) => cell && typeof cell === 'object'))) {
+            if (application.calculationMode === 'Manual')
+              return {
+                warning: `工作表「${sheetName}」已创建。Excel 当前为手动计算模式，公式结果尚未验证；请使用 Excel 的“立即计算”后检查结果。`,
+              };
+            if (canReadCalculationState && application.calculationState !== 'Done')
+              return {
+                warning: `工作表「${sheetName}」已创建，Excel 仍有待完成的计算；请等待计算结束后检查公式结果。`,
+              };
+          }
+          const errors: string[] = [];
+          table.rows.forEach((row, r) =>
+            row.forEach((cell, c) => {
+              if (
+                cell &&
+                typeof cell === 'object' &&
+                /^#(?:REF!|DIV\/0!|VALUE!|NAME\?|N\/A|NUM!|NULL!|SPILL!|CALC!)/.test(
+                  range.text[r + 1][c],
+                )
+              )
+                errors.push(`${columnName(c)}${r + 2} ${range.text[r + 1][c]}`);
+            }),
+          );
+          return errors.length
+            ? {
+                warning: `工作表「${sheetName}」已创建，但发现 ${errors.length} 个公式错误：${errors.slice(0, 8).join('、')}。请在 Excel 中检查引用和输入数据。`,
+              }
+            : undefined;
+        });
+      } catch (error) {
+        if (creationStarted)
+          throw new Error(
+            `工作表「${sheetName}」${created ? '已创建，但写入或检查未完成' : '可能已创建，但未能确认结果'}。请检查该表，删除未完成的表后再试。${officeError(error)}`,
+          );
+        throw error;
+      }
+    },
+  };
+}
+
 async function readExcel(): Promise<SelectionSnapshot> {
   return Excel.run(async (context) => {
     const range = context.workbook.getSelectedRange();
@@ -98,22 +225,28 @@ async function readExcel(): Promise<SelectionSnapshot> {
     await context.sync();
     if (range.rowCount * range.columnCount > MAX_CELLS)
       throw new Error('一次最多读取 2,000 个单元格，请缩小选区。');
-    range.load(['text', 'formulas']);
+    range.load(['text', 'values', 'formulas']);
     await context.sync();
-    const values = range.text;
-    if (!values.some((row) => row.some((cell) => cell.trim())))
-      throw new Error('选区为空，请选中包含数据或公式的单元格。');
+    const displayValues = range.text;
+    const values = range.values as unknown[][];
     const formulas = range.formulas as unknown[][];
     const hasFormulas = formulas.some((row) =>
       row.some((cell) => typeof cell === 'string' && cell.startsWith('=')),
     );
+    if (!hasFormulas && !values.some((row) => row.some((cell) => cell !== '' && cell != null)))
+      throw new Error('选区为空，请选中包含数据或公式的单元格。');
     // JSON retains tabs/newlines in cell values and avoids ambiguous TSV boundaries.
-    const text = JSON.stringify(
-      { address: range.address, values, ...(hasFormulas ? { formulas } : {}) },
-      null,
-      2,
-    );
-    return { text: requireText(text), label: range.address };
+    // Compact serialization leaves more of the 30k budget available for actual cells.
+    const text = JSON.stringify({
+      address: range.address,
+      values,
+      displayValues,
+      ...(hasFormulas ? { formulas } : {}),
+    });
+    return {
+      text: requireText(text),
+      label: `${range.address} · ${range.rowCount} 行 × ${range.columnCount} 列`,
+    };
   });
 }
 
@@ -133,7 +266,7 @@ async function prepareExcelFormula(): Promise<WritePlan> {
     const signature = JSON.stringify([range.formulas, range.values]);
     return {
       label: `写入 ${address}`,
-      before: String(range.formulas[0][0] || range.text[0][0] || '（空单元格）'),
+      before: String(range.formulas[0][0] ?? range.text[0][0]) || '（空单元格）',
       commit: async (raw: string) => {
         const formula = parseFormula(raw);
         await Excel.run(async (ctx) => {
@@ -154,12 +287,30 @@ async function addSlides(raw: string): Promise<void> {
   const slides = parseOutline(raw);
   // PowerPointApi 1.4 is checked before reaching this function.
   await PowerPoint.run(async (context) => {
-    const count = context.presentation.slides.getCount();
+    const collection = context.presentation.slides;
+    collection.load('items/id');
+    const pageSetup = supports('PowerPointApi', '1.10')
+      ? context.presentation.pageSetup
+      : undefined;
+    pageSetup?.load(['slideWidth', 'slideHeight']);
     await context.sync();
-    const start = count.value;
-    for (let i = 0; i < slides.length; i += 1) context.presentation.slides.add();
+    const previousIds = collection.items.map((slide) => slide.id);
+    const width = pageSetup?.slideWidth ?? 720;
+    const height = pageSetup?.slideHeight ?? 405;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 200 || height < 200)
+      throw new Error('无法确认幻灯片尺寸，请复制大纲后手动排版。');
+    for (let i = 0; i < slides.length; i += 1) collection.add();
     await context.sync();
-    const created = slides.map((_, i) => context.presentation.slides.getItemAt(start + i));
+    collection.load('items/id');
+    await context.sync();
+    const currentIds = collection.items.map((slide) => slide.id);
+    if (
+      currentIds.length !== previousIds.length + slides.length ||
+      previousIds.some((id, i) => currentIds[i] !== id)
+    )
+      throw new Error('建页期间演示文稿页序发生变化，已停止填充。请检查新增的空白页并撤销后重试。');
+    // Bind by ID after creation so later reordering cannot redirect writes to old slides.
+    const created = currentIds.slice(previousIds.length).map((id) => collection.getItem(id));
     for (const slide of created) slide.shapes.load('items');
     await context.sync();
     for (const [i, content] of slides.entries()) {
@@ -167,22 +318,35 @@ async function addSlides(raw: string): Promise<void> {
       // Default layouts can contain title/body placeholders; clear only the new slides.
       for (const shape of slide.shapes.items) shape.delete();
       const title = slide.shapes.addTextBox(content.title, {
-        left: 40,
-        top: 32,
-        width: 620,
-        height: 72,
+        left: width * 0.055,
+        top: height * 0.075,
+        width: width * 0.89,
+        height: height * 0.18,
       });
-      title.textFrame.textRange.font.size = 28;
+      title.textFrame.textRange.font.size = slideFontSize(
+        content.title,
+        width * 0.89,
+        height * 0.18,
+        28,
+        18,
+      );
       title.textFrame.textRange.font.bold = true;
       title.textFrame.autoSizeSetting = 'AutoSizeTextToFitShape';
-      // Fit both common 720×405 widescreen and 720×540 standard slide dimensions.
-      const body = slide.shapes.addTextBox(content.bullets.map((b) => `• ${b}`).join('\n\n'), {
-        left: 40,
-        top: 118,
-        width: 620,
-        height: 245,
+      // Older hosts use a 720×405 safe area; 1.10+ follows the actual page size.
+      const bodyText = content.bullets.map((b) => `• ${b}`).join('\n\n');
+      const body = slide.shapes.addTextBox(bodyText, {
+        left: width * 0.055,
+        top: height * 0.29,
+        width: width * 0.89,
+        height: height * 0.61,
       });
-      body.textFrame.textRange.font.size = 16;
+      body.textFrame.textRange.font.size = slideFontSize(
+        bodyText,
+        width * 0.89,
+        height * 0.61,
+        16,
+        12,
+      );
       body.textFrame.autoSizeSetting = 'AutoSizeTextToFitShape';
     }
     await context.sync();
@@ -192,6 +356,7 @@ async function addSlides(raw: string): Promise<void> {
 export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
   const nativeWord = host === 'word' && supports('WordApi');
   const nativeExcel = host === 'excel' && supports('ExcelApi');
+  const nativeTable = nativeExcel && supports('ExcelApi', '1.2');
   const commonText = supports('TextCoercion');
   let selectionRevision = 0;
   let guarded = false;
@@ -221,6 +386,8 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
       insert: nativeWord,
       formula: nativeExcel,
       slides: host === 'powerpoint' && supports('PowerPointApi', '1.4'),
+      document: nativeWord,
+      table: nativeTable,
     },
     readSelection: async () => {
       if (nativeWord) return readWord();
@@ -244,14 +411,25 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
           : {}),
       };
     },
-    prepareWrite: async (kind, source) => {
+    prepareWrite: async (kind, source, output) => {
       if (kind === 'replace' && source?.replace && canReplace)
         return {
           label: `替换 ${source.label}`,
           before: source.text,
+          ...(nativeWord
+            ? {
+                warning:
+                  '将以纯文本替换，选区内部的字体、加粗和段落样式可能改变。需要保留排版时，请返回并选择插入。',
+              }
+            : {}),
           commit: source.replace,
         };
       if (kind === 'insert' && nativeWord) return prepareWordInsertion();
+      if (kind === 'document' && nativeWord) {
+        parseReport(output || '');
+        return prepareWordInsertion(true);
+      }
+      if (kind === 'table' && nativeTable) return prepareExcelTable(output || '');
       if (kind === 'formula' && nativeExcel) return prepareExcelFormula();
       if (kind === 'slides' && host === 'powerpoint' && supports('PowerPointApi', '1.4'))
         return {

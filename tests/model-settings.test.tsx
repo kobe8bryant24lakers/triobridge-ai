@@ -3,11 +3,66 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../src/App';
 import { ModelSettings } from '../src/components/ModelSettings';
-import { PROFILE_KEY } from '../src/core/profile-store';
+import { emptyProfile, PROFILE_KEY } from '../src/core/profile-store';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('quick model setup', () => {
+  it('reveals the key only on explicit keyboard action without submitting or persisting it', async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    const save = vi.fn();
+    const user = userEvent.setup();
+    render(<ModelSettings state={{ profiles: [], activeId: '' }} onSave={save} onBack={vi.fn()} />);
+    const key = screen.getByLabelText('API Key');
+    await user.type(key, 'synthetic-visibility-key');
+    expect(key).toHaveAttribute('type', 'password');
+    await user.tab();
+    expect(screen.getByRole('button', { name: '显示密钥' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(key).toHaveAttribute('type', 'text');
+    expect(key).toHaveValue('synthetic-visibility-key');
+    expect(screen.getByRole('button', { name: '隐藏密钥' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await user.keyboard(' ');
+    expect(key).toHaveAttribute('type', 'password');
+    expect(screen.getByRole('button', { name: '显示密钥' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(localStorage.getItem(PROFILE_KEY) ?? '').not.toContain('synthetic-visibility-key');
+  });
+
+  it('hides the key again when changing profiles, providers or reopening settings', async () => {
+    const profiles = ['first', 'second'].map((id) => ({
+      ...emptyProfile(),
+      id,
+      name: id,
+      model: 'custom-model',
+      apiKey: `${id}-synthetic-key`,
+    }));
+    const props = { state: { profiles, activeId: 'first' }, onSave: vi.fn(), onBack: vi.fn() };
+    const user = userEvent.setup();
+    const view = render(<ModelSettings {...props} />);
+    await user.click(screen.getByRole('button', { name: '显示密钥' }));
+    await user.selectOptions(screen.getByLabelText('已保存的模型'), 'second');
+    expect(screen.getByLabelText(/API Key 本地/)).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText(/API Key 本地/)).toHaveValue('second-synthetic-key');
+    await user.click(screen.getByRole('button', { name: '显示密钥' }));
+    await user.selectOptions(screen.getByLabelText('模型服务'), 'openai');
+    expect(screen.getByLabelText('API Key')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('API Key')).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: '显示密钥' }));
+    view.unmount();
+    render(<ModelSettings {...props} />);
+    expect(screen.getByLabelText(/API Key 本地/)).toHaveAttribute('type', 'password');
+  });
+
   it('connects and saves with only a provider and key, without persisting the key by default', async () => {
     const fetcher = vi
       .fn()

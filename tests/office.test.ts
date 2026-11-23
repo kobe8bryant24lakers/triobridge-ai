@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOfficeBridge } from '../src/office/bridge';
+import { wordSelectionWarning } from '../src/office/word-safety';
+import { COMPLEX_REPORT, COMPLEX_TABLE } from '../src/office/complex-samples';
+
+const wordXml = (content = '<w:p><w:r><w:t>Original</w:t></w:r></w:p>') =>
+  `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${content}</w:body></w:document>`;
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -86,17 +91,25 @@ describe('Office API version fallback', () => {
 describe('Word tracked range and stale content protection', () => {
   function setup() {
     office(['WordApi:1.1']);
-    const range = { text: 'Original', load: vi.fn(), insertText: vi.fn() };
+    const paragraph = { insertHtml: vi.fn() };
+    const range = {
+      text: 'Original',
+      load: vi.fn(),
+      insertText: vi.fn(),
+      insertHtml: vi.fn(),
+      insertParagraph: vi.fn(() => paragraph),
+      getOoxml: vi.fn(() => ({ value: wordXml() })),
+    };
     const context = {
       document: { getSelection: () => range },
       sync: vi.fn().mockResolvedValue(undefined),
       trackedObjects: { add: vi.fn(), remove: vi.fn() },
     };
     vi.stubGlobal('Word', {
-      InsertLocation: { replace: 'Replace', end: 'End' },
+      InsertLocation: { replace: 'Replace', end: 'End', after: 'After' },
       run: vi.fn((...args) => args[args.length - 1](context)),
     });
-    return { range, context };
+    return { range, context, paragraph };
   }
   it('writes back to the tracked source rather than a later cursor location', async () => {
     const { range, context } = setup();
@@ -124,6 +137,194 @@ describe('Word tracked range and stale content protection', () => {
     const plan = await (await createOfficeBridge('word')).prepareWrite('insert');
     await plan.commit('New text');
     expect(range.insertText).toHaveBeenCalledWith('New text', 'End');
+  });
+  it('isolates report headings in a new paragraph so existing text is not restyled', async () => {
+    const { range, context, paragraph } = setup();
+    const bridge = await createOfficeBridge('word');
+    const raw = JSON.stringify(COMPLEX_REPORT);
+    await expect(bridge.prepareWrite('document', undefined, '{}')).rejects.toThrow();
+    expect(context.trackedObjects.add).not.toHaveBeenCalled();
+    const plan = await bridge.prepareWrite('document', undefined, raw);
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+    await plan.commit(raw);
+    expect(range.insertParagraph).toHaveBeenCalledWith('', 'After');
+    expect(paragraph.insertHtml).toHaveBeenCalledWith(expect.stringContaining('<table'), 'Replace');
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    expect(range.insertText).not.toHaveBeenCalled();
+    await plan.dispose!();
+    expect(context.trackedObjects.remove).toHaveBeenCalledWith(range);
+  });
+  it.each([
+    'tbl',
+    'drawing',
+    'pict',
+    'object',
+    'sdt',
+    'fldChar',
+    'fldSimple',
+    'hyperlink',
+    'footnoteReference',
+    'endnoteReference',
+  ])(
+    'keeps %s objects available as context without destructive text replacement',
+    async (element) => {
+      const { range, context } = setup();
+      range.getOoxml.mockReturnValue({
+        value: wordXml(`<w:${element}/><w:p><w:r><w:t>Original</w:t></w:r></w:p>`),
+      });
+      const source = await (await createOfficeBridge('word')).readSelection();
+      expect(source.text).toBe('Original');
+      expect(source.replace).toBeUndefined();
+      expect(source.warning).toContain('保留结构');
+      expect(context.trackedObjects.add).not.toHaveBeenCalled();
+    },
+  );
+  it('rechecks inserted objects even if the selected text did not change', async () => {
+    const { range } = setup();
+    const source = await (await createOfficeBridge('word')).readSelection();
+    range.getOoxml.mockReturnValue({ value: wordXml('<w:drawing/>') });
+    await expect(source.replace!('Replacement')).rejects.toThrow('保留结构');
+    expect(range.insertText).not.toHaveBeenCalled();
+  });
+  it('inspects namespace-aware body content and fails safely on broken OOXML', () => {
+    expect(
+      wordSelectionWarning(wordXml().replace(/w:/g, 'doc:').replace('xmlns:w', 'xmlns:doc')),
+    ).toBeUndefined();
+    expect(wordSelectionWarning('<broken')).toContain('无法确认');
+    expect(
+      wordSelectionWarning(
+        wordXml('<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"/>'),
+      ),
+    ).toContain('保留结构');
+    expect(
+      wordSelectionWarning(
+        wordXml().replace('</w:document>', '<w:styles><w:tbl/></w:styles></w:document>'),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe('Excel structured table creation', () => {
+  function setup() {
+    office(['ExcelApi:1.1', 'ExcelApi:1.2']);
+    const range = {
+      formulas: [] as unknown[][],
+      numberFormat: [] as string[][],
+      text: [
+        ['A', 'B'],
+        ['1', '2'],
+      ],
+      format: { wrapText: false, columnWidth: 0, autofitRows: vi.fn() },
+      load: vi.fn(),
+    };
+    const nativeTable = { style: '' };
+    const newSheet = {
+      getRange: vi.fn(() => range),
+      tables: { add: vi.fn(() => nativeTable) },
+      activate: vi.fn(),
+    };
+    const sheets = {
+      items: [{ name: '数据' }, { name: '数据 (2)' }],
+      load: vi.fn(),
+      add: vi.fn(() => newSheet),
+    };
+    const context = {
+      workbook: {
+        worksheets: sheets,
+        application: { load: vi.fn(), calculationMode: 'Automatic', calculationState: 'Done' },
+      },
+      sync: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.stubGlobal('Excel', {
+      run: (callback: (ctx: typeof context) => unknown) => callback(context),
+    });
+    return { range, newSheet, sheets, context, nativeTable };
+  }
+  const raw = JSON.stringify({
+    name: '数据',
+    headers: ['项目', '值'],
+    formats: ['text', 'number'],
+    rows: [['001', { formula: '=1+1' }]],
+  });
+  it('previews a unique name and writes only after commit to a new worksheet', async () => {
+    const { sheets, newSheet, range, nativeTable } = setup();
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, raw);
+    expect(plan.label).toContain('数据 (3)');
+    expect(plan.label).toContain('A1:B2');
+    expect(sheets.add).not.toHaveBeenCalled();
+    await plan.commit(raw);
+    expect(sheets.add).toHaveBeenCalledWith('数据 (3)');
+    expect(newSheet.getRange).toHaveBeenCalledWith('A1:B2');
+    expect(range.formulas).toEqual([
+      ["'项目", "'值"],
+      ["'001", '=1+1'],
+    ]);
+    expect(range.numberFormat).toEqual([
+      ['@', '@'],
+      ['@', '#,##0.00'],
+    ]);
+    expect(newSheet.tables.add).toHaveBeenCalledWith('A1:B2', true);
+    expect(nativeTable.style).toBe('TableStyleMedium2');
+    expect(newSheet.activate).toHaveBeenCalledTimes(1);
+  });
+  it('rejects a name collision or changed payload before creating any worksheet', async () => {
+    const { sheets } = setup();
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, raw);
+    await expect(plan.commit(raw.replace('001', '002'))).rejects.toThrow('确认时');
+    sheets.items.push({ name: '数据 (3)' });
+    await expect(plan.commit(raw)).rejects.toThrow('名称已被使用');
+    expect(sheets.add).not.toHaveBeenCalled();
+  });
+  it('reports calculated formula errors while acknowledging the sheet was created', async () => {
+    const { range } = setup();
+    range.text[1][1] = '#DIV/0!';
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, raw);
+    expect(await plan.commit(raw)).toMatchObject({
+      warning: expect.stringContaining('B2 #DIV/0!'),
+    });
+  });
+  it('does not claim validation or change workbook mode when Excel calculation is manual or pending', async () => {
+    const { context } = setup();
+    context.workbook.application.calculationMode = 'Manual';
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, raw);
+    expect(await plan.commit(raw)).toMatchObject({
+      warning: expect.stringContaining('手动计算模式'),
+    });
+    expect(context.workbook.application.calculationMode).toBe('Manual');
+    office(['ExcelApi:1.1', 'ExcelApi:1.2', 'ExcelApi:1.9']);
+    context.workbook.application.calculationMode = 'Automatic';
+    context.workbook.application.calculationState = 'Pending';
+    const pendingPlan = await (
+      await createOfficeBridge('excel')
+    ).prepareWrite('table', undefined, raw);
+    expect(await pendingPlan.commit(raw)).toMatchObject({
+      warning: expect.stringContaining('待完成的计算'),
+    });
+  });
+  it('names the partial worksheet on a write failure and does not retry automatically', async () => {
+    const { context, sheets } = setup();
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, raw);
+    context.sync
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('write failed'));
+    await expect(plan.commit(raw)).rejects.toThrow('数据 (3)');
+    expect(sheets.add).toHaveBeenCalledTimes(1);
+  });
+  it('creates the complete 48-row fixture and gates formatting on ExcelApi 1.2', async () => {
+    const { range, newSheet } = setup();
+    range.text = Array.from({ length: 49 }, () => Array(8).fill('0'));
+    const source = JSON.stringify(COMPLEX_TABLE);
+    const plan = await (await createOfficeBridge('excel')).prepareWrite('table', undefined, source);
+    await plan.commit(source);
+    expect(newSheet.getRange).toHaveBeenCalledWith('A1:H49');
+    expect(range.formulas).toHaveLength(49);
+    expect(range.formulas[48][5]).toBe('=D49-E49');
+    office(['ExcelApi:1.1']);
+    const legacy = await createOfficeBridge('excel');
+    expect(legacy.capabilities.table).toBe(false);
+    await expect(legacy.prepareWrite('table', undefined, source)).rejects.toThrow('不支持');
   });
 });
 
@@ -179,11 +380,62 @@ describe('Excel single-cell write protection', () => {
     await expect(plan.commit('=3+3')).rejects.toThrow('已经变化');
     expect(range.formulas).toEqual([['=1+1']]);
   });
+  it('retains numeric precision, formatted dates and percentages, and multiline cell boundaries', async () => {
+    const { range } = setup();
+    Object.assign(range, {
+      address: "'区域 销售'!A1:D2",
+      rowCount: 2,
+      columnCount: 4,
+      values: [
+        ['单价', '完成率', '日期', '备注'],
+        [1234.5678, 0.12567, 46000, '含\t制表符\n第二行'],
+      ],
+      text: [
+        ['单价', '完成率', '日期', '备注'],
+        ['¥1,234.57', '12.6%', '2025-12-09', '含\t制表符\n第二行'],
+      ],
+      formulas: [
+        ['单价', '完成率', '日期', '备注'],
+        [1234.5678, '=1/8+0.00067', 46000, '含\t制表符\n第二行'],
+      ],
+    });
+    const source = await (await createOfficeBridge('excel')).readSelection();
+    const content = JSON.parse(source.text);
+    expect(content.values[1]).toEqual([1234.5678, 0.12567, 46000, '含\t制表符\n第二行']);
+    expect(content.displayValues[1][1]).toBe('12.6%');
+    expect(content.formulas[1][1]).toBe('=1/8+0.00067');
+    expect(source.label).toContain('2 行 × 4 列');
+  });
+  it('reads formulas with empty displayed results and shows zero or false before overwriting', async () => {
+    const { range } = setup();
+    Object.assign(range, { values: [['']], text: [['']], formulas: [['=IF(A1="","",A1)']] });
+    const bridge = await createOfficeBridge('excel');
+    expect(JSON.parse((await bridge.readSelection()).text).formulas[0][0]).toContain('=IF');
+    for (const value of [0, false]) {
+      Object.assign(range, { values: [[value]], text: [['']], formulas: [[value]] });
+      expect((await bridge.prepareWrite('formula')).before).toBe(String(value));
+      expect(JSON.parse((await bridge.readSelection()).text).values[0][0]).toBe(value);
+    }
+  });
+  it('reads exactly 2,000 cells without whitespace exhausting the context budget', async () => {
+    const { range } = setup();
+    Object.assign(range, {
+      rowCount: 200,
+      columnCount: 10,
+      address: 'Sheet1!A1:J200',
+      values: Array.from({ length: 200 }, () => Array(10).fill(1)),
+      text: Array.from({ length: 200 }, () => Array(10).fill('1')),
+      formulas: Array.from({ length: 200 }, () => Array(10).fill(1)),
+    });
+    const source = await (await createOfficeBridge('excel')).readSelection();
+    expect(JSON.parse(source.text).values.flat()).toHaveLength(2000);
+    expect(source.text.length).toBeLessThan(30000);
+  });
 });
 
 describe('PowerPoint outline write boundaries', () => {
-  it('validates before adding slides and leaves existing content untouched', async () => {
-    office(['PowerPointApi:1.4']);
+  function setup(modern = false) {
+    office(['PowerPointApi:1.4', ...(modern ? ['PowerPointApi:1.10'] : [])]);
     const existingDelete = vi.fn();
     const newPlaceholderDeletes: ReturnType<typeof vi.fn>[] = [];
     const textBoxes: {
@@ -196,6 +448,7 @@ describe('PowerPoint outline write boundaries', () => {
     }[] = [];
     const slides = [
       {
+        id: 'existing-slide',
         shapes: {
           items: [{ delete: existingDelete }],
           load: vi.fn(),
@@ -204,11 +457,16 @@ describe('PowerPoint outline write boundaries', () => {
       },
     ];
     const collection = {
+      get items() {
+        return [...slides];
+      },
+      load: vi.fn(),
       getCount: () => ({ value: slides.length }),
       add: vi.fn(() => {
         const remove = vi.fn();
         newPlaceholderDeletes.push(remove);
         slides.push({
+          id: `new-${slides.length}`,
           shapes: {
             items: [{ delete: remove }],
             load: vi.fn(),
@@ -225,14 +483,22 @@ describe('PowerPoint outline write boundaries', () => {
         });
       }),
       getItemAt: (index: number) => slides[index],
+      getItem: vi.fn((id: string) => slides.find((slide) => slide.id === id)!),
     };
     const context = {
-      presentation: { slides: collection },
+      presentation: {
+        slides: collection,
+        pageSetup: { slideWidth: 540, slideHeight: 960, load: vi.fn() },
+      },
       sync: vi.fn().mockResolvedValue(undefined),
     };
     vi.stubGlobal('PowerPoint', {
       run: (callback: (ctx: typeof context) => unknown) => callback(context),
     });
+    return { slides, collection, context, existingDelete, textBoxes, newPlaceholderDeletes };
+  }
+  it('validates before adding slides and leaves existing content untouched', async () => {
+    const { slides, collection, existingDelete, textBoxes, newPlaceholderDeletes } = setup();
     const plan = await (await createOfficeBridge('powerpoint')).prepareWrite('slides');
     await expect(plan.commit('{"slides":[]}')).rejects.toThrow();
     expect(collection.add).not.toHaveBeenCalled();
@@ -251,5 +517,63 @@ describe('PowerPoint outline write boundaries', () => {
       textBoxes.every((box) => box.textFrame.autoSizeSetting === 'AutoSizeTextToFitShape'),
     ).toBe(true);
     expect(newPlaceholderDeletes.every((remove) => remove.mock.calls.length === 1)).toBe(true);
+  });
+  it('stops before deleting any shapes if another edit changes the page order during creation', async () => {
+    const { slides, context, existingDelete, newPlaceholderDeletes } = setup();
+    let syncs = 0;
+    context.sync.mockImplementation(async () => {
+      if (++syncs === 2) slides.reverse();
+    });
+    const plan = await (await createOfficeBridge('powerpoint')).prepareWrite('slides');
+    await expect(
+      plan.commit(JSON.stringify({ slides: [{ title: '新页', bullets: ['要点'] }] })),
+    ).rejects.toThrow('页序发生变化');
+    expect(existingDelete).not.toHaveBeenCalled();
+    expect(newPlaceholderDeletes[0]).not.toHaveBeenCalled();
+  });
+  it('reserves readable line spacing before native auto-fit for dense Chinese slides', async () => {
+    const { context, textBoxes } = setup(true);
+    context.presentation.pageSetup.slideWidth = 720;
+    context.presentation.pageSetup.slideHeight = 540;
+    const plan = await (await createOfficeBridge('powerpoint')).prepareWrite('slides');
+    await plan.commit(
+      JSON.stringify({
+        slides: [
+          { title: '验收范围', bullets: ['保留原始资料', '核对全部数据'] },
+          {
+            title: '复杂项目验收'.repeat(8),
+            bullets: Array.from({ length: 5 }, () => '验收数据完整性'.repeat(21)),
+          },
+        ],
+      }),
+    );
+    expect(textBoxes[0].textFrame.textRange.font.size).toBe(28);
+    expect(textBoxes[1].textFrame.textRange.font.size).toBe(16);
+    expect(textBoxes[2].textFrame.textRange.font.size).toBeGreaterThanOrEqual(18);
+    expect(textBoxes[2].textFrame.textRange.font.size).toBeLessThan(28);
+    expect(textBoxes[3].textFrame.textRange.font.size).toBe(12);
+    expect(textBoxes[3].textFrame.autoSizeSetting).toBe('AutoSizeTextToFitShape');
+  });
+  it('creates twelve dense slides by ID within a portrait presentation', async () => {
+    const { context, textBoxes, collection, existingDelete } = setup(true);
+    const plan = await (await createOfficeBridge('powerpoint')).prepareWrite('slides');
+    await plan.commit(
+      JSON.stringify({
+        slides: Array.from({ length: 12 }, (_, i) => ({
+          title: `第 ${i + 1} 页`,
+          bullets: Array(5).fill('长内容'.repeat(50)),
+        })),
+      }),
+    );
+    expect(textBoxes).toHaveLength(24);
+    expect(collection.getItem).toHaveBeenCalledTimes(12);
+    for (const box of textBoxes) {
+      const rect = box.options as { left: number; top: number; width: number; height: number };
+      expect(rect.left + rect.width).toBeLessThanOrEqual(context.presentation.pageSetup.slideWidth);
+      expect(rect.top + rect.height).toBeLessThanOrEqual(
+        context.presentation.pageSetup.slideHeight,
+      );
+    }
+    expect(existingDelete).not.toHaveBeenCalled();
   });
 });
