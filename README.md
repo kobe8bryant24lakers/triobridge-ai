@@ -23,7 +23,7 @@ The service starts at sign-in; close the installation window after setup. Run a 
 
 If a Windows app cannot see the entry, run `Diagnose.cmd` for a read-only check of Office versions, catalog registration/access and all three manifest hosts. It does not read model keys or documents. [Per-app discovery troubleshooting](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项).
 
-Packages are unsigned and may require system confirmation. On Mac, follow System Settings → Privacy & Security if execution is blocked, and handle macOS Office-data access and certificate prompts. Organizational policies may restrict sideloading. Native Windows Office acceptance remains pending. [Setup and troubleshooting](docs/LOCAL-MODELS.md).
+Packages are unsigned and may require system confirmation. On Mac, follow System Settings → Privacy & Security if execution is blocked, and handle macOS Office-data access and certificate prompts. First use of a saved key or an upgrade may also prompt for Keychain access by the local service; complete that system prompt and retry without entering the key again. Organizational policies may restrict sideloading. Native Windows Office acceptance remains pending. [Setup and troubleshooting](docs/LOCAL-MODELS.md).
 
 [Browser demo without a key](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [Features and downloads](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)
 

@@ -23,7 +23,7 @@
 
 Windows 只有部分应用显示加载项时，运行 `Diagnose.cmd`，只读检查应用版本、目录注册 / 可达性和三应用声明，不读取模型密钥或文档。[按应用排查入口](docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项)。
 
-安装包尚未签名，首次运行可能需要系统确认。Mac 可按“系统设置 → 隐私与安全性”提示允许；Office 数据访问和证书信任需按系统提示处理。组织策略可能限制旁加载。Windows 原生 Office 验收仍待完成。[完整安装与故障处理](docs/LOCAL-MODELS.md)。
+安装包尚未签名，首次运行可能需要系统确认。Mac 可按“系统设置 → 隐私与安全性”提示允许；Office 数据访问和证书信任需按系统提示处理。首次使用已存密钥或升级后，macOS 也可能请求允许本机服务访问钥匙串；在系统窗口确认后重试，无需重新填写密钥。组织策略可能限制旁加载。Windows 原生 Office 验收仍待完成。[完整安装与故障处理](docs/LOCAL-MODELS.md)。
 
 [浏览器演示（无需密钥）](https://kobe8bryant24lakers.github.io/triobridge-ai/app/) · [功能与下载页面](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)
 

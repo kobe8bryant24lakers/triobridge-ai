@@ -225,7 +225,9 @@ export function createSharedModelClient(
             : 'network';
       if (timedOut)
         throw new SharedModelClientError(
-          '本机共享服务响应超时，请检查服务后重试。',
+          connection
+            ? '连接等待超时。若系统正在请求密钥访问，请在系统窗口确认后重试；否则检查本机服务。本次修改尚未确认保存，请重新连接后核对配置。'
+            : '本机共享服务响应超时，请检查服务后重试。',
           'local_timeout',
         );
       if (signal?.aborted) throw new DOMException('已取消操作。', 'AbortError');
