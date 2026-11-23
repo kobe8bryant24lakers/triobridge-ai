@@ -74,6 +74,8 @@ The baseline engine target is ES2020 / Safari 15.4+, with modern WebView2 requir
 
 Native Mac acceptance completed on November 21–23, 2026. Real-model cases include a six-section Word report with two tables, an Excel workbook with 41 formulas and native recalculation, and ten PowerPoint slides appended to a three-slide original. Separate fixed-response stress cases cover 48 Excel rows with 96 formulas and twelve dense PowerPoint slides. The shared edition was also checked for cross-app switching, conflicting edits, offline recovery, and production-build reopening. The recorded regression suite has 284 passing checks, with 810 additional saved-file assertions and every page of the complex Word/PPT PDFs reviewed. See the [test scope and evidence](docs/TESTING.md). Windows native acceptance remains pending; other versions, protected files, and templates require separate verification.
 
+The v0.4.0 installer was additionally tested in all three native Mac apps with saved real-model settings: a two-page report, a 24-row order sheet with 96 checked native formula results, and five slides appended while retaining six originals. All files reopened successfully; 337 saved-file assertions passed. The current automated suite passes 303 checks. [Installer acceptance and remaining Windows validation](docs/TESTING.md).
+
 ## Complex document workflows
 
 - **Word reports**: Select **Structured report (结构化报告)** and describe the audience, sections, and table requirements. After generation, edit the title, body, bullet points, and table cells directly, then check the insertion point and confirm. Each report supports up to 12 sections, with tables limited to 8 columns and 60 rows per section.

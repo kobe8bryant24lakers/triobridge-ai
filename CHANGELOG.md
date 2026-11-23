@@ -12,6 +12,8 @@ Windows packages check for running Office apps before changing the catalog and i
 
 PowerPoint generation instructions now describe append-only behavior, so preserving existing slides does not request placeholder copies in the generated outline. Generated Excel percentage columns display two decimal places. Mac setup and model settings also explain first-use Keychain prompts.
 
+The installed Mac build passed real configured-model generation, writing, saving and reopening in all three native Office apps. Saved outputs passed 337 field assertions, including 96 native Excel formula results and unchanged original PowerPoint slides; Word pages and new slides were visually reviewed. See [validation scope and remaining Windows work](docs/TESTING.md).
+
 ### 简体中文
 
 - 新增 Windows / Mac、x64 / ARM64 本机共享安装包，自带运行环境，双击安装并按系统提示完成配置。
