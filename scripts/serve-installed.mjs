@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { mkdir, rename, stat, writeFile } from 'node:fs/promises';
 import { installedRoot, readInstallation, assertRegularOwned } from './local-install-files.mjs';
+import { enforcePrivatePath } from './private-local-permissions.mjs';
 
 const root = installedRoot();
 const state = await readInstallation(root);
@@ -39,6 +40,7 @@ if (process.platform === 'win32') {
     JSON.stringify({ installationId: state.id, version: state.active, pid: process.pid }) + '\n',
     { mode: 0o600, flag: 'wx' },
   );
+  await enforcePrivatePath(temporary, 'file', { created: true });
   await rename(temporary, destination);
 }
 await assertRegularOwned(join(root, 'certificates'), 'directory');
