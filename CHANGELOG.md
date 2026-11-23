@@ -10,7 +10,7 @@ The English and Chinese website and README now prioritize local shared downloads
 
 Windows packages check for running Office apps before changing the catalog and include a read-only `Diagnose.cmd` for per-app discovery problems. Reports contain application versions and catalog/manifest status, without document content or model credentials.
 
-PowerPoint generation instructions now describe append-only behavior, so preserving existing slides does not request placeholder copies in the generated outline. Mac setup and model settings also explain first-use Keychain prompts.
+PowerPoint generation instructions now describe append-only behavior, so preserving existing slides does not request placeholder copies in the generated outline. Generated Excel percentage columns display two decimal places. Mac setup and model settings also explain first-use Keychain prompts.
 
 ### 简体中文
 
@@ -19,7 +19,7 @@ PowerPoint generation instructions now describe append-only behavior, so preserv
 - 本地 HTTP API 通过本机服务调用；连接报错明确区分插件到本机服务、服务到模型 API 的故障。
 - README 与 GitHub Pages 优先提供本机共享下载，在线版独立说明。Windows 原生 Office 验收仍由使用者后续完成。
 - Windows 安装前检查三应用是否关闭，并提供只读 `Diagnose.cmd`，定位目录注册、可达性及宿主声明，不读取密钥或文档。
-- 明确 PowerPoint 只生成待新增页面，避免把保留原页误生成为占位页；Mac 安装及模型设置补充钥匙串访问提示。
+- 明确 PowerPoint 只生成待新增页面，避免把保留原页误生成为占位页；Excel 百分比列默认显示两位小数；Mac 安装及模型设置补充钥匙串访问提示。
 
 ## 0.3.0 — 2026-11-23
 

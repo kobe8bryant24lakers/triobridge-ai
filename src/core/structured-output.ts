@@ -298,7 +298,7 @@ export const NUMBER_FORMATS: Record<ColumnFormat, string> = {
   text: '@',
   integer: '#,##0',
   number: '#,##0.00',
-  percent: '0.0%',
+  percent: '0.00%',
 };
 
 export function columnName(index: number): string {
