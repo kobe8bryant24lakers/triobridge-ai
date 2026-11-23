@@ -21,8 +21,8 @@ test('Windows private ACL invocation uses a fixed script and passes only a liter
   assert.deepEqual(calls[0][1], [
     '-NoProfile',
     '-NonInteractive',
-    '-Command',
-    WINDOWS_PRIVATE_ACL_SCRIPT,
+    '-EncodedCommand',
+    Buffer.from(WINDOWS_PRIVATE_ACL_SCRIPT, 'utf16le').toString('base64'),
   ]);
   assert.equal(calls[0][1].join(' ').includes(path), false);
   assert.equal(calls[0][2].env.TRIOBRIDGE_PRIVATE_PATH, path);

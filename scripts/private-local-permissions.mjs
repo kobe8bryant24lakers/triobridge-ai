@@ -9,6 +9,8 @@ const execute = promisify(execFile);
 export const WINDOWS_PRIVATE_ACL_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$stage = 'INSPECT'
+try {
 $path = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_PATH', 'Process')
 $kind = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_KIND', 'Process')
 $fresh = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_CREATED', 'Process') -eq '1'
@@ -20,11 +22,13 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $current = Get-Acl -LiteralPath $path
 $owner = $current.GetOwner([Security.Principal.SecurityIdentifier]).Value
 if ($owner -ne $identity.User.Value) {
+  $stage = 'OWNER'
   $principal = New-Object Security.Principal.WindowsPrincipal($identity)
   if (-not ($fresh -and $owner -eq 'S-1-5-32-544' -and $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
     throw 'TBACL_OWNER: Private path belongs to another OS account.'
   }
 }
+$stage = 'BUILD'
 if ($kind -eq 'directory') { $acl = New-Object Security.AccessControl.DirectorySecurity }
 else { $acl = New-Object Security.AccessControl.FileSecurity }
 $acl.SetOwner($identity.User)
@@ -39,11 +43,17 @@ foreach ($sid in $allowed) {
   }
   [void]$acl.AddAccessRule($rule)
 }
+$stage = 'APPLY'
 Set-Acl -LiteralPath $path -AclObject $acl
+$stage = 'VERIFY'
 $verified = Get-Acl -LiteralPath $path
 if (-not $verified.AreAccessRulesProtected -or $verified.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.User.Value) { throw 'Private ACL verification failed.' }
 foreach ($rule in $verified.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
   if ($rule.IdentityReference.Value -notin $allowed -or $rule.AccessControlType -ne 'Allow' -or $rule.IsInherited) { throw 'Private ACL contains an unexpected rule.' }
+}
+} catch {
+  [Console]::Error.WriteLine('TBACL_' + $stage)
+  exit 1
 }
 `;
 
@@ -67,7 +77,12 @@ export async function protectWindowsPath(
   try {
     await runner(
       executable,
-      ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_PRIVATE_ACL_SCRIPT],
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-EncodedCommand',
+        Buffer.from(WINDOWS_PRIVATE_ACL_SCRIPT, 'utf16le').toString('base64'),
+      ],
       {
         env: {
           ...environment,
@@ -80,8 +95,14 @@ export async function protectWindowsPath(
         maxBuffer: 8192,
       },
     );
-  } catch {
-    throw new Error('Could not enforce private permissions for the current Windows account.');
+  } catch (error) {
+    const stage = String(error.stderr || '').match(
+      /TBACL_(INSPECT|OWNER|BUILD|APPLY|VERIFY)\b/,
+    )?.[1];
+    throw new Error(
+      'Could not enforce private permissions for the current Windows account.' +
+        (stage ? ` (ACL_${stage})` : ''),
+    );
   }
 }
 
