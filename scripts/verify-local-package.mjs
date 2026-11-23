@@ -81,11 +81,34 @@ try {
 import { runInstaller } from ${moduleUrl('install-local.mjs')};
 import { platformDriver, certificateIdentity } from ${moduleUrl('local-install-platform.mjs')};
 import { installedRoot } from ${moduleUrl('local-install-files.mjs')};
+import { windowsPowerShellEnvironment } from ${moduleUrl('private-local-permissions.mjs')};
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 if (process.env.GITHUB_ACTIONS !== 'true' || process.platform !== 'win32') throw new Error('CI only');
 const driver = platformDriver(installedRoot());
 driver.trustCertificate = async (directory, id) => { await certificateIdentity(directory, id); };
+let starts = 0;
+async function startupDiagnostics() {
+  // Only this freshly created CI installation is inspected. Do not print task
+  // arguments, private manifests, model metadata or credential values.
+  const command = "$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $name = 'TrioBridgeAI-Local-' + $sid; $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue; $info = Get-ScheduledTaskInfo -TaskName $name -ErrorAction SilentlyContinue; [PSCustomObject]@{state = [string]$task.State; lastResult = $info.LastTaskResult; session = (Get-Process -Id $PID).SessionId} | ConvertTo-Json -Compress";
+  try {
+    const result = await promisify(execFile)(join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'), ['-NoProfile', '-NonInteractive', '-Command', command], { env: windowsPowerShellEnvironment(), windowsHide: true, timeout: 60000 });
+    console.log('Native task diagnostic ' + result.stdout.trim());
+  } catch { console.log('Native task diagnostic unavailable'); }
+  for (const name of ['service.log', 'service-error.log']) {
+    try {
+      const text = await readFile(join(installedRoot(), 'logs', name), 'utf8');
+      console.log('Native service diagnostic ' + name + ': ' + text.slice(-2000));
+    } catch { console.log('Native service diagnostic ' + name + ': absent'); }
+  }
+}
 for (const [name, operation] of Object.entries(driver)) {
   driver[name] = async (...args) => {
+    if (name === 'stop' && starts > 0) await startupDiagnostics();
+    if (name === 'start') starts++;
     const start = Date.now();
     console.log('Native step ' + name + ' started');
     try { return await operation(...args); }
