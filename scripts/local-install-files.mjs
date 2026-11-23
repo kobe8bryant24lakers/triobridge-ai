@@ -136,6 +136,7 @@ export async function verifyPackage(directory, platform = process.platform, arch
     'app/scripts/install-local.mjs',
     'app/manifest.xml',
     platform === 'win32' ? 'runtime/node.exe' : 'runtime/node',
+    ...(platform === 'win32' ? ['app/scripts/start-installed.ps1'] : []),
   ])
     if (!seen.has(required)) throw new Error('安装包缺少必要组件。');
   return { ...metadata, digest: createHash('sha256').update(raw).digest('hex') };

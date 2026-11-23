@@ -1,8 +1,9 @@
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Console } from 'node:console';
+import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rename, stat } from 'node:fs/promises';
+import { mkdir, rename, stat, writeFile } from 'node:fs/promises';
 import { installedRoot, readInstallation, assertRegularOwned } from './local-install-files.mjs';
 
 const root = installedRoot();
@@ -25,6 +26,21 @@ if (process.platform === 'win32') {
 const app = join(root, 'versions', state.active || '', 'app');
 if (!state.active || resolve(fileURLToPath(new URL('..', import.meta.url))) !== resolve(app))
   throw new Error('This is not the active installed TrioBridge runtime.');
+if (process.platform === 'win32') {
+  const destination = join(root, 'service-process.json');
+  try {
+    await assertRegularOwned(destination);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const temporary = join(root, `.service-process-${randomUUID()}.tmp`);
+  await writeFile(
+    temporary,
+    JSON.stringify({ installationId: state.id, version: state.active, pid: process.pid }) + '\n',
+    { mode: 0o600, flag: 'wx' },
+  );
+  await rename(temporary, destination);
+}
 await assertRegularOwned(join(root, 'certificates'), 'directory');
 if (process.platform === 'win32') {
   process.env.TLS_PFX_PATH = join(root, 'certificates/server.pfx');

@@ -165,6 +165,23 @@ await runInstaller(process.argv[2], { driver });
     await run('install');
     const first = await readInstallation(root);
     checks.push('native install, generated TLS certificate, login service and Office catalog');
+    // A stale or replaced PID record must never terminate an unrelated process.
+    // Point it at this verifier, whose executable is outside the installed app.
+    const processRecordPath = join(root, 'service-process.json');
+    const originalProcessRecord = await readFile(processRecordPath, 'utf8');
+    await writeFile(
+      processRecordPath,
+      JSON.stringify({ ...JSON.parse(originalProcessRecord), pid: process.pid }),
+    );
+    try {
+      await run('restart');
+    } catch (error) {
+      assert.match(error.message, /3000 端口仍被占用/);
+      await writeFile(processRecordPath, originalProcessRecord);
+      await run('restart');
+    }
+    assert.equal((await call('state', {})).profiles.length, 0);
+    checks.push('stale PID protection leaves an unrelated process alive');
     const id = 'installer-test-' + randomUUID();
     const saved = await call('upsert', {
       expectedRevision: 0,

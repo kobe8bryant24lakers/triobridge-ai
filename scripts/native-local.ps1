@@ -88,6 +88,32 @@ function Assert-Catalog {
     }
 }
 
+function Stop-OwnedServiceProcess {
+    $recordPath = Join-Path $Root 'service-process.json'
+    if (-not (Test-Path -LiteralPath $recordPath)) { return }
+    Assert-OrdinaryPath $recordPath
+    $record = [IO.File]::ReadAllText($recordPath) | ConvertFrom-Json
+    if ($record.installationId -ne $state.id -or $record.version -notmatch '^\d+\.\d+\.\d+-[a-f0-9]{12}(-[a-f0-9]{8})?$' -or
+        $record.pid -notmatch '^\d+$' -or [long]$record.pid -le 0 -or [long]$record.pid -gt [int]::MaxValue) {
+        throw 'Invalid service process record; no process was stopped.'
+    }
+    $version = Join-Path $Root ('versions\' + $record.version)
+    $executable = Join-Path $version 'runtime\node.exe'
+    $entry = Join-Path $version 'app\scripts\serve-installed.mjs'
+    $target = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
+    if (-not $target) { return }
+    try {
+        # Hold the process handle so a recycled PID cannot select another process.
+        $null = $target.Handle
+        if ($target.MainModule.FileName -ne $executable) { return }
+        $processInfo = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + [int]$record.pid)
+        $commandPattern = '^"?' + [Regex]::Escape($executable) + '"?\s+"' + [Regex]::Escape($entry) + '"\s*$'
+        if (-not $processInfo -or $processInfo.CommandLine -notmatch $commandPattern) { return }
+        $target.Kill()
+        if (-not $target.WaitForExit(15000)) { throw 'The owned local service did not stop.' }
+    } finally { $target.Dispose() }
+}
+
 function Invoke-Share([string]$Operation) {
     $helper = Join-Path $PSScriptRoot 'local-catalog-share.ps1'
     $quoted = @($helper, $Operation, $catalog, $account, $shareName) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }
@@ -155,6 +181,7 @@ switch ($Action) {
     }
     'Stop' {
         if (Get-OwnedTask) { Stop-ScheduledTask -TaskName $taskName }
+        Stop-OwnedServiceProcess
     }
     'Start' {
         $null = Get-OwnedTask

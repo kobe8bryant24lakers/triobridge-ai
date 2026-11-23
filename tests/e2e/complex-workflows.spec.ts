@@ -116,6 +116,9 @@ test('settings and help preserve drafts; changing requirements retains a visibly
 test('oversized paste is retained and clearing the result never removes its editor', async ({
   page,
 }) => {
+  // Filling 4,000 lines through the browser's native insertText path can exceed
+  // 30s on CI even in a plain textarea. Keep assertion deadlines unchanged.
+  test.setTimeout(90_000);
   await page.goto('/');
   const large = '多语言文本🙂\n'.repeat(4000);
   await page.getByLabel('参考内容').fill(large);
