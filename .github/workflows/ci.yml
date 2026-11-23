@@ -28,7 +28,9 @@ jobs:
         run: ./tests/installers.ps1
       - name: Use official Ubuntu HTTPS mirrors for browser dependencies
         run: |
-          for ubuntu_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+          # Hosted runners can resolve Ubuntu sources through this mirror list.
+          # Rewriting only ubuntu.sources leaves the slow HTTP mirror active.
+          for ubuntu_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt; do
             if [ -f "$ubuntu_source_file" ]; then
               sudo sed -i -E 's|http://([a-z0-9.-]+\.)?archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security\.ubuntu\.com/ubuntu|https://security.ubuntu.com/ubuntu|g' "$ubuntu_source_file"
             fi
