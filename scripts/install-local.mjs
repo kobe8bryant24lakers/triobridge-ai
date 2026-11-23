@@ -210,6 +210,8 @@ async function install(root, driver) {
   console.log('1/5 正在校验安装包及自带运行环境…');
   const metadata = await verifyPackage(packageRoot);
   const previous = await readInstallation(root);
+  if (process.platform === 'darwin')
+    console.log('首次访问 Office 目录时，请留意并处理 macOS 的数据访问提示。');
   await driver.preflight();
   if (!previous.active && (await portOpen()))
     throw new Error(

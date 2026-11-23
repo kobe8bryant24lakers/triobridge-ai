@@ -7,7 +7,22 @@ import {
   enforcePrivatePath,
   protectWindowsPath,
   WINDOWS_PRIVATE_ACL_SCRIPT,
+  windowsPowerShellEnvironment,
 } from '../scripts/private-local-permissions.mjs';
+
+test('Windows PowerShell reconstructs module paths inherited through Node from PowerShell 7', () => {
+  const environment = {
+    SystemRoot: 'C:\\Windows',
+    PSModulePath: 'incompatible-v7',
+    psMODULEpath: 'v7',
+    OTHER: 'keep',
+  };
+  assert.deepEqual(windowsPowerShellEnvironment(environment), {
+    SystemRoot: 'C:\\Windows',
+    OTHER: 'keep',
+  });
+  assert.equal(environment.PSModulePath, 'incompatible-v7');
+});
 
 test('Windows private ACL invocation uses a fixed script and passes only a literal path through environment', async () => {
   const path = "C:\\Users\\Synthetic User\\a'; Write-Host PWNED; #\\模型配置";

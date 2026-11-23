@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { enforcePrivatePath } from './private-local-permissions.mjs';
+import { enforcePrivatePath, windowsPowerShellEnvironment } from './private-local-permissions.mjs';
 import { assertRegularOwned } from './local-install-files.mjs';
 import {
   LOCAL_MANIFEST_ID,
@@ -65,7 +65,12 @@ export function platformDriver(root, platform = process.platform) {
     ];
     for (const [key, value] of Object.entries(extra)) args.push(`-${key}`, value);
     try {
-      await execute(executable, args, { windowsHide: true, timeout: 180_000, maxBuffer: 256_000 });
+      await execute(executable, args, {
+        env: windowsPowerShellEnvironment(),
+        windowsHide: true,
+        timeout: 180_000,
+        maxBuffer: 256_000,
+      });
     } catch (error) {
       throw new Error(
         `Windows 安装步骤 ${action} 未完成。${String(error.stderr || error.stdout || '').slice(-1600)}`,

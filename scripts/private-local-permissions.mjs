@@ -4,6 +4,14 @@ import { win32 } from 'node:path';
 import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
+// An intermediate Node process can inherit PowerShell 7 module paths. Windows
+// PowerShell then resolves built-in cmdlets to incompatible modules. Let 5.1
+// construct its own search path without changing the parent environment.
+export function windowsPowerShellEnvironment(environment = process.env) {
+  return Object.fromEntries(
+    Object.entries(environment).filter(([name]) => name.toLowerCase() !== 'psmodulepath'),
+  );
+}
 // Only non-secret paths and a fixed kind travel through the child environment.
 // The command is fixed: no path, token, API key or caller input is interpolated.
 export const WINDOWS_PRIVATE_ACL_SCRIPT = `
@@ -90,7 +98,7 @@ export async function protectWindowsPath(
       ],
       {
         env: {
-          ...environment,
+          ...windowsPowerShellEnvironment(environment),
           TRIOBRIDGE_PRIVATE_PATH: path,
           TRIOBRIDGE_PRIVATE_KIND: kind,
           TRIOBRIDGE_PRIVATE_CREATED: created ? '1' : '0',

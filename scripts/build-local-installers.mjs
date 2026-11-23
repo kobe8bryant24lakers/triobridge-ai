@@ -183,7 +183,7 @@ export async function buildLocalInstaller(
             : `"%~dp0runtime\\node.exe" "%~dp0app\\scripts\\install-local.mjs" ${action}`;
         await writeFile(
           join(directory, `${name}.cmd`),
-          `@echo off\r\nsetlocal\r\nchcp 65001 >nul\r\n${launcher}\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n`,
+          `@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\n${launcher}\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n`,
         );
       }
     }
