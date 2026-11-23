@@ -26,6 +26,13 @@ jobs:
       - name: Check Windows installer syntax and isolated share behavior
         shell: pwsh
         run: ./tests/installers.ps1
+      - name: Use official Ubuntu HTTPS mirrors for browser dependencies
+        run: |
+          for ubuntu_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$ubuntu_source_file" ]; then
+              sudo sed -i -E 's|http://([a-z0-9.-]+\.)?archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security\.ubuntu\.com/ubuntu|https://security.ubuntu.com/ubuntu|g' "$ubuntu_source_file"
+            fi
+          done
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - run: npm run test:pages
