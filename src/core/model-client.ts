@@ -198,7 +198,7 @@ export async function complete(
       throw new ModelError('服务返回了无效 JSON，请检查接口地址。', 'response');
     if (isSharedProfile(profile))
       throw new ModelError(
-        '无法连接 TrioBridge 本机共享服务。请确认本机服务仍在运行，再重新连接。',
+        '无法连接 TrioBridge 本机共享服务。请双击本机共享安装包中的 Restart，重启服务后重新连接。',
         'network',
       );
     if (/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?=[:/])/i.test(endpoint))

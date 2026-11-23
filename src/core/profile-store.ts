@@ -261,8 +261,8 @@ export function createProfileController(options: ControllerOptions = {}) {
       legacyAvailable: hasLegacyProfiles(local),
       warning:
         error instanceof SharedModelClientError && ['capability', 'local_auth'].includes(error.code)
-          ? '本机共享入口缺少有效的安装凭证。请重新安装生成的本机共享清单，保存文档并完全退出、重开 Office。旧模型配置未修改。'
-          : '本机共享服务暂时未连接。已保留共享配置，请恢复本机服务后重试；未切换到旧本地密钥。',
+          ? '本机共享入口缺少有效的安装凭证。请重新运行本机共享安装包中的 Install，保存文档并完全退出、重开 Office。旧模型配置未修改。'
+          : '本机共享服务暂时未连接。请双击本机共享安装包中的 Restart，恢复后重试。已保留共享配置，未切换到旧本地密钥。',
     });
   }
   async function refresh(signal?: AbortSignal): Promise<SharedProfileState> {

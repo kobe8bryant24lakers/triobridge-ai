@@ -232,8 +232,9 @@ await runInstaller(process.argv[2], { driver });
         nodeVersion: metadata.nodeVersion,
         checks,
         modelResponses: 'synthetic transport fixture; not native Office acceptance',
-        interactiveCertificateTrust:
-          'not exercised in unattended CI; requires manual Windows acceptance',
+        interactiveCertificateTrust: process.argv.includes('--install')
+          ? 'not exercised in unattended CI; requires manual Windows acceptance'
+          : 'not exercised by package integrity verification',
       },
       null,
       2,
