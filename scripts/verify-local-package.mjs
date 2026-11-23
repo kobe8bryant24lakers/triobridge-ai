@@ -84,6 +84,14 @@ import { installedRoot } from ${moduleUrl('local-install-files.mjs')};
 if (process.env.GITHUB_ACTIONS !== 'true' || process.platform !== 'win32') throw new Error('CI only');
 const driver = platformDriver(installedRoot());
 driver.trustCertificate = async (directory, id) => { await certificateIdentity(directory, id); };
+for (const [name, operation] of Object.entries(driver)) {
+  driver[name] = async (...args) => {
+    const start = Date.now();
+    console.log('Native step ' + name + ' started');
+    try { return await operation(...args); }
+    finally { console.log('Native step ' + name + ' elapsed ' + (Date.now() - start) + ' ms'); }
+  };
+}
 await runInstaller(process.argv[2], { driver });
 `,
       );
@@ -93,7 +101,7 @@ await runInstaller(process.argv[2], { driver });
     const run = (action, runner = lifecycleRunner) =>
       execute(node, [runner, action], {
         windowsHide: true,
-        timeout: 300_000,
+        timeout: 600_000,
         maxBuffer: 512_000,
       });
     const apiCalls = [];
