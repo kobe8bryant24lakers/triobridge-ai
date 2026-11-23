@@ -5,12 +5,12 @@ import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { request } from 'node:https';
-import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { verifyPackage, installedRoot, readInstallation } from './local-install-files.mjs';
-import { localInstallerName } from './build-local-installers.mjs';
+import { localInstallerName, packageFiles } from './build-local-installers.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
 import { createNativeModelVault } from './shared-model-vault.mjs';
 
@@ -71,12 +71,13 @@ try {
     // CI has no person to approve it. Exercise the installed core with only this
     // OS confirmation boundary replaced. Every HTTPS request still validates the
     // real generated certificate via its explicit CA; no TLS checks are disabled.
-    lifecycleRunner = join(temporary, 'native-lifecycle.mjs');
-    const moduleUrl = (name) =>
-      JSON.stringify(pathToFileURL(join(directory, 'app/scripts', name)).href);
-    await writeFile(
-      lifecycleRunner,
-      `
+    const createRunner = async (packageDirectory, name) => {
+      const runner = join(temporary, name);
+      const moduleUrl = (name) =>
+        JSON.stringify(pathToFileURL(join(packageDirectory, 'app/scripts', name)).href);
+      await writeFile(
+        runner,
+        `
 import { runInstaller } from ${moduleUrl('install-local.mjs')};
 import { platformDriver, certificateIdentity } from ${moduleUrl('local-install-platform.mjs')};
 import { installedRoot } from ${moduleUrl('local-install-files.mjs')};
@@ -85,9 +86,12 @@ const driver = platformDriver(installedRoot());
 driver.trustCertificate = async (directory, id) => { await certificateIdentity(directory, id); };
 await runInstaller(process.argv[2], { driver });
 `,
-    );
-    const run = (action) =>
-      execute(node, [lifecycleRunner, action], {
+      );
+      return runner;
+    };
+    lifecycleRunner = await createRunner(directory, 'native-lifecycle.mjs');
+    const run = (action, runner = lifecycleRunner) =>
+      execute(node, [runner, action], {
         windowsHide: true,
         timeout: 300_000,
         maxBuffer: 512_000,
@@ -176,6 +180,26 @@ await runInstaller(process.argv[2], { driver });
     assert.equal((await readInstallation(root)).active, first.active);
     assert.equal((await call('state', {})).profiles[0].id, id);
     checks.push('idempotent repair retains configuration');
+    // A valid, separately staged test package fails only when its service starts.
+    // Recovery must restore the real scheduled service, not just an in-memory stub.
+    const broken = join(temporary, 'broken-upgrade');
+    await cp(directory, broken, { recursive: true });
+    await writeFile(
+      join(broken, 'app/scripts/serve-installed.mjs'),
+      "throw new Error('Synthetic upgrade startup failure');\n",
+    );
+    const brokenMetadata = JSON.parse(
+      await readFile(join(broken, 'package-manifest.json'), 'utf8'),
+    );
+    brokenMetadata.files = (await packageFiles(broken)).filter(
+      (file) => file.path !== 'package-manifest.json',
+    );
+    await writeFile(join(broken, 'package-manifest.json'), JSON.stringify(brokenMetadata) + '\n');
+    const brokenRunner = await createRunner(broken, 'broken-lifecycle.mjs');
+    await assert.rejects(run('install', brokenRunner), /本机服务未能启动/);
+    assert.equal((await readInstallation(root)).active, first.active);
+    assert.equal((await call('state', {})).profiles[0].id, id);
+    checks.push('failed upgrade activation restores the previous native service and model catalog');
     await run('restart');
     const result = await call('complete', {
       profileId: id,
