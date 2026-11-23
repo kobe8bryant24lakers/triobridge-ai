@@ -96,6 +96,28 @@ describe('shared metadata and fixed local routing', () => {
     );
     expect(fetcher.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
   });
+  it('distinguishes an unavailable local bridge from an unreachable model API', async () => {
+    const failure = vi.fn().mockRejectedValue(new TypeError('private error content'));
+    await expect(createSharedModelClient(failure, () => token).state()).rejects.toMatchObject({
+      code: 'local_network',
+      message: expect.stringContaining('本机共享服务'),
+    });
+    vi.spyOn(capability, 'getLocalCapability').mockReturnValue(token);
+    const profile = parseSharedState(state).profiles[0];
+    await expect(complete(profile, messages, undefined, failure)).rejects.toMatchObject({
+      code: 'network',
+      message: expect.stringContaining('本机共享服务'),
+    });
+    const upstream = vi
+      .fn()
+      .mockResolvedValue(
+        json({ error: { code: 'network', message: 'API refused: ECONNREFUSED' } }, 502),
+      );
+    await expect(complete(profile, messages, undefined, upstream)).rejects.toMatchObject({
+      code: 'network',
+      message: 'API refused: ECONNREFUSED',
+    });
+  });
   it('rejects stale shared generation without silently reissuing it', async () => {
     vi.spyOn(capability, 'getLocalCapability').mockReturnValue(token);
     const fetcher = vi

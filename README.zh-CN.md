@@ -135,7 +135,9 @@ npm run sideload:mac
 1. 运行 `npm run manifest:local`，将命令生成的私有清单放入专用目录，例如 `C:\OfficeAddins\TrioBridge`。这份文件只用于本机当前账号，不应分发；见[同机共享配置](docs/LOCAL-MODELS.md)。
 2. 在文件夹属性中设置网络共享，仅向自己的账号授予所需读写权限，取得 UNC 地址，例如 `\\YOUR-PC\TrioBridge`。
 3. 在 Office 的 **文件 → 选项 → 信任中心 → 信任中心设置 → 受信任的加载项目录** 中添加 UNC 地址，勾选“在菜单中显示”。
-4. 重启 Office，在 **插入 → 我的加载项 → 共享文件夹** 中选择 TrioBridge AI。入口文字可能因版本而异。
+4. 保存文档并完全退出、重开 Office，在 **插入 → 我的加载项 → 共享文件夹** 中选择 **TrioBridge AI · 三桥 AI（本机共享）**。模型设置页应显示 **本机共享**。
+
+Windows 的“共享文件夹”只是加载项安装目录，不等于模型配置共享。在线版 ZIP 也使用此入口。请安装上一步生成的 `triobridge-ai.xml`，不要使用仓库根目录的原始 `manifest.xml` 或在线版清单。若连接本地 API 时仍出现包含 CORS 的直连报错，请检查是否打开了旧入口；见[本地 API 排查](docs/LOCAL-MODELS.md#本地-http-api-与连接排查)。
 
 清单中的 `localhost` 指运行 Office 的电脑，HTTPS 服务和证书必须配置在同一台电脑。共享文件夹目录用于开发测试，不是正式生产分发渠道。
 

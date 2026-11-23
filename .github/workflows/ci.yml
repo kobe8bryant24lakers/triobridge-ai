@@ -56,7 +56,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: check
+    needs: [check, local-installers]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -72,3 +72,50 @@ jobs:
       - name: Publish site and Office add-in
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
+
+  local-installers:
+    name: Local installer (${{ matrix.platform }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+            asset: Mac
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+            asset: Mac
+          - runner: windows-2025
+            platform: win32
+            arch: x64
+            asset: Windows
+          - runner: windows-11-arm
+            platform: win32
+            arch: arm64
+            asset: Windows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:local
+      - name: Verify bundled runtime and native credential binding
+        run: node scripts/verify-local-package.mjs dist-local/TrioBridge-AI-Local-${{ matrix.asset }}-${{ matrix.arch }}.zip
+      - name: Verify Windows installation lifecycle
+        if: runner.os == 'Windows'
+        run: node scripts/verify-local-package.mjs dist-local/TrioBridge-AI-Local-${{ matrix.asset }}-${{ matrix.arch }}.zip --install
+      - name: Save local shared installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: local-installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist-local/*.zip
+          if-no-files-found: error
+          retention-days: 14

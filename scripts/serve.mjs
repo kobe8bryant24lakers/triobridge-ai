@@ -18,6 +18,7 @@ try {
 const port = 3000;
 const proxy = createProxy(process.env.MODEL_PROXY_TARGET, `https://localhost:${port}`);
 const shared = await createSharedModelRuntime(`https://localhost:${port}`);
+const version = JSON.parse(await readFile(resolve('package.json'), 'utf8')).version;
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript',
@@ -27,6 +28,25 @@ const types = {
   '.json': 'application/json',
 };
 const server = createServer(tlsOptions(), (req, res) => {
+  if (
+    req.url === '/local-health' &&
+    req.method === 'GET' &&
+    ['localhost:3000', '127.0.0.1:3000'].includes(req.headers.host)
+  ) {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.end(
+      JSON.stringify({
+        product: 'triobridge-ai-local',
+        version,
+        installationId: process.env.TRIOBRIDGE_INSTALLATION_ID ?? null,
+      }),
+    );
+    return;
+  }
   Promise.resolve(
     shared(req, res, () =>
       proxy(req, res, async () => {

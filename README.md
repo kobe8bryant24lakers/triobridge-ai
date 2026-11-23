@@ -135,7 +135,9 @@ Official instructions: [Sideload on Mac](https://learn.microsoft.com/en-us/offic
 1. Run `npm run manifest:local`, then copy the generated private manifest into a dedicated directory such as `C:\OfficeAddins\TrioBridge`. Keep this installation-specific file private; see [shared model setup](docs/LOCAL-MODELS.md).
 2. Enable network sharing in the folder's properties, grant only your own account the required read/write permissions, and obtain the UNC address, such as `\\YOUR-PC\TrioBridge`.
 3. In Office, go to **File → Options → Trust Center → Trust Center Settings → Trusted Add-in Catalogs**, add the UNC address, and enable **Show in Menu**.
-4. Restart Office and select TrioBridge AI under **Insert → My Add-ins → Shared Folder**. Labels may vary by version.
+4. Save your documents and fully quit and reopen Office. Select **TrioBridge AI · 三桥 AI（本机共享）** under **Insert → My Add-ins → Shared Folder**. Model settings must show **本机共享** (shared on this computer).
+
+Windows **Shared Folder** is an add-in installation catalog, not a model-sharing mode. The online ZIP also uses this catalog. Install the generated `triobridge-ai.xml`, not the repository's raw `manifest.xml` or the hosted manifest. A local API failure mentioning browser CORS indicates a direct-call entry; check for an old entry and follow [local API troubleshooting](docs/LOCAL-MODELS.md#本地-http-api-与连接排查).
 
 The manifest's `localhost` refers to the computer running Office. The HTTPS server and certificate must be configured on that same computer. Shared-folder catalogs are for development testing, not production distribution.
 

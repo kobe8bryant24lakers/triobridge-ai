@@ -9,6 +9,12 @@ foreach ($file in @('Manage.ps1', 'Share.ps1')) {
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $templates $file), [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 }
+foreach ($file in @('native-local.ps1', 'local-catalog-share.ps1', 'uninstall-local.ps1')) {
+    $tokens = $null
+    $parseErrors = $null
+    $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $root ('scripts/' + $file)), [ref]$tokens, [ref]$parseErrors)
+    if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+}
 
 $testState = @{existingShare = $null; created = 0; removed = 0; grantedAccount = ''; shareAccess = @()}
 function Import-Module { [CmdletBinding()]param([string]$Name) }
@@ -62,4 +68,24 @@ foreach ($conflict in @(
         Assert ($testState.existingShare -eq $conflict) 'An unrelated share must remain untouched.'
     }
 }
-Write-Host 'PASS: PowerShell syntax, share idempotence, account scope, ACL drift and collision handling. Windows integration still needs a real host.'
+$testState.existingShare = $null
+$testState.created = 0
+$testState.removed = 0
+$helper = Join-Path $root 'scripts/local-catalog-share.ps1'
+$arguments = @{Directory = 'C:\Users\Test User\LocalCatalog'; Account = 'PC\Test User'; Name = 'TrioBridgeAI-Local-S-1-5-21-123$'}
+& $helper -Action Install @arguments
+& $helper -Action Install @arguments
+Assert ($testState.created -eq 1) 'Local setup must reuse its own share.'
+Assert ($testState.grantedAccount -eq 'PC\Test User') 'Local catalog must only grant the original account access.'
+$testState.shareAccess += [PSCustomObject]@{AccountName = 'Everyone'; AccessControlType = 'Allow'; AccessRight = 'Read'}
+$rejected = $false
+try { & $helper -Action Install @arguments } catch { $rejected = $true }
+Assert $rejected 'Local catalog must reject expanded permissions.'
+& $helper -Action Remove @arguments
+& $helper -Action Remove @arguments
+Assert ($testState.removed -eq 1) 'Repeated local removal must be harmless.'
+$testState.existingShare = [PSCustomObject]@{Path = 'C:\Unrelated'; Description = 'Another application'}
+$rejected = $false
+try { & $helper -Action Remove @arguments } catch { $rejected = $true }
+Assert $rejected 'Local removal must not delete an unrelated share.'
+Write-Host 'PASS: PowerShell syntax, both catalog helpers, account scope, ACL drift and collision handling.'

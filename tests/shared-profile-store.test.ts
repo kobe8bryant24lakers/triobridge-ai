@@ -45,6 +45,36 @@ describe('multi-host shared profile state', () => {
     expect(store.getSnapshot().mode).not.toBe('shared');
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it('blocks local Office fallback without a capability and preserves legacy credentials', async () => {
+    saveProfiles({
+      profiles: [{ ...emptyProfile(), name: 'Legacy', model: 'old', apiKey: 'legacy-secret' }],
+      activeId: '',
+    });
+    const before = localStorage.getItem(PROFILE_KEY);
+    const read = vi.spyOn(localStorage, 'getItem');
+    const fetcher = vi.fn().mockResolvedValue(json(snapshot()));
+    let installedToken: string | undefined;
+    const store = createProfileController({
+      fetcher,
+      capability: () => installedToken,
+      requireShared: true,
+    });
+    controllers.push(store);
+    store.start();
+    await vi.waitFor(() => expect(store.getSnapshot().mode).toBe('shared'));
+    expect(store.getSnapshot()).toMatchObject({
+      connection: 'offline',
+      profiles: [],
+      warning: expect.stringContaining('安装凭证'),
+    });
+    expect(read).not.toHaveBeenCalledWith(PROFILE_KEY);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(() => store.saveLocal({ profiles: [], activeId: '' })).toThrow('共享模式');
+    expect(localStorage.getItem(PROFILE_KEY)).toBe(before);
+    installedToken = token;
+    await store.actions.refresh();
+    expect(store.getSnapshot()).toMatchObject({ mode: 'shared', connection: 'ready' });
+  });
   it('enables shared state without loading legacy credentials', async () => {
     saveProfiles({
       profiles: [{ ...emptyProfile(), name: 'Legacy', model: 'old', apiKey: 'legacy-secret' }],
@@ -72,7 +102,7 @@ describe('multi-host shared profile state', () => {
     await store.actions.refresh();
     await store.actions.refresh();
     expect(store.getSnapshot()).toMatchObject({ revision: 3 });
-    await expect(store.actions.refresh()).rejects.toThrow('offline');
+    await expect(store.actions.refresh()).rejects.toMatchObject({ code: 'local_network' });
     expect(store.getSnapshot()).toMatchObject({
       mode: 'shared',
       revision: 3,

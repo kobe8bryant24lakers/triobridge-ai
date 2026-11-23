@@ -17,6 +17,16 @@ export function isLocalSharedOrigin(origin: string): boolean {
   }
 }
 
+/** A locally installed Office pane must never silently fall back to browser credentials. */
+export function requiresLocalSharedMode(
+  location: Pick<Location, 'origin' | 'search'> = window.location,
+): boolean {
+  return (
+    isLocalSharedOrigin(location.origin) &&
+    new URLSearchParams(location.search).get('office') === '1'
+  );
+}
+
 /** Consume the sideload-only bootstrap before rendering or initiating requests. */
 export function bootstrapLocalCapability(context: BootstrapContext = window): void {
   const url = new URL(context.location.href);

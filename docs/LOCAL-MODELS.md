@@ -47,6 +47,24 @@ npm run manifest:local
 
 服务离线后，已进入共享模式的页面保持共享模型信息并提示重新连接，不会悄悄使用旧的本应用密钥继续调用。缺少本机安装凭证时，重新执行安装清单步骤并重开 Office。
 
+## 本地 HTTP API 与连接排查
+
+支持 `http://127.0.0.1:8001/v1` 这样的本地 OpenAI 兼容 API。插件追加 `/chat/completions`；模型 ID 填写 API 实际提供的名称。服务无需鉴权时，明确选择“不使用密钥”。共享版由本机 Node.js 服务调用 API，不要求模型 API 提供浏览器 CORS。
+
+**Windows 的“共享文件夹”不等于“本机共享模型”。** 它只是加载项安装目录，在线版也能通过它安装。判断依据是模型设置页显示“本机共享”，而不是“仅此应用”。
+
+若连接时报“无法连接模型服务……CORS……本机代理”，表示当前使用浏览器直连流程。请在运行 Office 的同一电脑、同一系统账号下执行 `npm run manifest:local`，把生成的 `triobridge-ai.xml` 安装到受信任目录；Mac 使用 `npm run sideload:mac`。不要安装仓库原始清单、在线版清单或另一台电脑生成的私有清单。保存文档并完全退出、重开 Office，选择名称含“本机共享”的加载项，并保持 `npm start` 运行。
+
+确认共享模式后，可在运行 TrioBridge 本机服务的电脑上用 Node.js 检查 API 是否可达（不发送密钥，不修改配置）：
+
+```sh
+node -e "fetch('http://127.0.0.1:8001/v1/models',{signal:AbortSignal.timeout(5000)}).then(async r=>{console.log('HTTP',r.status);await r.body?.cancel()}).catch(e=>console.error(e.cause?.code||e.name))"
+```
+
+- `HTTP 200` 表示该模型列表接口可访问；`HTTP 401/403` 表示已连到服务，但需要鉴权；`HTTP 404` 表示已收到 HTTP 响应，需要确认服务是否提供此路径。这些结果都不能代替 Chat Completions 的“连接并保存”测试。
+- `ECONNREFUSED` 表示目标拒绝连接，请检查 API 是否启动，以及监听地址和端口。`127.0.0.1` 指运行本机 Node.js 服务的电脑；API 在容器或虚拟机内时，需要将端口映射到这台电脑。
+- 更新后的共享服务会区分拒绝连接、域名解析失败、连接中断、超时和证书错误，不展示原始错误正文或密钥。不需要为 HTTP 回环 API 关闭证书校验或添加通配 CORS。
+
 ## 存储与调用范围
 
 - Mac 元数据位于 `~/Library/Application Support/TrioBridge AI/models/`，Windows 位于 `%LOCALAPPDATA%\TrioBridgeAI\models\`。元数据不含 API Key；本机文件限定当前账号访问。

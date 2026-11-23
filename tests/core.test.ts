@@ -73,6 +73,19 @@ describe('OpenAI-compatible model client', () => {
     await complete({ ...profile(), apiKey: '' }, messages, undefined, fetcher);
     expect(fetcher.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
   });
+  it('identifies browser-direct local API failure and points to the shared entry', async () => {
+    await expect(
+      complete(
+        { ...profile(), baseUrl: 'http://127.0.0.1:8001/v1' },
+        messages,
+        undefined,
+        vi.fn().mockRejectedValue(new TypeError('fetch failed')),
+      ),
+    ).rejects.toMatchObject({
+      code: 'network',
+      message: expect.stringContaining('当前加载项正在直连本地 API'),
+    });
+  });
   it.each([401, 403, 404, 429, 500])(
     'handles HTTP %s without exposing provider body',
     async (status) => {

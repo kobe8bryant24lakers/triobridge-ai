@@ -229,7 +229,11 @@ export function createSharedModelClient(
           'local_timeout',
         );
       if (signal?.aborted) throw new DOMException('已取消操作。', 'AbortError');
-      throw error;
+      if (error instanceof SharedModelClientError) throw error;
+      throw new SharedModelClientError(
+        '无法连接 TrioBridge 本机共享服务。请确认本机服务仍在运行，再重试。本次修改尚未确认保存，请重新连接后核对配置。',
+        'local_network',
+      );
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
