@@ -4,16 +4,16 @@
 
 Connect Word, Excel, and PowerPoint to your own AI models.
 
-**v0.4.0** adds self-contained local shared installers. Configure multiple models once for Word, Excel, and PowerPoint on the same computer and OS account, including local APIs such as `http://127.0.0.1:8001/v1`. [Release notes](CHANGELOG.md#040--2026-11-23) · [Sharing and migration](docs/LOCAL-MODELS.md)
+**v0.5.0** adds local material folders, complete editable PPTX generation, scoped edits to existing slides, and native data charts. The self-contained local edition shares model settings across Word, Excel, and PowerPoint, including local HTTP APIs. [PowerPoint guide](docs/POWERPOINT.md) · [Release notes](CHANGELOG.md) · [Local setup](docs/LOCAL-MODELS.md)
 
 ## Download and install
 
 | Computer | Local shared package |
 | --- | --- |
-| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-x64.zip) |
-| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-arm64.zip) |
-| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
-| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
 1. Save documents and completely close Word, Excel and PowerPoint. Extract the entire folder and double-click `Install.cmd` on Windows or `Install.command` on Mac. No separate Node.js or commands required. The installer sets up the local service, HTTPS certificate, and all three add-in entries. Windows requests administrator authorization for a dedicated catalog share.
 2. Follow system prompts, then reopen Office. Add **三桥 AI（本机共享）** separately in each app under Home → Add-ins; on Windows use Advanced / More Add-ins → Shared Folder. Model settings should show **本机共享** (local shared).
@@ -35,7 +35,7 @@ Packages are unsigned and may require system confirmation. On Mac, follow System
 | --- | --- | --- |
 | Word | Rewrite selections, summarize, translate, draft content, and create structured reports | Confirm replacement of a plain-text selection, or insert a report with sections, bullet points, and native tables |
 | Excel | Generate and explain formulas, answer questions about tables, suggest analyses, and create data tables | Write a single formula, or create a data table with formulas and column formatting in a separate new worksheet |
-| PowerPoint | Create presentation outlines, rewrite copy, organize key points, and edit individual slides | Edit titles, bullet points, and slide order before confirming slide creation; selected-text replacement is also supported |
+| PowerPoint | Material-folder deck generation, existing-slide editing, native data charts, copy and outlines | Editable PPTX, selective object changes, bulk style / alignment / replacement, slide ordering |
 
 - Multiple model profiles, profile switching, connection tests, 5–300 second timeouts, request cancellation, and Chinese error messages.
 - OpenAI-compatible Chat Completions APIs, including local models that do not require an API key.
@@ -67,14 +67,23 @@ The baseline engine target is ES2020 / Safari 15.4+, with modern WebView2 requir
 - Common text reading uses `TextCoercion 1.1`. Word text and report write-back use `WordApi 1.1`. Excel single-formula writing uses `ExcelApi 1.1`; creating formatted data tables requires `ExcelApi 1.2`.
 - PowerPoint copy rewriting uses the common text API. When selection changes cannot be monitored, only copying is offered to avoid overwriting the wrong content.
 - Automatic slide creation requires `PowerPointApi 1.4`; older versions can still generate and copy outlines. Microsoft's version table lists Office 2024 for this capability in volume-licensed Windows editions, and version 16.62 as the minimum on Mac.
-- Outlines support up to 12 slides and create basic title and bullet-point text boxes, without themes, images, or charts. Layout can be refined in Office.
+- The legacy outline workflow supports up to 12 basic text slides. The new material workflow creates 2–20 slides with nine layouts, editable text/tables/charts, pictures, source references, and notes. [Workflow and limits](docs/POWERPOINT.md).
+- Existing-slide editing requires PowerPointApi 1.4; selection requires 1.5, reorder/thumbnail 1.8. Native whole-slide insertion requires 1.2 and accurate size reading in 1.10. Unsupported hosts can download PPTX.
 - `PowerPointApi 1.10` can read the actual slide dimensions and adapt text boxes. Older versions use a basic 720×405 point area. Slide-order changes are checked during creation, and content is written to slides identified by their IDs.
 
 **Testing in native Office applications** covers selection reading, generated previews, and writing in Mac versions of Word, Excel, and PowerPoint. All three Mac applications have now been tested end to end with the configured real OpenAI model, including structured output, native write-back, saved-file verification, and reopening. The earlier fixed-response checks remain separately identified. Windows and different perpetual-license editions still require testing on physical machines. See the [version and testing records](docs/TESTING.md).
 
 Native Mac acceptance completed on November 21–23, 2026. Real-model cases include a six-section Word report with two tables, an Excel workbook with 41 formulas and native recalculation, and ten PowerPoint slides appended to a three-slide original. Separate fixed-response stress cases cover 48 Excel rows with 96 formulas and twelve dense PowerPoint slides. The shared edition was also checked for cross-app switching, conflicting edits, offline recovery, and production-build reopening. The recorded regression suite has 284 passing checks, with 810 additional saved-file assertions and every page of the complex Word/PPT PDFs reviewed. See the [test scope and evidence](docs/TESTING.md). Windows native acceptance remains pending; other versions, protected files, and templates require separate verification.
 
-The v0.4.0 installer was additionally tested in all three native Mac apps with saved real-model settings: a two-page report, a 24-row order sheet with 96 checked native formula results, and five slides appended while retaining six originals. All files reopened successfully; 337 saved-file assertions passed. The current automated suite passes 303 checks. [Installer acceptance and remaining Windows validation](docs/TESTING.md).
+The v0.4.0 installer was additionally tested in all three native Mac apps with saved real-model settings: a two-page report, a 24-row order sheet with 96 checked native formula results, and five slides appended while retaining six originals. All files reopened successfully; 337 saved-file assertions passed. That release’s automated suite passed 303 checks. [Installer acceptance and remaining Windows validation](docs/TESTING.md).
+
+## PowerPoint from local materials
+
+Choose **素材生成** → **选择素材目录**, review the extracted content, and describe the audience and goal. Generate 2–20 slides, review and edit each page, then download PPTX, open a new presentation, or confirm appending it. Pictures are inserted locally; sending image previews for model understanding is a separate opt-in.
+
+**编辑现有** reads selected slides or the whole deck, previews individual text/style/position/order changes, and verifies the target again before applying. Local bulk tools handle replacement, alignment, distribution, and reordering. **数据图表** turns source tables or pasted Excel data into editable charts with embedded workbooks; the model recommends presentation, while numeric data comes directly from the table. Download a backup before editing.
+
+Only selected material is sent when generation starts. No directory index or generation history is stored. Parsing limits, unsupported internals, font fallback, native API requirements, and data handling are documented in the [PowerPoint guide](docs/POWERPOINT.md).
 
 ## Complex document workflows
 
@@ -83,7 +92,7 @@ The v0.4.0 installer was additionally tested in all three native Mac apps with s
 - **PowerPoint outlines**: Select **Presentation outline (演示大纲)** to edit titles and bullet points slide by slide, add or delete slides, and change their order. Dense slides prompt you to split the content; the confirmation dialog shows a readable outline. Existing slides are preserved, and new slides still need layout refinement for the actual presentation.
 - **Try without an API key**: Switch the browser workbench to **Complex document examples (复杂文档示例)** to try a six-section report with two tables, a 48-row table with 96 formulas, and a 12-slide outline. All examples use fixed synthetic data, and the interface continuously indicates that no AI has been called.
 
-Generated results remain only in the current workbench's memory. Refreshing or switching the demo application / example resets them. Copy the content or download JSON / text for backup; JSON downloads are not DOCX, XLSX, or PPTX exports.
+Generated results remain only in the current workbench's memory. Refreshing or switching the demo application / example resets them. Legacy tools offer JSON / text backups, which are not Office files; the new PowerPoint material and chart workflows export real PPTX files.
 
 Official references: [Add-in manifests](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/add-in-manifests), [Word APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/word/word-api-requirement-sets), [Excel APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/excel/excel-api-requirement-sets), and [PowerPoint APIs](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/powerpoint/powerpoint-api-requirement-sets).
 
@@ -198,7 +207,7 @@ npm run test:pages         # Build and verify the static site, hosted workbench,
 npm run manifest:validate # Microsoft validator; requires network access
 ```
 
-GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest version is `1.1.0.0`; the application version is `0.4.0`.
+GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest remains at `1.1.0.0` to preserve saved sideload references; the application version is `0.5.0`.
 
 ```text
 src/core/          Tasks, model client, result validation, configuration storage
@@ -217,7 +226,7 @@ The hosted version is distributed through this repository's GitHub Pages site. R
 
 Teams can host `dist/` on a trusted HTTPS domain, update the manifest's SourceLocation, icons, and AppDomain, and distribute it through their existing organizational add-in channels. Static hosting requires a model provider that allows CORS; teams can also deploy their own authenticated gateway.
 
-Word plain-text replacement does not guarantee preservation of all rich-text formatting within the selection. Structured reports insert headings, lists, and tables; Word determines the final pagination. New Excel worksheets support bulk data and explicit formulas but do not automatically create charts. PowerPoint creates basic text slides without themes, images, or charts. Office writes are not general-purpose transactions: failures may leave partially created slides or worksheets. The interface explains how to inspect and recover from failures and does not automatically repeat writes.
+Word plain-text replacement does not guarantee preservation of all rich-text formatting within the selection. Structured reports insert headings, lists, and tables; Word determines pagination. New Excel worksheets support bulk data and formulas but do not automatically create charts. PowerPoint material generation uses preset layouts, without custom master or animation replication. Editing does not expand group, SmartArt, table, or chart internals. Office writes are not general-purpose transactions: failures may leave partial changes. The interface explains inspection and recovery and does not automatically repeat writes.
 
 Never commit real API keys, document content, `.env`, certificates, or private configurations to the repository.
 

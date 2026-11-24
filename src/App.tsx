@@ -16,6 +16,7 @@ import { createProfileController, type LocalProfileState } from './core/profile-
 import type { HostBridge, HostKind } from './core/types';
 import { createDemoBridge } from './office/demo';
 import type { DemoScenario } from './office/complex-samples';
+import type { PresentationMode } from './components/PresentationWorkspace';
 
 const ICONS = { word: FileText, excel: Grid2X2, powerpoint: Presentation };
 interface Props {
@@ -23,8 +24,14 @@ interface Props {
 }
 
 export default function App({ officeBridge }: Props) {
-  const [host, setHost] = useState<HostKind>(officeBridge?.host || 'word');
+  const [host, setHost] = useState<HostKind>(() => {
+    const demoHost = new URLSearchParams(window.location.search).get('demo-host');
+    return (
+      officeBridge?.host || (demoHost === 'excel' || demoHost === 'powerpoint' ? demoHost : 'word')
+    );
+  });
   const [page, setPage] = useState<'work' | 'settings' | 'help'>('work');
+  const [presentationMode, setPresentationMode] = useState<PresentationMode>('generate');
   const profileController = useMemo(() => createProfileController(), []);
   const profiles = useSyncExternalStore(profileController.subscribe, profileController.getSnapshot);
   useEffect(() => {
@@ -123,7 +130,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             把选择留在你手里。
           </p>
-          <span>TrioBridge AI · 0.4.0</span>
+          <span>TrioBridge AI · 0.5.0</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -171,23 +178,25 @@ export default function App({ officeBridge }: Props) {
                 <li>
                   <h2>提供上下文</h2>
                   <p>
-                    在 Office 中选中内容，再点击「读取选区」。PowerPoint
-                    需要进入文字编辑状态。只有你读取或粘贴的内容会发送给模型。
+                    Word / Excel 可读取选区。PowerPoint
+                    可选择本地素材目录，或读取选中页面、整份演示稿。素材先在本机解析，点击生成时才发送勾选内容；图片理解需另外开启。
                   </p>
                 </li>
                 <li>
                   <h2>检查后写入</h2>
                   <p>
                     选择任务并生成预览。可以编辑结果，核对目标位置后确认写入。Word
-                    报告支持章节和表格；Excel 可写入单个公式，或创建独立的数据工作表。
+                    报告支持章节和表格；Excel 可写入单个公式，或创建独立的数据工作表。PPT
+                    支持生成可编辑整稿、逐项应用局部改动、插入原生图表；建议先下载原稿备份。
                   </p>
                 </li>
               </ol>
               <h2>不同版本，按能力适配</h2>
               <p>
                 基础文本使用通用 Office API；Word 和 Excel 单公式使用 1.1 基础 API，Excel
-                新建格式化数据表需要 ExcelApi 1.2。PowerPoint 自动建页需要 PowerPointApi
-                1.4，不满足时仍可生成大纲并复制。旧式 IE / EdgeHTML WebView 不在支持范围内。
+                新建格式化数据表需要 ExcelApi 1.2。PPT 对象编辑需要 PowerPointApi 1.4，选中页需要
+                1.5，重排需要 1.8；插入整页需要 1.2 及可读取页面尺寸的 1.10。不支持时仍可下载
+                PPTX。旧式 IE / EdgeHTML WebView 不在支持范围内。
               </p>
               <h2>本地模型与隐私</h2>
               <p>
@@ -219,6 +228,8 @@ export default function App({ officeBridge }: Props) {
               onSettings={() => setPage('settings')}
               onBusyChange={setBusy}
               demoScenario={demoScenario}
+              presentationMode={presentationMode}
+              onPresentationModeChange={setPresentationMode}
               onDemoScenarioChange={(next) => {
                 setDemoScenario(next);
                 setDemoDocument('');

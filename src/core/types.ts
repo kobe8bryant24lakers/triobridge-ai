@@ -54,6 +54,7 @@ export interface WritePlan {
 }
 
 export interface HostBridge {
+  presentation?: import('../presentation/types').PresentationAccess;
   host: HostKind;
   mode: 'office' | 'demo';
   capabilities: {
@@ -97,6 +98,14 @@ export interface TableContent {
   formats: ColumnFormat[];
 }
 export interface ChatMessage {
+  role: 'system' | 'user';
+  content: string | ChatContentPart[];
+}
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail: 'low' | 'high' | 'auto' } };
+
+export interface TextChatMessage {
   role: 'system' | 'user';
   content: string;
 }

@@ -155,7 +155,15 @@ export function startModelAudit(
     httpStatus: null,
     finishReason: null,
     usage: null,
-    messages: messages.map(({ role, content }) => ({ role, content })),
+    messages: messages.map(({ role, content }) => ({
+      role,
+      content:
+        typeof content === 'string'
+          ? content
+          : content
+              .map((part) => (part.type === 'text' ? part.text : '[图片内容未记录]'))
+              .join('\n'),
+    })),
     responseContent: null,
     responseContentTruncated: false,
     outcome: 'network',

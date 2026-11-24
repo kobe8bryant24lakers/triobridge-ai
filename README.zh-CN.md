@@ -4,16 +4,16 @@
 
 让 Word、Excel、PowerPoint 连接你自己的 AI 模型。
 
-**v0.4.0** 提供自带运行环境的本机共享安装包。同一电脑、同一系统账号配置一次，Word、Excel、PowerPoint 复用多模型及默认选择；支持 `http://127.0.0.1:8001/v1` 等本地 API。[更新记录](CHANGELOG.md#040--2026-11-23) · [共享与迁移](docs/LOCAL-MODELS.md)
+**v0.5.0** 新增本地素材目录、整套可编辑 PPTX 生成、现有页面局部修改和原生数据图表。本机共享安装包仍支持三款 Office 共用模型与本地 HTTP API。[PPT 使用指南](docs/POWERPOINT.md) · [更新记录](CHANGELOG.md) · [本机安装](docs/LOCAL-MODELS.md)
 
 ## 下载与安装
 
 | 电脑 | 本机共享版安装包 |
 | --- | --- |
-| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-x64.zip) |
-| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Windows-arm64.zip) |
-| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-arm64.zip) |
-| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-Mac-x64.zip) |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-x64.zip) |
 
 1. 先保存文档并完全退出 Word、Excel、PowerPoint，再解压完整文件夹，双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`。无需另外安装 Node.js 或输入命令。安装器配置本机服务、HTTPS 证书和三应用清单；Windows 创建当前账号专用共享目录时请求管理员授权。
 2. 按系统提示完成安装，重开 Office。在每个应用的“主页 → 加载项”分别添加 **三桥 AI（本机共享）**；Windows 从“高级 / 更多加载项 → 共享文件夹”添加。模型设置页应显示 **本机共享**。
@@ -35,7 +35,7 @@ Windows 只有部分应用显示加载项时，运行 `Diagnose.cmd`，只读检
 | --- | --- | --- |
 | Word | 选区改写、摘要、翻译、内容起草、结构化报告 | 确认替换纯文字选区，或插入带章节、要点和原生表格的报告 |
 | Excel | 公式生成与解释、表格问答、分析建议、创建数据表 | 写入单个公式，或在独立新工作表创建带公式、列格式的数据表 |
-| PowerPoint | 演示大纲、文案改写、要点整理、逐页编辑 | 修改标题、要点和页序后确认建页；支持选中文字替换 |
+| PowerPoint | 目录素材生成整稿、现有页面编辑、原生数据图表、文案与大纲 | 可编辑 PPTX、逐项确认局部改动、批量样式 / 对齐 / 替换、页面重排 |
 
 - 多模型配置与切换、连接测试、5–300 秒超时、取消请求、中文错误提示。
 - OpenAI 兼容 Chat Completions 接口，支持无 API Key 的本地模型。
@@ -67,14 +67,23 @@ Windows 只有部分应用显示加载项时，运行 `Diagnose.cmd`，只读检
 - 通用文本读取使用 `TextCoercion 1.1`；Word 文本与报告写回使用 `WordApi 1.1`；Excel 单公式写入使用 `ExcelApi 1.1`，新建格式化数据表需要 `ExcelApi 1.2`。
 - PowerPoint 文案改写使用通用文本 API；无法监听选区变化时仅提供复制，避免误覆盖。
 - 自动创建幻灯片需要 `PowerPointApi 1.4`；旧版本仍可生成和复制大纲。微软的版本表将 Windows 批量授权此能力列为 Office 2024；Mac 对应最低版本 16.62。
-- 大纲最多 12 页，创建基础标题和要点文本框，不生成主题、图片或图表。可在 Office 中继续排版。
+- 原有大纲工具最多 12 页，创建基础文字页；新的素材生成可生成 2–20 页，包含主题色、图片、原生图表与表格、来源及备注，详见 [PPT 使用指南](docs/POWERPOINT.md)。
+- 现有对象编辑需要 PowerPointApi 1.4，选中页需 1.5，重排 / 缩略图需 1.8。插入整页需 1.2 及准确尺寸读取的 1.10；不满足时仍可下载 PPTX。
 - PowerPointApi 1.10 可读取实际页面尺寸并适配文字框；较旧版本使用 720×405 点的基础区域。创建时检查页序变化，填充时按页面 ID 绑定目标。
 
 **实机验证**覆盖 Mac 版 Word、Excel 和 PowerPoint 的选区读取、生成预览和写入。三类 Mac 应用均已使用配置的真实 OpenAI 模型完成复杂内容生成、原生写入、保存文件核对与重开；早期固定回包检查单独记录。Windows 和不同永久授权版本仍待实机验证。见[版本与测试记录](docs/TESTING.md)。
 
 2026-11-21 至 11-23 完成 Mac 原生验收：真实模型生成六节两表的 Word 报告、含 41 个公式且经过原生重算的 Excel 工作簿，以及在三页原稿后追加十页的 PowerPoint。另有固定回包压力案例覆盖 Excel 48 行、96 个公式和 PPT 12 页密集中文。共享版也验证了跨应用切换、并发冲突、离线恢复与正式构建重开。记录包含 284 项回归检查、810 项保存文件检查，复杂 Word/PPT 的 PDF 全部逐页复核。详见[验证范围与证据](docs/TESTING.md)。Windows 原生验收仍待完成；其他版本、受保护文件和模板需独立验证。
 
-v0.4.0 安装包另完成三款原生 Mac 应用的真实模型验收：两页报告、24 行且含 96 个原生计算公式的订单表、保留六页原稿并追加五页演示。三个文件均成功重开，337 项保存文件检查通过；当前自动回归共 303 项通过。[安装包验收与 Windows 待验范围](docs/TESTING.md)。
+v0.4.0 安装包另完成三款原生 Mac 应用的真实模型验收：两页报告、24 行且含 96 个原生计算公式的订单表、保留六页原稿并追加五页演示。三个文件均成功重开，337 项保存文件检查通过；该版本自动回归共 303 项通过。[安装包验收与 Windows 待验范围](docs/TESTING.md)。
+
+## 从本地素材制作与修改 PPT
+
+选择「素材生成 → 选择素材目录」，检查提取内容，填写演示要求，可生成 2–20 页、九种版式的可编辑 PPTX。逐页审阅文字、数据、来源和演讲备注后，下载文件、打开新演示稿，或确认插入原稿末尾。图片可直接作为插图；图片理解另行勾选。
+
+「编辑现有」读取选中页或整稿，逐项预览并选择文字、样式、位置和页序改动，应用前检查原稿是否变化，应用后回读核验。另有批量查找替换、对齐与等距、页面重排工具。「数据图表」从素材表格或粘贴的 Excel 数据创建带内嵌工作簿的原生图表，模型负责建议，绘图直接使用原始数值。编辑前可下载原稿备份。
+
+资料在本机解析，点击生成时发送勾选内容，不建立目录索引、不保存生成历史。支持格式、大小限制、字体替代、组合对象等边界见 [PPT 使用指南](docs/POWERPOINT.md)。
 
 ## 复杂文档工作流
 
@@ -83,7 +92,7 @@ v0.4.0 安装包另完成三款原生 Mac 应用的真实模型验收：两页�
 - **PPT 大纲**：选择「演示大纲」，逐页修改标题和要点，可增删或调整页序。密集页面会提示拆分；确认框显示可读大纲。原有幻灯片保留，新页面仍需按实际演示需求排版。
 - **免密钥体验**：浏览器工作台切换到「复杂文档示例」，使用 6 节含 2 张表的报告、48 行含 96 个公式的数据表、12 页大纲检验操作。全部为固定合成数据，界面持续标明未调用 AI。
 
-生成结果仅在当前工作台内存中保留，刷新或切换演示应用 / 示例会重置。可复制内容或下载 JSON / 文本备份；JSON 下载不是 DOCX、XLSX 或 PPTX 导出。
+生成结果仅在当前工作台内存中保留，刷新或切换演示应用 / 示例会重置。原有工具可复制内容或下载 JSON / 文本备份，JSON 不是 Office 文件；新的 PPT 素材和图表流程导出真正的 PPTX。
 
 官方依据：[加载项清单](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/add-in-manifests)、[Word API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/word/word-api-requirement-sets)、[Excel API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/excel/excel-api-requirement-sets)、[PowerPoint API](https://learn.microsoft.com/en-us/javascript/api/requirement-sets/powerpoint/powerpoint-api-requirement-sets)。
 
@@ -198,7 +207,7 @@ npm run test:pages        # 构建并验证静态站点、在线工作台及清�
 npm run manifest:validate  # 微软验证器，需要网络
 ```
 
-GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单版本为 `1.1.0.0`，应用版本为 `0.4.0`。
+GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单保留 `1.1.0.0`，兼容文稿已保存的旁加载引用；应用版本为 `0.5.0`。
 
 ```text
 src/core/          任务、模型客户端、结果校验、配置存储
@@ -217,7 +226,7 @@ manifest.xml       三应用共用 XML 清单
 
 团队可将 `dist/` 托管到可信 HTTPS 域名，更新清单中的 SourceLocation、图标和 AppDomain，通过组织已有的加载项渠道分发。静态托管要求模型允许 CORS，也可自行部署经过鉴权的网关。
 
-Word 纯文字替换不保证保留选区内部全部富文本样式；结构化报告插入标题、列表和表格，最终分页由 Word 决定。Excel 新表支持批量数据和显式公式，不自动创建图表；PowerPoint 创建基础文字页，不生成主题、图片或图表。Office 写入并非通用事务，失败可能留下部分新增页或工作表；界面会说明检查和恢复方法，不自动重复写入。
+Word 纯文字替换不保证保留选区内部全部富文本样式；结构化报告插入标题、列表和表格，最终分页由 Word 决定。Excel 新表支持批量数据和显式公式，不自动创建图表。PowerPoint 的素材生成使用预设版式，不复刻自定义母版与动画；组合、SmartArt、现有图表和表格内部编辑尚不支持。Office 写入并非通用事务，失败可能留下部分改动；界面会说明检查和恢复方法，不自动重复写入。
 
 真实 API Key、文档内容、`.env`、证书和私有配置不得提交仓库。
 

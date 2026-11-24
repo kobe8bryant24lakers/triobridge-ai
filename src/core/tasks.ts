@@ -1,4 +1,4 @@
-import type { ChatMessage, HostKind, TaskSpec } from './types';
+import type { TextChatMessage, HostKind, TaskSpec } from './types';
 
 export const HOST_NAMES: Record<HostKind, string> = {
   word: 'Word',
@@ -142,7 +142,7 @@ export function buildMessages(
   source: string,
   instruction: string,
   language: string,
-): ChatMessage[] {
+): TextChatMessage[] {
   if (source.length > MAX_SOURCE_LENGTH)
     throw new Error('选区内容超过 30,000 字符，请缩小选区后重新读取。');
   if (instruction.length > MAX_INSTRUCTION_LENGTH)

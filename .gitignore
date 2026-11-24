@@ -30,6 +30,7 @@ out/
 output/
 coverage/
 .cache/
+tmp/
 *.tsbuildinfo
 
 # Logs

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { syntheticPdf } from '../pdf-fixture';
 
 test('hosted demo loads assets under the repository/app base and completes a preview', async ({
   page,
@@ -34,10 +35,41 @@ for (const host of ['Word', 'Excel', 'PowerPoint']) {
     await expect(page.getByRole('heading', { name: `${host} 工作台` })).toBeVisible();
     await expect(page.getByText('Office 加载项', { exact: true })).toBeVisible();
     await expect(page.getByRole('option', { name: '演示模型 · 无需 API Key' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '生成预览', exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole('button', {
+        name: host === 'PowerPoint' ? '生成整套 PPT' : '生成预览',
+        exact: true,
+      }),
+    ).toBeDisabled();
     await expect(page.locator('.brand img')).toHaveAttribute('src', '/triobridge-ai/app/icon.svg');
   });
 }
+
+test('production PDF worker loads from the hosted app base and extracts selected material locally', async ({
+  page,
+}) => {
+  const posts: string[] = [],
+    failures: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST') posts.push(request.url());
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) failures.push(response.url());
+  });
+  await page.goto('app/?demo-host=powerpoint');
+  const worker = page.waitForResponse((response) => /pdf\.worker.*\.mjs$/.test(response.url()));
+  await page.getByLabel('选择素材文件', { exact: true }).setInputFiles({
+    name: 'synthetic-survey.pdf',
+    mimeType: 'application/pdf',
+    buffer: syntheticPdf(),
+  });
+  expect((await worker).headers()['content-type']).toContain('javascript');
+  await expect(page.getByRole('button', { name: '素材上下文 · 1 份已选' })).toBeVisible();
+  await page.getByText('查看内容', { exact: true }).click();
+  await expect(page.locator('.material-text')).toContainText('120 responses');
+  expect(posts).toEqual([]);
+  expect(failures).toEqual([]);
+});
 
 test('site resources and hosted manifest are served while unapproved docs stay private', async ({
   request,
@@ -147,7 +179,7 @@ test('both languages offer four distinct local packages before the hosted editio
       await expect(links.nth(index)).toBeVisible();
       await expect(links.nth(index)).toHaveAttribute(
         'href',
-        `https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.4.0/TrioBridge-AI-Local-${asset}.zip`,
+        `https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-${asset}.zip`,
       );
     }
     await expect(page.locator('.hosted-edition')).not.toHaveAttribute('open');

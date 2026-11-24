@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-11-23
+
+PowerPoint now accepts a local material folder or selected files as context for a complete editable deck or targeted changes to an existing presentation. DOCX, XLSX, PPTX, selectable-text PDF, text and images are parsed locally. Users review the included sources before submitting a model request; optional image understanding is explicit.
+
+Full decks support nine layouts, 2–20 pages, source references, speaker notes, editable tables, images and native data charts. Existing slides support object-level before/after review, selective application, backup, stale-target rejection and post-write verification. Deterministic tools add cross-page text replacement, style unification, alignment, spacing and page ordering. Chart values come from source tables, with zero, negative and missing values preserved in both chart caches and embedded workbooks.
+
+Mac PowerPoint acceptance used the saved real model for a ten-page deck, source-based local edits and a chart recommendation: three requests returned 6,719 tokens. Native files, both aspect ratios, embedded chart data and stale-edit rejection were checked separately from browser demos. Font substitution and unsupported grouped content remain explicit limits. See [PowerPoint guide](docs/POWERPOINT.md) and [validation scope](docs/TESTING.md). The manifest retains version `1.1.0.0` and its existing identity so saved Mac sideloaded documents keep resolving their add-in reference; application version is `0.5.0`.
+
+### 简体中文
+
+- 选择本地素材目录，生成可编辑的整套 PPT；支持文字、图片、表格和原生图表，并保留来源及备注。
+- 参考素材局部修改现有页面，逐项预览与确认；支持原稿备份、过期方案拒绝和应用后核验。
+- 新增跨页替换、统一样式、对象对齐 / 等距和页面重排；图表保留真实零值、负数和空值。
+- 已用保存的真实模型完成 Mac PowerPoint 端到端验收；Windows 原生 Office 仍由用户发布后人工验收。详见测试记录。
+
 ## 0.4.0 — 2026-11-23
 
 Self-contained local shared installers are provided for Windows and macOS, each in x64 and ARM64 builds. They bundle a pinned Node.js runtime and the native credential-store binding, create a private localhost certificate and Office manifest on the target computer, and start the service at sign-in. No separate Node.js or npm setup is required. Upgrade, repair, restart, and uninstall preserve existing model profiles and OS-stored keys.
