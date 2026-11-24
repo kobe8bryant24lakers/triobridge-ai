@@ -149,13 +149,7 @@ async function writeJournal(root, journal) {
   await enforcePrivatePath(path, 'file', { created: true });
 }
 
-async function verifyRestoredService(root, state) {
-  const ca = await waitForHealth(root, state, state.active.split('-')[0]);
-  const token = await getOrCreateLocalCapability(sharedModelsDirectory());
-  await waitForLocalEndpoint({ ca, token });
-}
-
-export async function recoverInstallation(root, driver, waitReady = verifyRestoredService) {
+export async function recoverInstallation(root, driver, waitReady = waitForHealth) {
   const path = join(root, 'transaction.json');
   if (!(await exists(path))) return;
   await assertRegularOwned(path);
@@ -190,7 +184,9 @@ export async function recoverInstallation(root, driver, waitReady = verifyRestor
   await writeInstallation(root, restored);
   if (restored.active) {
     await driver.start(restored);
-    await waitReady(root, restored);
+    // Recovery restores the previous executable. An existing catalog error must not
+    // leave a pending journal that blocks the user's next repair or uninstall.
+    await waitReady(root, restored, restored.active.split('-')[0]);
     await driver.registerUninstaller();
   } else await driver.removeService();
   await rm(path);
