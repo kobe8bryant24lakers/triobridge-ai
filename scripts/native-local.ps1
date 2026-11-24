@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('Preflight', 'Certificate', 'Trust', 'RemoveCertificate', 'Start', 'Stop', 'Catalog', 'RemoveCatalog', 'RemoveService', 'RegisterUninstaller')][string]$Action,
+    [Parameter(Mandatory = $true)][ValidateSet('Preflight', 'Certificate', 'Trust', 'RemoveCertificate', 'Start', 'Stop', 'TaskStatus', 'Catalog', 'RemoveCatalog', 'RemoveService', 'RegisterUninstaller')][string]$Action,
     [Parameter(Mandatory = $true)][string]$Root,
     [string]$CertificateDirectory,
     [string]$InstallationId,
@@ -8,6 +8,12 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+trap {
+    if ($Action -in @('Start', 'Stop')) {
+        [Console]::Error.WriteLine(('TRIOBRIDGE_TASK_ERROR 0x{0:X8}' -f $_.Exception.HResult))
+    }
+    break
+}
 . (Join-Path $PSScriptRoot 'windows-office-discovery.ps1')
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $sid = $identity.User.Value
@@ -137,6 +143,9 @@ function Get-OwnedCertificate {
 }
 
 switch ($Action) {
+    'TaskStatus' {
+        Get-TrioBridgeTaskStatus | ConvertTo-Json -Compress
+    }
     'Preflight' {
         if ($RequireClosedOffice) { Assert-TrioBridgeOfficeClosed }
         Assert-OrdinaryPath $Root

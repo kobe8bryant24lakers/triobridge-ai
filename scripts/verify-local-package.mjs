@@ -131,8 +131,9 @@ await runInstaller(process.argv[2], { driver });
       return runner;
     };
     lifecycleRunner = await createRunner(directory, 'native-lifecycle.mjs');
-    const run = (action, runner = lifecycleRunner) =>
+    const run = (action, runner = lifecycleRunner, env = process.env) =>
       execute(node, [runner, action], {
+        env,
         windowsHide: true,
         timeout: 600_000,
         maxBuffer: 512_000,
@@ -219,9 +220,30 @@ await runInstaller(process.argv[2], { driver });
     await assert.rejects(lstat(models), { code: 'ENOENT' });
     await closeSimulatedOffice();
     checks.push('catalog installation refuses an open simulated Office process without closing it');
-    await run('install');
+    // Simulate a machine with Node's environment proxy enabled and no loopback exemptions.
+    const proxyEnv = Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([key]) => !/^(?:https?_proxy|all_proxy|no_proxy|node_use_env_proxy)$/i.test(key),
+      ),
+    );
+    const proxy = 'http://127.0.0.1:' + fixtureApi.address().port;
+    let tunnels = 0;
+    fixtureApi.on('connect', (_req, socket) => {
+      tunnels++;
+      socket.destroy();
+    });
+    await run('install', lifecycleRunner, {
+      ...proxyEnv,
+      NODE_USE_ENV_PROXY: '1',
+      HTTPS_PROXY: proxy,
+      HTTP_PROXY: proxy,
+      NO_PROXY: '',
+    });
+    assert.equal(tunnels, 0);
+    assert.equal(apiCalls.length, 0);
     const first = await readInstallation(root);
     checks.push('native install, generated TLS certificate, login service and Office catalog');
+    checks.push('local readiness bypasses the environment proxy without sending it any traffic');
     // A stale or replaced PID record must never terminate an unrelated process.
     // Point it at this verifier, whose executable is outside the installed app.
     const processRecordPath = join(root, 'service-process.json');
@@ -262,25 +284,32 @@ await runInstaller(process.argv[2], { driver });
     nativeReference = JSON.parse(await readFile(join(models, 'profiles.json'), 'utf8')).profiles[0]
       .credentialRef;
     checks.push('connect and save through HTTP with native credential storage');
-    const diagnosis = await execute(
-      join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
-      [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        join(directory, 'app/scripts/windows-office-discovery.ps1'),
-        '-Diagnose',
-      ],
-      { env: windowsPowerShellEnvironment(), windowsHide: true, timeout: 120_000 },
-    );
+    const diagnose = () =>
+      execute(
+        join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          join(directory, 'app/scripts/windows-office-discovery.ps1'),
+          '-Diagnose',
+        ],
+        { env: windowsPowerShellEnvironment(), windowsHide: true, timeout: 120_000 },
+      );
+    const diagnosis = await diagnose();
     const report = JSON.parse(diagnosis.stdout.replace(/^\uFEFF/, ''));
     assert.deepEqual(Object.keys(report).sort(), [
       'catalogs',
       'detectedVersions',
       'format',
+      'localService',
       'runningOffice',
     ]);
+    assert.equal(report.format, 2);
+    assert.equal(report.localService.tcp3000, true);
+    assert.equal(report.localService.task.state, 'Running');
+    assert.deepEqual(report.localService.lastStartup, { phase: 'ready', code: 'OK' });
     assert.deepEqual(
       report.catalogs.find((catalog) => catalog.edition === 'local'),
       {
@@ -320,6 +349,12 @@ await runInstaller(process.argv[2], { driver });
     assert.equal((await readInstallation(root)).active, first.active);
     assert.equal((await call('state', {})).profiles[0].id, id);
     checks.push('failed upgrade activation restores the previous native service and model catalog');
+    const afterRollback = JSON.parse((await diagnose()).stdout.trim()).localService;
+    assert.equal(afterRollback.tcp3000, true);
+    assert.equal(afterRollback.lastStartup.phase, 'https');
+    assert.equal(afterRollback.lastStartup.code, 'NO_LISTENER');
+    assert.match(afterRollback.lastStartup.taskResult, /^0x[\dA-F]{8}$/);
+    checks.push('the failing startup phase and scheduler result survive rollback');
     await run('restart');
     const result = await call('complete', {
       profileId: id,

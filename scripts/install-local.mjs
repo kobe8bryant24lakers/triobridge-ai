@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { request } from 'node:https';
 import { createConnection } from 'node:net';
 import { lstat, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -16,6 +15,11 @@ import {
   assertRegularOwned,
   VERSION_DIRECTORY,
 } from './local-install-files.mjs';
+import {
+  checkLoopbackPort,
+  ReadinessError,
+  waitForLocalEndpoint,
+} from './local-service-readiness.mjs';
 import { platformDriver, certificateIdentity } from './local-install-platform.mjs';
 import { getOrCreateLocalCapability } from './local-capability.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
@@ -39,80 +43,85 @@ export async function portOpen() {
   });
 }
 
-async function requestLocal(root, path, token) {
-  const ca = await readFile(join(root, 'certificates/server.crt'));
-  return new Promise((done, reject) => {
-    const req = request(
-      {
-        hostname: '127.0.0.1',
-        port: 3000,
-        servername: 'localhost',
-        ca,
-        path,
-        method: token ? 'POST' : 'GET',
-        headers: {
-          Host: 'localhost:3000',
-          ...(token
-            ? {
-                Origin: 'https://localhost:3000',
-                'Content-Type': 'application/json',
-                'X-TrioBridge-Local-Token': token,
-              }
-            : {}),
-        },
-      },
-      (res) => {
-        const chunks = [];
-        let size = 0;
-        res.on('data', (chunk) => {
-          size += chunk.length;
-          if (size > 512_000) req.destroy(new Error('Local response too large.'));
-          else chunks.push(chunk);
-        });
-        res.on('error', reject);
-        res.on('end', () => {
-          try {
-            if (res.statusCode !== 200) throw new Error('Local service did not become ready.');
-            done(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(2000, () => req.destroy(new Error('Local service readiness timeout.')));
-    req.end(token ? '{}' : undefined);
-  });
+async function waitForHealth(root, state, version) {
+  const path = join(root, 'certificates/server.crt');
+  await assertRegularOwned(path);
+  const ca = await readFile(path);
+  await waitForLocalEndpoint({ ca, installationId: state.id, version });
+  return ca;
 }
 
-// Windows may initialize its PowerShell permission modules on the first launch.
-// On ARM64 the service was healthy shortly after the old 30-second deadline.
-// Keep checking the real TLS/installation identity, with a bounded cold-start grace.
-export async function waitForHealth(
-  root,
-  state,
-  version,
-  timeout = process.platform === 'win32' ? 120_000 : 30_000,
-) {
-  const until = Date.now() + timeout;
-  do {
-    try {
-      const health = await requestLocal(root, '/local-health');
-      if (
-        health.product === 'triobridge-ai-local' &&
-        health.installationId === state.id &&
-        (!version || health.version === version)
-      )
-        return health;
-    } catch {
-      /* The managed service may still be starting. */
+const startupPhases = {
+  stop: ['正在等待旧服务释放 3000 端口', 'TASK_STOP'],
+  activate: ['正在启用本次安装的证书和运行文件', 'ACTIVATION'],
+  credential: ['正在准备当前账号的共享配置访问凭据', 'CAPABILITY_ACCESS'],
+  start: ['正在启动当前账号的登录任务', 'TASK_START'],
+  https: ['正在验证 localhost:3000 的 HTTPS 和安装标识', 'CERTIFICATE_READ'],
+  models: ['正在检查本机共享模型配置', 'MODEL_STORAGE'],
+};
+
+async function saveStartupResult(root, report) {
+  if (process.platform !== 'win32') return;
+  const temporary = join(root, `.startup-${randomUUID()}.tmp`);
+  try {
+    // Only fixed phase/error codes and scheduler status are kept, even after rollback.
+    await writeFile(temporary, JSON.stringify(report), { flag: 'wx', mode: 0o600 });
+    await rename(temporary, join(root, 'last-startup.json'));
+  } catch {
+    console.warn('本次启动诊断未写入，安装窗口中的阶段和代码仍可用于排查。');
+  } finally {
+    await rm(temporary, { force: true }).catch(() => {});
+  }
+}
+
+async function startAndVerify(root, driver, state, version, activate) {
+  let phase;
+  let since;
+  function progress(next) {
+    phase = next;
+    since = Date.now();
+    console.log('  ' + startupPhases[phase][0] + '…');
+  }
+  const heartbeat = setInterval(() => {
+    console.log(
+      `  ${startupPhases[phase][0]}，已等待 ${Math.floor((Date.now() - since) / 1000)} 秒。`,
+    );
+  }, 10_000);
+  try {
+    progress('stop');
+    await stopAndWait(driver);
+    await checkLoopbackPort();
+    if (activate) {
+      progress('activate');
+      await activate();
     }
-    await delay(300);
-  } while (Date.now() < until);
-  throw new Error(
-    '本机服务未能启动。请查看安装目录 logs 中的日志，并检查 3000 端口是否被其他程序占用。',
-  );
+    // Finish protecting the directory before the new process can open it on first launch.
+    progress('credential');
+    const capability = await getOrCreateLocalCapability(sharedModelsDirectory());
+    progress('start');
+    await driver.start(state);
+    progress('https');
+    const ca = await waitForHealth(root, state, version);
+    progress('models');
+    await waitForLocalEndpoint({ ca, token: capability });
+    await saveStartupResult(root, { phase: 'ready', code: 'OK' });
+    return capability;
+  } catch (error) {
+    const code = error instanceof ReadinessError ? error.code : startupPhases[phase][1];
+    let task;
+    if (driver.taskStatus) task = await driver.taskStatus().catch(() => undefined);
+    await saveStartupResult(root, { phase, code, task, hresult: error.taskHresult });
+    const detail =
+      error instanceof ReadinessError ? error.message : startupPhases[phase][0] + '时出错。';
+    throw new Error(
+      `本机服务未能启动。[${phase}/${code}] ${detail}` +
+        (error.taskHresult ? ` Windows 错误码 ${error.taskHresult}。` : '') +
+        (task ? ` Windows 登录任务 ${task.state}，结果 ${task.result ?? '未知'}。` : '') +
+        (process.platform === 'win32' ? ' 可双击包内 Diagnose.cmd 查看本次启动诊断。' : ''),
+    );
+  } finally {
+    clearInterval(heartbeat);
+  }
 }
 
 async function stopAndWait(driver) {
@@ -121,9 +130,7 @@ async function stopAndWait(driver) {
     if (!(await portOpen())) return;
     await delay(200);
   }
-  throw new Error(
-    '3000 端口仍被占用。请关闭此前手动启动的 TrioBridge 服务或其他占用程序，然后重新双击 Install。未终止其他程序。',
-  );
+  throw new ReadinessError('PORT_BUSY');
 }
 
 async function exists(path) {
@@ -142,7 +149,13 @@ async function writeJournal(root, journal) {
   await enforcePrivatePath(path, 'file', { created: true });
 }
 
-export async function recoverInstallation(root, driver, waitReady = waitForHealth) {
+async function verifyRestoredService(root, state) {
+  const ca = await waitForHealth(root, state, state.active.split('-')[0]);
+  const token = await getOrCreateLocalCapability(sharedModelsDirectory());
+  await waitForLocalEndpoint({ ca, token });
+}
+
+export async function recoverInstallation(root, driver, waitReady = verifyRestoredService) {
   const path = join(root, 'transaction.json');
   if (!(await exists(path))) return;
   await assertRegularOwned(path);
@@ -256,19 +269,15 @@ async function install(root, driver) {
       await driver.trustCertificate(next, previous.id);
     } else await driver.trustCertificate(certificate, previous.id);
     console.log('3/5 正在启动随登录运行的本机服务…');
-    if (process.platform === 'win32') console.log('首次启动可能需要约两分钟，请保持窗口打开。');
-    await stopAndWait(driver);
-    if (renew) {
-      if (hadCertificate) await rename(certificate, join(root, journal.previousCertificate));
-      await rename(join(root, journal.nextCertificate), certificate);
-    }
     const nextState = { ...previous, active };
-    await writeInstallation(root, nextState);
-    await driver.start(nextState);
-    await waitForHealth(root, nextState, metadata.version);
+    const capability = await startAndVerify(root, driver, nextState, metadata.version, async () => {
+      if (renew) {
+        if (hadCertificate) await rename(certificate, join(root, journal.previousCertificate));
+        await rename(join(root, journal.nextCertificate), certificate);
+      }
+      await writeInstallation(root, nextState);
+    });
     const directory = sharedModelsDirectory();
-    const capability = await getOrCreateLocalCapability(directory);
-    await requestLocal(root, '/local-models/state', capability);
     console.log('4/5 正在为 Word、Excel、PowerPoint 安装当前账号专用的共享入口…');
     const manifest = renderLocalManifest(
       await readFile(join(version, 'app/manifest.xml'), 'utf8'),
@@ -307,6 +316,8 @@ async function install(root, driver) {
     );
     console.log('本机服务会随当前账号登录启动，无需保持此窗口打开。');
   } catch (error) {
+    console.error(error.message);
+    console.log('正在恢复安装前的状态…');
     try {
       await recoverInstallation(root, driver);
     } catch {
@@ -335,9 +346,7 @@ export async function runInstaller(action, { driver: injectedDriver } = {}) {
     const state = await readInstallation(root);
     if (action === 'restart') {
       if (!state.active) throw new Error('安装尚未完成，请重新双击 Install。');
-      await stopAndWait(driver);
-      await driver.start(state);
-      await waitForHealth(root, state);
+      await startAndVerify(root, driver, state, state.active.split('-')[0]);
       console.log('本机共享服务已重启，原有模型配置和密钥已保留。');
       return;
     }

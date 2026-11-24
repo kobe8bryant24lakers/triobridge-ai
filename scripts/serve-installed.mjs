@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Console } from 'node:console';
 import { randomUUID } from 'node:crypto';
@@ -25,7 +25,7 @@ if (process.platform === 'win32') {
   });
 }
 const app = join(root, 'versions', state.active || '', 'app');
-if (!state.active || resolve(fileURLToPath(new URL('..', import.meta.url))) !== resolve(app))
+if (!state.active || relative(app, fileURLToPath(new URL('..', import.meta.url))) !== '')
   throw new Error('This is not the active installed TrioBridge runtime.');
 if (process.platform === 'win32') {
   const destination = join(root, 'service-process.json');

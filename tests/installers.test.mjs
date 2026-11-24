@@ -31,6 +31,18 @@ test('downloadable packages install, update and remove only the hosted Mac add-i
     assert.ok((await stat(join(mac, 'Install.command'))).mode & 0o111);
     assert.ok((await stat(join(mac, 'Uninstall.command'))).mode & 0o111);
     const windows = join(temporary, 'TrioBridge-AI-Windows');
+    const diagnostic = join(temporary, 'TrioBridge-Diagnose-Windows');
+    assert.deepEqual((await readdir(diagnostic)).sort(), [
+      'Diagnose.cmd',
+      'LICENSE',
+      'README.txt',
+      'windows-office-discovery.ps1',
+    ]);
+    for (const script of ['Diagnose.cmd', 'windows-office-discovery.ps1'])
+      assert.deepEqual(
+        await readFile(join(diagnostic, script)),
+        await readFile(join(windows, script)),
+      );
     assert.deepEqual((await readdir(windows)).sort(), [
       'Diagnose.cmd',
       'Install.cmd',

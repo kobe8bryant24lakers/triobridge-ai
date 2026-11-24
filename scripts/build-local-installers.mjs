@@ -33,6 +33,7 @@ const runtimeScripts = [
   'local-manifest.mjs',
   'model-connection-error.mjs',
   'install-local.mjs',
+  'local-service-readiness.mjs',
   'local-install-files.mjs',
   'local-install-platform.mjs',
   'native-local.ps1',
@@ -192,11 +193,11 @@ export async function buildLocalInstaller(
     if (platform === 'win32')
       await writeFile(
         join(directory, 'Diagnose.cmd'),
-        '@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\necho Read-only Office discovery check. No model settings or keys are read.\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\\scripts\\windows-office-discovery.ps1" -Diagnose\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n',
+        '@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\necho Read-only local service and Office catalog check.\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\\scripts\\windows-office-discovery.ps1" -Diagnose\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n',
       );
     await writeFile(
       join(directory, 'README.txt'),
-      `TrioBridge AI ${version} · 本机共享版 / Local shared edition\n\n先保存文档并完全退出 Word、Excel、PowerPoint，再解压整个文件夹，双击 Install.${platform === 'darwin' ? 'command' : 'cmd'}。无需另外安装 Node.js 或运行 npm。\n安装会请求系统证书信任${platform === 'win32' ? '和当前账号专用共享目录的管理员授权' : ''}。按系统提示批准。\n${platform === 'darwin' ? '首次使用已存密钥或升级后，macOS 可能请求本机服务访问钥匙串；在系统窗口确认后重试，无需重新填写密钥。\n' : ''}保存文档并完全退出、重开 Office，选择“三桥 AI（本机共享）”。模型设置应显示“本机共享”。\n本机服务会随当前账号登录启动；模型列表与密钥在 Word、Excel、PowerPoint 之间复用。\n本地 API 可使用 http://127.0.0.1:8001/v1；服务无需鉴权时选择“不使用密钥”。\n${platform === 'win32' ? '若有应用看不到入口，可运行 Diagnose.cmd 只读检查目录和宿主，不读取模型密钥或文档。\n' : ''}再次双击 Install 可升级或修复，Restart 可重启服务，Uninstall 可卸载服务及入口。卸载保留模型配置和系统密钥。\n安装包未签名；组织策略可能限制安装，系统可能要求确认。不会修改防火墙或关闭 TLS 验证。\n\nSave documents and completely close Word, Excel and PowerPoint, then extract the entire folder and open Install. No separate Node.js or npm setup is required. Approve the OS certificate/catalog prompts, then restart Office and select the local shared add-in. Uninstall preserves model profiles and OS-stored keys.\n\nhttps://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html\n`,
+      `TrioBridge AI ${version} · 本机共享版 / Local shared edition\n\n先保存文档并完全退出 Word、Excel、PowerPoint，再解压整个文件夹，双击 Install.${platform === 'darwin' ? 'command' : 'cmd'}。无需另外安装 Node.js 或运行 npm。\n安装会请求系统证书信任${platform === 'win32' ? '和当前账号专用共享目录的管理员授权' : ''}。按系统提示批准。\n${platform === 'darwin' ? '首次使用已存密钥或升级后，macOS 可能请求本机服务访问钥匙串；在系统窗口确认后重试，无需重新填写密钥。\n' : ''}保存文档并完全退出、重开 Office，选择“三桥 AI（本机共享）”。模型设置应显示“本机共享”。\n本机服务会随当前账号登录启动；模型列表与密钥在 Word、Excel、PowerPoint 之间复用。\n本地 API 可使用 http://127.0.0.1:8001/v1；服务无需鉴权时选择“不使用密钥”。\n${platform === 'win32' ? '第 3 步失败或部分应用看不到入口时，双击 Diagnose.cmd 查看本机服务和加载项目录状态。\n' : ''}再次双击 Install 可升级或修复，Restart 可重启服务，Uninstall 可卸载服务及入口。卸载保留模型配置和系统密钥。\n安装包未签名；组织策略可能限制安装，系统可能要求确认。不会修改防火墙或关闭 TLS 验证。\n\nSave documents and completely close Word, Excel and PowerPoint, then extract the entire folder and open Install. No separate Node.js or npm setup is required. Approve the OS certificate/catalog prompts, then restart Office and select the local shared add-in. Uninstall preserves model profiles and OS-stored keys.\n\nhttps://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html\n`,
     );
     const files = await packageFiles(directory);
     await writeFile(
