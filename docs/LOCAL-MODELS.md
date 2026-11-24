@@ -20,13 +20,28 @@
 
 安装完成后参考下方“配置与迁移”。以下源码方式只供开发和自行构建使用。
 
-### Windows 只有部分应用显示加载项
+### Windows 安装停在第 3 步
+
+从本机共享版 v0.5.1 起，安装窗口会显示正在检查的项目及等待秒数。第 3 步先释放 3000 端口，然后准备本账号的凭据、启动登录任务、验证服务的 HTTPS 证书和安装标识，最后读取共享配置。连接模型 API 是安装完成后在插件里单独执行的操作。
+
+如果窗口报错，先记下方括号中的阶段和代码。双击包内 `Diagnose.cmd`，或解压并运行[独立诊断工具](https://kobe8bryant24lakers.github.io/triobridge-ai/install/TrioBridge-Diagnose-Windows.zip)。工具可以在安装期间和回退后运行。
+
+| 诊断字段或代码 | 如何使用 |
+| --- | --- |
+| `localService.lastStartup` | 最近一次完成的启动检查。`phase` 与 `code` 记录结果。失败时尽可能保留当时的计划任务状态和 Windows 错误码。旧安装包没有这条记录。 |
+| `localService.task` 和 `tcp3000` | 运行诊断时计划任务的状态、最近返回值及端口能否建立 TCP 连接。升级回退后，当前运行的可能是已恢复的旧版本。 |
+| `PORT_BUSY` / `PORT_DENIED` | 前者请检查当前使用 3000 端口的程序。后者请让管理员检查回环端口保留范围和本机策略。 |
+| `TASK_START` / `NO_LISTENER` | 查看记录中的任务状态、返回值或 HRESULT，确认当前账号可启动该登录任务。 |
+| `TLS_CERTIFICATE` / `SERVICE_IDENTITY` | 核对端口上的程序与本次安装的证书，再用同一账号运行 Install 修复。 |
+| `LOCAL_AUTH` / `MODEL_STORAGE` / `CAPABILITY_ACCESS` | 检查当前账号对共享模型配置目录的访问权限。保留已有配置，使用同一账号运行 Install 修复。 |
+
+## Windows 只有部分应用显示加载项
 
 共享目录与模型配置可复用，但首次添加加载项需要在 Word、Excel、PowerPoint 中分别操作。请打开普通空白文档，在“主页 → 加载项 → 高级 / 更多加载项”查看“共享文件夹”；“文件 → 选项 → 加载项”中的 COM 加载项列表不是此入口。
 
 若某个应用仍没有“共享文件夹”，在该应用打开“文件 → 选项 → 信任中心 → 信任中心设置 → 受信任的加载项目录”，检查是否存在与可用应用相同的目录，并勾选“显示在菜单中”。注册目录前须保存文档并关闭所有 Office 应用；新版安装器会检查当前会话中仍运行的三个宿主，不强制关闭文档。`Restart` 只重启本机服务，可在 Office 开着时使用。参见[微软共享目录旁加载步骤](https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins)。
 
-包内 `Diagnose.cmd` 可在 Office 打开时运行，不需要管理员授权，也不改动目录、缓存、策略或模型配置。报告只包含检测到的 Office 版本、运行中的应用名称，以及在线版 / 本机共享版的以下状态，不包含用户名、计算机名、共享路径、模型密钥或文档内容：
+包内 `Diagnose.cmd` 可在 Office 打开时运行，不需要管理员授权，也不改动目录、缓存、策略或模型配置。报告包含上方的本机服务状态、检测到的 Office 版本、运行中的应用名称和下表的加载项目录状态。
 
 | 字段 | 含义 |
 | --- | --- |

@@ -65,13 +65,21 @@ export function platformDriver(root, platform = process.platform) {
     ];
     for (const [key, value] of Object.entries(extra)) args.push(`-${key}`, value);
     try {
-      await execute(executable, args, {
+      const { stdout } = await execute(executable, args, {
         env: windowsPowerShellEnvironment(),
         windowsHide: true,
-        timeout: 180_000,
+        timeout: action === 'TaskStatus' ? 15_000 : 180_000,
         maxBuffer: 256_000,
       });
+      return stdout;
     } catch (error) {
+      if (action === 'Start' || action === 'Stop') {
+        const failure = new Error('Windows 登录任务操作失败。');
+        failure.taskHresult = String(error.stderr || '').match(
+          /TRIOBRIDGE_TASK_ERROR (0x[0-9A-F]{8})\b/,
+        )?.[1];
+        throw failure;
+      }
       throw new Error(
         `Windows 安装步骤 ${action} 未完成。${String(error.stderr || error.stdout || '').slice(-1600)}`,
       );
@@ -92,6 +100,18 @@ export function platformDriver(root, platform = process.platform) {
     }
   }
   return {
+    ...(platform === 'win32' && {
+      async taskStatus() {
+        const { state, result } = JSON.parse((await native('TaskStatus')).trim());
+        if (
+          !['Unknown', 'Disabled', 'Queued', 'Ready', 'Running', 'Missing', 'Unavailable'].includes(
+            state,
+          )
+        )
+          return undefined;
+        return { state, result: /^0x[0-9A-F]{8}$/.test(result) ? result : null };
+      },
+    }),
     async preflight(action = 'install') {
       if (platform === 'win32')
         return native('Preflight', { RequireClosedOffice: action === 'restart' ? '0' : '1' });

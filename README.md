@@ -4,16 +4,16 @@
 
 Connect Word, Excel, and PowerPoint to your own AI models.
 
-**v0.5.0** adds local material folders, complete editable PPTX generation, scoped edits to existing slides, and native data charts. The self-contained local edition shares model settings across Word, Excel, and PowerPoint, including local HTTP APIs. [PowerPoint guide](docs/POWERPOINT.md) · [Release notes](CHANGELOG.md) · [Local setup](docs/LOCAL-MODELS.md)
+**v0.5.1** fixes premature local setup failures on slower computers. Windows setup shows progress for each part of step 3 and keeps the last startup result after rollback. The self-contained local edition shares model settings across Word, Excel, and PowerPoint, including local HTTP APIs. [PowerPoint guide](docs/POWERPOINT.md) · [Release notes](CHANGELOG.md) · [Local setup](docs/LOCAL-MODELS.md)
 
 ## Download and install
 
 | Computer | Local shared package |
 | --- | --- |
-| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-x64.zip) |
-| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-arm64.zip) |
-| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-arm64.zip) |
-| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-x64.zip) |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-x64.zip) |
 
 1. Save documents and completely close Word, Excel and PowerPoint. Extract the entire folder and double-click `Install.cmd` on Windows or `Install.command` on Mac. No separate Node.js or commands required. The installer sets up the local service, HTTPS certificate, and all three add-in entries. Windows requests administrator authorization for a dedicated catalog share.
 2. Follow system prompts, then reopen Office. Add **三桥 AI（本机共享）** separately in each app under Home → Add-ins; on Windows use Advanced / More Add-ins → Shared Folder. Model settings should show **本机共享** (local shared).
@@ -207,7 +207,7 @@ npm run test:pages         # Build and verify the static site, hosted workbench,
 npm run manifest:validate # Microsoft validator; requires network access
 ```
 
-GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest remains at `1.1.0.0` to preserve saved sideload references; the application version is `0.5.0`.
+GitHub Actions uses Node 22 to run type checking, tests, builds, and Chromium / WebKit workflows. The Office manifest remains at `1.1.0.0` to preserve saved sideload references; the application version is `0.5.1`.
 
 ```text
 src/core/          Tasks, model client, result validation, configuration storage

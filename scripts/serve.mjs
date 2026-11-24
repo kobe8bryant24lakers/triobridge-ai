@@ -17,7 +17,12 @@ try {
 }
 const port = 3000;
 const proxy = createProxy(process.env.MODEL_PROXY_TARGET, `https://localhost:${port}`);
-const shared = await createSharedModelRuntime(`https://localhost:${port}`);
+const sharedReady = createSharedModelRuntime(`https://localhost:${port}`);
+async function shared(req, res, next) {
+  if (!req.url?.startsWith('/local-models/')) return next();
+  const middleware = await sharedReady;
+  return middleware(req, res, next);
+}
 const version = JSON.parse(await readFile(resolve('package.json'), 'utf8')).version;
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -87,6 +92,11 @@ const server = createServer(tlsOptions(), (req, res) => {
     res.end();
   });
 });
-server.listen(port, '127.0.0.1', () =>
-  console.log(`TrioBridge AI: https://localhost:${port} (loopback only)`),
-);
+await new Promise((done, reject) => {
+  server.once('error', reject);
+  server.listen(port, '127.0.0.1', () => {
+    server.removeListener('error', reject);
+    done();
+  });
+});
+console.log(`TrioBridge AI: https://localhost:${port} (loopback only)`);

@@ -1,12 +1,16 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
-export const INSTALLER_FILES = ['TrioBridge-AI-Mac.zip', 'TrioBridge-AI-Windows.zip'];
+export const INSTALLER_FILES = [
+  'TrioBridge-AI-Mac.zip',
+  'TrioBridge-AI-Windows.zip',
+  'TrioBridge-Diagnose-Windows.zip',
+];
 
 export async function buildInstallers(root, destination, manifest, manifestId) {
   const staging = await mkdtemp(join(tmpdir(), 'triobridge-installers-'));
@@ -65,7 +69,7 @@ export async function buildInstallers(root, destination, manifest, manifestId) {
         );
         await writeFile(
           join(directory, 'Diagnose.cmd'),
-          '@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\necho Read-only Office discovery check. No model settings or keys are read.\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0windows-office-discovery.ps1" -Diagnose\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n',
+          '@echo off\r\nsetlocal\r\nset "PSModulePath="\r\nchcp 65001 >nul\r\necho Read-only local service and Office catalog check.\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0windows-office-discovery.ps1" -Diagnose\r\nset "result=%ERRORLEVEL%"\r\npause\r\nexit /b %result%\r\n',
         );
         for (const [file, action] of [
           ['Install.cmd', 'Install'],
@@ -81,6 +85,19 @@ export async function buildInstallers(root, destination, manifest, manifestId) {
       // zip preserves executable bits on the Mac launchers; only staging's allowlisted files enter it.
       await exec('zip', ['-q', '-X', '-r', output, name], { cwd: staging });
     }
+    const name = 'TrioBridge-Diagnose-Windows';
+    const folder = join(staging, name);
+    await mkdir(folder);
+    for (const file of ['Diagnose.cmd', 'windows-office-discovery.ps1'])
+      await copyFile(join(staging, 'TrioBridge-AI-Windows', file), join(folder, file));
+    await copyFile(join(root, 'LICENSE'), join(folder, 'LICENSE'));
+    await writeFile(
+      join(folder, 'README.txt'),
+      '解压整个文件夹，双击 Diagnose.cmd。localService 显示本机 3000 端口、当前账号的登录任务和最近一次启动检查结果。可在安装过程中或回退后运行。\r\n\r\nExtract the folder and open Diagnose.cmd to check the local service and Office catalog. This read-only report uses fixed status fields.\r\n',
+    );
+    const output = resolve(destination, name + '.zip');
+    await rm(output, { force: true });
+    await exec('zip', ['-q', '-X', '-r', output, name], { cwd: staging });
   } finally {
     await rm(staging, { recursive: true, force: true });
   }

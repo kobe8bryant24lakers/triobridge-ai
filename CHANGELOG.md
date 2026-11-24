@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-11-23
+
+Windows local setup reports the active startup check and elapsed time. The installer connects directly to loopback with the installation certificate, waits for a cold shared configuration read, and checks both endpoints on restart. The read-only diagnostic includes the last startup phase and scheduler status even after a failed upgrade rolls back.
+
+Windows 本机共享版修复配置读取超过两秒就提前回退的问题。安装窗口显示当前等待项。若失败，可用包内或独立的 `Diagnose.cmd` 查看端口、登录任务及最近一次启动检查记录。
+
 ## 0.5.0 — 2026-11-23
 
 PowerPoint now accepts a local material folder or selected files as context for a complete editable deck or targeted changes to an existing presentation. DOCX, XLSX, PPTX, selectable-text PDF, text and images are parsed locally. Users review the included sources before submitting a model request; optional image understanding is explicit.

@@ -4,16 +4,16 @@
 
 让 Word、Excel、PowerPoint 连接你自己的 AI 模型。
 
-**v0.5.0** 新增本地素材目录、整套可编辑 PPTX 生成、现有页面局部修改和原生数据图表。本机共享安装包仍支持三款 Office 共用模型与本地 HTTP API。[PPT 使用指南](docs/POWERPOINT.md) · [更新记录](CHANGELOG.md) · [本机安装](docs/LOCAL-MODELS.md)
+**v0.5.1** 修复了本机共享版在配置响应较慢时提前回退的问题。Windows 安装第 3 步会显示当前正在检查的项目，回退后也可查看失败阶段和错误码。本机共享安装包仍支持三款 Office 共用模型与本地 HTTP API。[PPT 使用指南](docs/POWERPOINT.md) · [更新记录](CHANGELOG.md) · [本机安装](docs/LOCAL-MODELS.md)
 
 ## 下载与安装
 
 | 电脑 | 本机共享版安装包 |
 | --- | --- |
-| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-x64.zip) |
-| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Windows-arm64.zip) |
-| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-arm64.zip) |
-| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.0/TrioBridge-AI-Local-Mac-x64.zip) |
+| Windows Intel / AMD | [Windows x64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-x64.zip) |
+| Windows ARM / Snapdragon | [Windows ARM64](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-arm64.zip) |
+| Mac Apple M | [Mac Apple silicon](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-arm64.zip) |
+| Mac Intel | [Mac Intel](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-x64.zip) |
 
 1. 先保存文档并完全退出 Word、Excel、PowerPoint，再解压完整文件夹，双击 Windows 的 `Install.cmd` 或 Mac 的 `Install.command`。无需另外安装 Node.js 或输入命令。安装器配置本机服务、HTTPS 证书和三应用清单；Windows 创建当前账号专用共享目录时请求管理员授权。
 2. 按系统提示完成安装，重开 Office。在每个应用的“主页 → 加载项”分别添加 **三桥 AI（本机共享）**；Windows 从“高级 / 更多加载项 → 共享文件夹”添加。模型设置页应显示 **本机共享**。
@@ -207,7 +207,7 @@ npm run test:pages        # 构建并验证静态站点、在线工作台及清�
 npm run manifest:validate  # 微软验证器，需要网络
 ```
 
-GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单保留 `1.1.0.0`，兼容文稿已保存的旁加载引用；应用版本为 `0.5.0`。
+GitHub Actions 使用 Node 22 运行类型检查、测试、构建和 Chromium / WebKit 工作流。Office 清单保留 `1.1.0.0`，兼容文稿已保存的旁加载引用；应用版本为 `0.5.1`。
 
 ```text
 src/core/          任务、模型客户端、结果校验、配置存储

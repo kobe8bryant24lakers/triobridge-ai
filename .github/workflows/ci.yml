@@ -108,6 +108,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Exercise Windows startup checks over loopback TLS
+        if: runner.os == 'Windows'
+        run: node --test tests/local-service-readiness.test.mjs
       - run: npm run build:local
       - name: Verify bundled runtime and native credential binding
         run: node scripts/verify-local-package.mjs dist-local/TrioBridge-AI-Local-${{ matrix.asset }}-${{ matrix.arch }}.zip

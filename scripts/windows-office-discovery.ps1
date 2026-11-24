@@ -100,12 +100,68 @@ function Get-TrioBridgeCatalogReport([string]$Edition) {
     return [PSCustomObject]$result
 }
 
+function Get-TrioBridgeTaskStatus {
+    $result = [ordered]@{ state = 'Unavailable'; result = $null }
+    try {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $name = 'TrioBridgeAI-Local-' + $sid
+        $task = Get-ScheduledTask -TaskPath '\' -TaskName $name -ErrorAction Stop
+        if ([string]$task.State -in @('Unknown', 'Disabled', 'Queued', 'Ready', 'Running')) {
+            $result.state = [string]$task.State
+        }
+        $info = Get-ScheduledTaskInfo -TaskPath '\' -TaskName $name -ErrorAction Stop
+        $result.result = '0x{0:X8}' -f ([long]$info.LastTaskResult -band 4294967295L)
+    } catch {
+        if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { $result.state = 'Missing' }
+    }
+    return [PSCustomObject]$result
+}
+
+function Get-TrioBridgeLastStartup {
+    $root = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'TrioBridgeAI\LocalApp'
+    try {
+        $item = Get-Item -LiteralPath (Join-Path $root 'last-startup.json') -Force -ErrorAction Stop
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 1024) { return }
+        $record = [IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json -ErrorAction Stop
+        if ($record.phase -isnot [string] -or $record.code -isnot [string] -or
+            $record.phase -cnotin @('stop', 'activate', 'credential', 'start', 'https', 'models', 'ready') -or
+            $record.code -cnotin @('OK', 'TASK_STOP', 'TASK_START', 'ACTIVATION', 'CERTIFICATE_READ', 'CAPABILITY_ACCESS',
+                'PORT_BUSY', 'PORT_DENIED', 'NO_LISTENER', 'TIMEOUT', 'CONNECTION_RESET', 'TLS_CERTIFICATE', 'SERVICE_IDENTITY',
+                'LOCAL_AUTH', 'MODEL_STORAGE', 'INVALID_RESPONSE', 'TRANSPORT')) { return }
+        $safe = [ordered]@{ phase = [string]$record.phase; code = [string]$record.code }
+        if ($record.PSObject.Properties['hresult'] -and $record.hresult -is [string] -and $record.hresult -cmatch '^0x[0-9A-F]{8}\z') {
+            $safe.hresult = [string]$record.hresult
+        }
+        if ($record.PSObject.Properties['task'] -and $record.task.state -is [string] -and $record.task.state -cin @('Unknown', 'Disabled', 'Queued', 'Ready', 'Running', 'Missing', 'Unavailable')) {
+            $safe.taskState = [string]$record.task.state
+            if ($record.task.result -is [string] -and $record.task.result -cmatch '^0x[0-9A-F]{8}\z') { $safe.taskResult = [string]$record.task.result }
+        }
+        return [PSCustomObject]$safe
+    } catch { return }
+}
+
+function Get-TrioBridgeLocalServiceReport {
+    $client = New-Object Net.Sockets.TcpClient
+    $listening = $false
+    try {
+        $probe = $client.BeginConnect('127.0.0.1', 3000, $null, $null)
+        if ($probe.AsyncWaitHandle.WaitOne(750)) { $client.EndConnect($probe); $listening = $true }
+    } catch {
+        # TCP reachability alone cannot identify the process or confirm TLS.
+    } finally { $client.Close() }
+    return [PSCustomObject][ordered]@{
+        tcp3000 = $listening
+        task = Get-TrioBridgeTaskStatus
+        lastStartup = Get-TrioBridgeLastStartup
+    }
+}
+
 if ($Diagnose) {
     $ErrorActionPreference = 'Stop'
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Windows is required.' }
     [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
     [ordered]@{
-        format = 1
+        format = 2
         runningOffice = @(Get-TrioBridgeRunningOfficeApps)
         detectedVersions = [ordered]@{
             Word = Get-TrioBridgeOfficeVersion 'WINWORD.EXE'
@@ -113,5 +169,6 @@ if ($Diagnose) {
             PowerPoint = Get-TrioBridgeOfficeVersion 'POWERPNT.EXE'
         }
         catalogs = @((Get-TrioBridgeCatalogReport 'local'), (Get-TrioBridgeCatalogReport 'online'))
+        localService = Get-TrioBridgeLocalServiceReport
     } | ConvertTo-Json -Depth 5
 }
