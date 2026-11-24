@@ -3,7 +3,42 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createSharedModelStore, sharedCompletionUrl } from '../scripts/shared-model-store.mjs';
+import {
+  createSharedModelStore,
+  sharedCompletionUrl,
+  validateSharedMessages,
+} from '../scripts/shared-model-store.mjs';
+
+test('multimodal messages only accept bounded inline images and preserve text budgets', () => {
+  const image = {
+    type: 'image_url',
+    image_url: { url: 'data:image/jpeg;base64,eA==', detail: 'low' },
+  };
+  const messages = [{ role: 'user', content: [{ type: 'text', text: '本地选择的图片' }, image] }];
+  assert.deepEqual(validateSharedMessages(messages), messages);
+  for (const url of [
+    'https://example.test/photo.jpg',
+    'file:///tmp/a.png',
+    'data:image/svg+xml;base64,eA==',
+  ])
+    assert.throws(() =>
+      validateSharedMessages([
+        { role: 'user', content: [{ ...image, image_url: { ...image.image_url, url } }] },
+      ]),
+    );
+  assert.throws(() => validateSharedMessages([{ role: 'system', content: [image] }]));
+  assert.throws(() => validateSharedMessages([{ role: 'user', content: Array(5).fill(image) }]));
+  assert.throws(() =>
+    validateSharedMessages([
+      { role: 'user', content: [{ type: 'text', text: 'x'.repeat(150001) }] },
+    ]),
+  );
+  assert.throws(() =>
+    validateSharedMessages([
+      { role: 'user', content: [{ ...image, image_url: { ...image.image_url, extra: true } }] },
+    ]),
+  );
+});
 
 const profile = (id = 'first', extra = {}) => ({
   id,

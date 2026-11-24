@@ -378,6 +378,7 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
   }
   const canReplace = nativeWord || (host === 'powerpoint' && guarded);
   return {
+    ...(host === 'powerpoint' ? { presentation: createPresentationAccess() } : {}),
     host,
     mode: 'office',
     capabilities: {
@@ -455,3 +456,4 @@ export function officeError(error: unknown): string {
     return 'Office 操作失败，可能是目标已改变或文档只读。请重新选择内容后重试；结果仍可复制。';
   return error instanceof Error ? error.message : '操作未完成，请重试。';
 }
+import { createPresentationAccess } from './presentation';

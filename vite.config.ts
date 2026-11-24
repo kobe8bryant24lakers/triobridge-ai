@@ -21,7 +21,10 @@ export default defineConfig(({ mode, command }) => {
             server.middlewares.use(
               createModelAuditMiddleware(
                 `${office ? 'https' : 'http'}://localhost:3000`,
-                resolve('.cache/real-model-acceptance-2026-11-21/requests.jsonl'),
+                resolve(
+                  env.REAL_MODEL_AUDIT_PATH ||
+                    '.cache/real-model-acceptance-2026-11-21/requests.jsonl',
+                ),
               ),
             );
           server.middlewares.use(

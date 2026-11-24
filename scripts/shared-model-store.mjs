@@ -128,18 +128,55 @@ function credentialFields(value) {
 export function validateSharedMessages(messages) {
   if (!Array.isArray(messages) || !messages.length || messages.length > 16)
     fail('request', '模型请求需要 1–16 条消息。');
-  let length = 0;
+  let length = 0,
+    imageLength = 0,
+    imageCount = 0;
   return messages.map((message) => {
     if (
       !isObject(message) ||
       Object.keys(message).some((key) => !['role', 'content'].includes(key)) ||
-      !['system', 'user'].includes(message.role) ||
-      typeof message.content !== 'string'
+      !['system', 'user'].includes(message.role)
     )
       fail('request', '模型消息格式无效。');
-    length += message.content.length;
+    let content;
+    if (typeof message.content === 'string') {
+      length += message.content.length;
+      content = message.content;
+    } else if (
+      message.role === 'user' &&
+      Array.isArray(message.content) &&
+      message.content.length > 0 &&
+      message.content.length <= 12
+    ) {
+      content = message.content.map((part) => {
+        if (!isObject(part)) fail('request', '模型消息内容无效。');
+        if (
+          part.type === 'text' &&
+          typeof part.text === 'string' &&
+          Object.keys(part).every((key) => ['type', 'text'].includes(key))
+        ) {
+          length += part.text.length;
+          return { type: 'text', text: part.text };
+        }
+        const image = part.image_url;
+        if (
+          part.type !== 'image_url' ||
+          Object.keys(part).some((key) => !['type', 'image_url'].includes(key)) ||
+          !isObject(image) ||
+          Object.keys(image).some((key) => !['url', 'detail'].includes(key)) ||
+          typeof image.url !== 'string' ||
+          !/^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(image.url) ||
+          !['low', 'high', 'auto'].includes(image.detail)
+        )
+          fail('request', '只支持本次选择的 PNG / JPEG 图片数据，不支持远程图片地址。');
+        imageLength += image.url.length;
+        if (++imageCount > 4 || imageLength > 200_000 || image.url.length > 50_000)
+          fail('request', '图片过多或过大，请减少图片数量。', 413);
+        return { type: 'image_url', image_url: { url: image.url, detail: image.detail } };
+      });
+    } else fail('request', '模型消息格式无效。');
     if (length > 150_000) fail('request', '模型请求内容过长。', 413);
-    return { role: message.role, content: message.content };
+    return { role: message.role, content };
   });
 }
 

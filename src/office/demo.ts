@@ -44,6 +44,7 @@ export function createDemoBridge(
   return {
     host,
     mode: 'demo',
+    ...(host === 'powerpoint' ? { presentation: createDemoPresentation(onWrite) } : {}),
     capabilities: {
       read: true,
       replace: host !== 'excel',
@@ -186,3 +187,4 @@ export async function demoComplete(
     return '本季度，团队在客户服务、用户引导和协作规划方面取得了进展：\n\n客户反馈的平均响应时间由 24 小时缩短至 8 小时；新版入门指南正式上线，帮助新用户更快完成配置。\n\n下季度，我们将继续优化跨团队协作流程，让信息流转更高效。';
   return `演示预览\n\n${source}\n\n这是交互演示，未调用 AI。连接真实模型后，将根据你的内容与要求完成改写。`;
 }
+import { createDemoPresentation } from './presentation-demo';

@@ -22,6 +22,7 @@ const version = JSON.parse(await readFile(resolve('package.json'), 'utf8')).vers
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',

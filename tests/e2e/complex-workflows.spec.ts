@@ -66,6 +66,7 @@ test('PowerPoint twelve-page outline can be reordered and repaired without JSON'
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'PowerPoint', exact: true }).click();
+  await page.getByRole('button', { name: '文案与大纲', exact: true }).click();
   await page.getByLabel('示例文档').selectOption('complex');
   await page.getByLabel('具体要求').fill('12 页验收汇报');
   await page.getByRole('button', { name: '生成演示预览' }).click();

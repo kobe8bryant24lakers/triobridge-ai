@@ -38,6 +38,7 @@ test('Excel: generate formula and write to the reviewed cell', async ({ page }) 
 test('PowerPoint: structured outline, edit validation, and slide creation', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'PowerPoint', exact: true }).click();
+  await page.getByRole('button', { name: '文案与大纲', exact: true }).click();
   await page.getByLabel('具体要求').fill('季度工作回顾');
   await page.getByRole('button', { name: '生成演示预览' }).click();
   await expect(page.locator('.slide-outline > li')).toHaveCount(4);

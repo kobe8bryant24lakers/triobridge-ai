@@ -45,6 +45,7 @@ import { ReportPreview, TablePreview } from './StructuredPreview';
 import { ReportEditor } from './ReportEditor';
 import { TableEditor } from './TableEditor';
 import { COMPLEX_DESCRIPTIONS, type DemoScenario } from '../office/complex-samples';
+import { PresentationWorkspace, type PresentationMode } from './PresentationWorkspace';
 
 interface Props {
   bridge: HostBridge;
@@ -54,6 +55,8 @@ interface Props {
   onBusyChange: (busy: boolean) => void;
   demoScenario?: DemoScenario;
   onDemoScenarioChange?: (scenario: DemoScenario) => void;
+  presentationMode?: PresentationMode;
+  onPresentationModeChange?: (mode: PresentationMode) => void;
 }
 
 async function copyText(text: string) {
@@ -82,8 +85,14 @@ export function Workbench({
   onBusyChange,
   demoScenario = 'basic',
   onDemoScenarioChange,
+  presentationMode: savedPresentationMode,
+  onPresentationModeChange,
 }: Props) {
   const tasks = TASKS[bridge.host];
+  const [localPresentationMode, setLocalPresentationMode] = useState<PresentationMode>('generate');
+  const presentationMode = savedPresentationMode ?? localPresentationMode;
+  const setPresentationMode = onPresentationModeChange ?? setLocalPresentationMode;
+  const [presentationBusy, setPresentationBusy] = useState(false);
   const [taskId, setTaskId] = useState(tasks[0].id);
   const task = tasks.find((item) => item.id === taskId)!;
   const [modelId, setModelId] = useState(
@@ -117,7 +126,7 @@ export function Workbench({
   const writeTrigger = useRef<HTMLElement | null>(null);
   const outputRef = useRef<HTMLElement>(null);
   const disposed = useRef(false);
-  const active = Boolean(busy) || Boolean(plan) || switchingModel;
+  const active = Boolean(busy) || Boolean(plan) || switchingModel || presentationBusy;
   const sharedUnavailable =
     profiles.mode === 'checking' || (profiles.mode === 'shared' && profiles.connection !== 'ready');
   const operation = useRef(false);
@@ -384,7 +393,7 @@ export function Workbench({
               ? '从你的文字出发，让下一稿更好。'
               : bridge.host === 'excel'
                 ? '理解表格，让计算更有把握。'
-                : '整理想法，把重点讲清楚。'}
+                : '从素材生成整稿，也能直接编辑现有页面。'}
           </p>
         </div>
         <span className="connection-badge">
@@ -430,487 +439,533 @@ export function Workbench({
             : '当前文档为模拟文档；生成时会实际调用选中的模型服务。'}
         </p>
       )}
-      {bridge.mode === 'demo' && onDemoScenarioChange && (
-        <div className="demo-scenario">
-          <label>
-            示例文档
-            <select
-              disabled={active || pendingCell}
-              value={demoScenario}
-              onChange={(e) => onDemoScenarioChange(e.target.value as DemoScenario)}
-            >
-              <option value="basic">基础示例</option>
-              <option value="complex">复杂文档示例</option>
-            </select>
-          </label>
-          <p className="field-help">
-            {demoScenario === 'complex'
-              ? COMPLEX_DESCRIPTIONS[bridge.host]
-              : '使用简短内容熟悉读取、预览和写入。'}{' '}
-            切换示例会重置当前演示工作稿。
-          </p>
-        </div>
-      )}
-      <div className="workspace-grid">
-        <section className="compose-area" aria-label="输入与任务">
-          <div className="section-heading">
-            <h2>选择任务</h2>
-            <span className="muted">{tasks.length} 项能力</span>
-          </div>
-          <div className="task-options" role="group" aria-label="选择任务">
-            {tasks.map((item) => (
-              <button
-                key={item.id}
-                disabled={active}
-                aria-pressed={taskId === item.id}
-                className={taskId === item.id ? 'task-option selected' : 'task-option'}
-                onClick={() => {
-                  setTaskId(item.id);
-                  invalidate(true);
-                }}
+      {bridge.mode === 'demo' &&
+        onDemoScenarioChange &&
+        (bridge.host !== 'powerpoint' || presentationMode === 'text') && (
+          <div className="demo-scenario">
+            <label>
+              示例文档
+              <select
+                disabled={active || pendingCell}
+                value={demoScenario}
+                onChange={(e) => onDemoScenarioChange(e.target.value as DemoScenario)}
               >
-                {item.label}
-                {taskId === item.id && <Check size={14} />}
+                <option value="basic">基础示例</option>
+                <option value="complex">复杂文档示例</option>
+              </select>
+            </label>
+            <p className="field-help">
+              {demoScenario === 'complex'
+                ? COMPLEX_DESCRIPTIONS[bridge.host]
+                : '使用简短内容熟悉读取、预览和写入。'}{' '}
+              切换示例会重置当前演示工作稿。
+            </p>
+          </div>
+        )}
+      {bridge.host === 'powerpoint' && (
+        <>
+          <div className="ppt-mode-nav" role="group" aria-label="PPT 工作模式">
+            {(
+              [
+                ['generate', '素材生成'],
+                ['edit', '编辑现有'],
+                ['chart', '数据图表'],
+                ['text', '文案与大纲'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                disabled={active}
+                className={presentationMode === id ? 'selected' : ''}
+                aria-pressed={presentationMode === id}
+                onClick={() => setPresentationMode(id)}
+              >
+                {label}
               </button>
             ))}
           </div>
-          <p className="task-description">{task.description}</p>
-          <div className="section-heading source-heading">
-            <h2>
-              <label htmlFor="source-text">参考内容</label>
-            </h2>
-            <button
-              className="text-button"
-              onClick={read}
-              disabled={active || !bridge.capabilities.read}
-            >
-              {busy === 'reading' ? (
-                <LoaderCircle size={16} className="spin" />
-              ) : (
-                <ScanText size={16} />
-              )}
-              {bridge.mode === 'demo' ? '读取示例选区' : '读取选区'}
-            </button>
-          </div>
-          <textarea
-            id="source-text"
-            className="source-input"
-            value={source}
-            disabled={active}
-            onChange={(e) => editSource(e.target.value)}
-            placeholder={
-              bridge.host === 'excel'
-                ? '在 Excel 中选中数据或公式，点击「读取选区」。也可以粘贴表格内容。'
-                : bridge.host === 'powerpoint'
-                  ? '在幻灯片中进入文本编辑状态并选中文字，点击「读取选区」。也可以直接粘贴文案。'
-                  : '选中文档中的一段文字，再点击「读取选区」。也可以直接在这里粘贴内容。'
-            }
-            aria-invalid={Boolean(sourceError)}
-            aria-describedby={`source-info${sourceError ? ' source-error' : ''}`}
+          <PresentationWorkspace
+            bridge={bridge}
+            model={model}
+            demoModel={isDemoModel}
+            sharedUnavailable={sharedUnavailable}
+            mode={presentationMode}
+            onBusyChange={setPresentationBusy}
           />
-          <div className="source-meta" id="source-info">
-            <span>{sourceLabel}</span>
-            <span>{source.length.toLocaleString()} / 30,000 字符</span>
-          </div>
-          {sourceError && (
-            <p id="source-error" className="field-error" role="alert">
-              {sourceError}
-            </p>
-          )}
-          {snapshot.current?.warning && <p className="write-warning">{snapshot.current.warning}</p>}
-          {task.id === 'translate' && (
-            <label className="language-field">
-              目标语言
-              <select
-                value={language}
-                disabled={active}
-                onChange={(e) => {
-                  setLanguage(e.target.value);
-                  invalidate();
-                }}
+        </>
+      )}
+      <div hidden={bridge.host === 'powerpoint' && presentationMode !== 'text'}>
+        <div className="workspace-grid">
+          <section className="compose-area" aria-label="输入与任务">
+            <div className="section-heading">
+              <h2>选择任务</h2>
+              <span className="muted">{tasks.length} 项能力</span>
+            </div>
+            <div className="task-options" role="group" aria-label="选择任务">
+              {tasks.map((item) => (
+                <button
+                  key={item.id}
+                  disabled={active}
+                  aria-pressed={taskId === item.id}
+                  className={taskId === item.id ? 'task-option selected' : 'task-option'}
+                  onClick={() => {
+                    setTaskId(item.id);
+                    invalidate(true);
+                  }}
+                >
+                  {item.label}
+                  {taskId === item.id && <Check size={14} />}
+                </button>
+              ))}
+            </div>
+            <p className="task-description">{task.description}</p>
+            <div className="section-heading source-heading">
+              <h2>
+                <label htmlFor="source-text">参考内容</label>
+              </h2>
+              <button
+                className="text-button"
+                onClick={read}
+                disabled={active || !bridge.capabilities.read}
               >
-                {['英语', '简体中文', '繁体中文', '日语', '韩语', '法语', '德语', '西班牙语'].map(
-                  (lang) => (
-                    <option key={lang}>{lang}</option>
-                  ),
+                {busy === 'reading' ? (
+                  <LoaderCircle size={16} className="spin" />
+                ) : (
+                  <ScanText size={16} />
                 )}
-              </select>
-            </label>
-          )}
-          <label className="instruction-label" htmlFor="instruction">
-            {task.needsInstruction ? '具体要求' : '补充要求'}{' '}
-            <span className="muted">{task.needsInstruction ? '必填' : '可选'}</span>
-          </label>
-          <textarea
-            id="instruction"
-            className="instruction-input"
-            value={instruction}
-            disabled={active}
-            aria-invalid={Boolean(instructionError)}
-            aria-describedby={instructionError ? 'instruction-error' : undefined}
-            onChange={(e) => {
-              setInstruction(e.target.value);
-              invalidate();
-            }}
-            placeholder={
-              task.id === 'formula'
-                ? '例如：计算 B2:B4 的合计，结果放在 B6'
-                : task.id === 'outline'
-                  ? '例如：为季度工作回顾生成 5 页演示大纲，面向团队成员'
-                  : task.id === 'ask'
-                    ? '例如：哪个区域的季度合计最高？'
-                    : task.id === 'generate'
-                      ? '例如：写一封项目进度邮件，包含已完成事项和下周计划'
-                      : task.id === 'report'
-                        ? '例如：生成项目验收报告，包含指标对比表、风险与行动计划'
-                        : task.id === 'table'
-                          ? '例如：创建项目进度表，包含负责人、计划工时、实际工时和差异公式'
-                          : '例如：语气更简洁，保留所有数字与专业术语'
-            }
-          />
-          {instructionError && (
-            <p id="instruction-error" className="field-error" role="alert">
-              {instructionError}
-            </p>
-          )}
-          <div className="generate-row">
-            <button
-              className="primary generate-button"
-              onClick={generate}
-              disabled={
-                active ||
-                pendingCell ||
-                Boolean(sourceError || instructionError) ||
-                (!model && !isDemoModel) ||
-                (!isDemoModel && sharedUnavailable) ||
-                (task.needsSource && !source.trim()) ||
-                (task.needsInstruction && !instruction.trim())
-              }
-            >
-              {busy === 'generating' ? (
-                <LoaderCircle size={18} className="spin" />
-              ) : (
-                <Sparkles size={18} />
-              )}
-              {busy === 'generating' ? '正在生成…' : isDemoModel ? '生成演示预览' : '生成预览'}
-              {!busy && <ArrowRight size={17} />}
-            </button>
-            {busy === 'generating' && (
-              <button className="secondary" onClick={() => request.current?.abort()}>
-                <Square size={14} />
-                停止
+                {bridge.mode === 'demo' ? '读取示例选区' : '读取选区'}
               </button>
+            </div>
+            <textarea
+              id="source-text"
+              className="source-input"
+              value={source}
+              disabled={active}
+              onChange={(e) => editSource(e.target.value)}
+              placeholder={
+                bridge.host === 'excel'
+                  ? '在 Excel 中选中数据或公式，点击「读取选区」。也可以粘贴表格内容。'
+                  : bridge.host === 'powerpoint'
+                    ? '在幻灯片中进入文本编辑状态并选中文字，点击「读取选区」。也可以直接粘贴文案。'
+                    : '选中文档中的一段文字，再点击「读取选区」。也可以直接在这里粘贴内容。'
+              }
+              aria-invalid={Boolean(sourceError)}
+              aria-describedby={`source-info${sourceError ? ' source-error' : ''}`}
+            />
+            <div className="source-meta" id="source-info">
+              <span>{sourceLabel}</span>
+              <span>{source.length.toLocaleString()} / 30,000 字符</span>
+            </div>
+            {sourceError && (
+              <p id="source-error" className="field-error" role="alert">
+                {sourceError}
+              </p>
             )}
-          </div>
-          <p className="privacy-note">
-            <ShieldCheck size={14} />
-            {isDemoModel
-              ? '演示模式不会向模型发送内容，也不会修改 Office 文件。'
-              : '生成时仅将上方参考内容和要求发送给所选模型服务。'}
-          </p>
-        </section>
-        <section
-          ref={outputRef}
-          tabIndex={-1}
-          className={`result-area ${hasResult ? 'has-result' : ''}`}
-          aria-labelledby="result-heading"
-          aria-busy={busy === 'generating'}
-        >
-          <div className="section-heading">
-            <h2 id="result-heading">结果预览</h2>
-            {hasResult ? (
-              <span className={`result-status ${written ? 'applied' : ''}`}>
-                {written ? <CheckCheck size={14} /> : <FileCheck2 size={14} />}
-                {written ? '已写入' : outdated ? '旧预览' : formatError ? '待修正' : '待确认'}
-              </span>
-            ) : (
-              <span className="muted">生成后由你确认</span>
+            {snapshot.current?.warning && (
+              <p className="write-warning">{snapshot.current.warning}</p>
             )}
-          </div>
-          {!hasResult ? (
-            <div className="empty-result">
-              {busy === 'generating' ? (
-                <>
-                  <LoaderCircle size={36} className="spin" />
-                  <h3>正在整理你的内容</h3>
-                  <p>
-                    生成过程中不会修改文档。
-                    <br />
-                    你可以随时停止请求。
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="preview-symbol">
-                    <FileCheck2 size={34} strokeWidth={1.5} />
-                  </div>
-                  <h3>下一稿，从这里开始</h3>
-                  <p>
-                    读取内容，选择任务。
-                    <br />
-                    AI 结果会先显示在这里，
-                    <br />
-                    检查后再写入文档。
-                  </p>
-                  <div className="flow-hint">
-                    <span>读取</span>
-                    <ArrowRight size={13} />
-                    <span>预览</span>
-                    <ArrowRight size={13} />
-                    <span>确认</span>
-                  </div>
-                </>
+            {task.id === 'translate' && (
+              <label className="language-field">
+                目标语言
+                <select
+                  value={language}
+                  disabled={active}
+                  onChange={(e) => {
+                    setLanguage(e.target.value);
+                    invalidate();
+                  }}
+                >
+                  {['英语', '简体中文', '繁体中文', '日语', '韩语', '法语', '德语', '西班牙语'].map(
+                    (lang) => (
+                      <option key={lang}>{lang}</option>
+                    ),
+                  )}
+                </select>
+              </label>
+            )}
+            <label className="instruction-label" htmlFor="instruction">
+              {task.needsInstruction ? '具体要求' : '补充要求'}{' '}
+              <span className="muted">{task.needsInstruction ? '必填' : '可选'}</span>
+            </label>
+            <textarea
+              id="instruction"
+              className="instruction-input"
+              value={instruction}
+              disabled={active}
+              aria-invalid={Boolean(instructionError)}
+              aria-describedby={instructionError ? 'instruction-error' : undefined}
+              onChange={(e) => {
+                setInstruction(e.target.value);
+                invalidate();
+              }}
+              placeholder={
+                task.id === 'formula'
+                  ? '例如：计算 B2:B4 的合计，结果放在 B6'
+                  : task.id === 'outline'
+                    ? '例如：为季度工作回顾生成 5 页演示大纲，面向团队成员'
+                    : task.id === 'ask'
+                      ? '例如：哪个区域的季度合计最高？'
+                      : task.id === 'generate'
+                        ? '例如：写一封项目进度邮件，包含已完成事项和下周计划'
+                        : task.id === 'report'
+                          ? '例如：生成项目验收报告，包含指标对比表、风险与行动计划'
+                          : task.id === 'table'
+                            ? '例如：创建项目进度表，包含负责人、计划工时、实际工时和差异公式'
+                            : '例如：语气更简洁，保留所有数字与专业术语'
+              }
+            />
+            {instructionError && (
+              <p id="instruction-error" className="field-error" role="alert">
+                {instructionError}
+              </p>
+            )}
+            <div className="generate-row">
+              <button
+                className="primary generate-button"
+                onClick={generate}
+                disabled={
+                  active ||
+                  pendingCell ||
+                  Boolean(sourceError || instructionError) ||
+                  (!model && !isDemoModel) ||
+                  (!isDemoModel && sharedUnavailable) ||
+                  (task.needsSource && !source.trim()) ||
+                  (task.needsInstruction && !instruction.trim())
+                }
+              >
+                {busy === 'generating' ? (
+                  <LoaderCircle size={18} className="spin" />
+                ) : (
+                  <Sparkles size={18} />
+                )}
+                {busy === 'generating' ? '正在生成…' : isDemoModel ? '生成演示预览' : '生成预览'}
+                {!busy && <ArrowRight size={17} />}
+              </button>
+              {busy === 'generating' && (
+                <button className="secondary" onClick={() => request.current?.abort()}>
+                  <Square size={14} />
+                  停止
+                </button>
               )}
             </div>
-          ) : (
-            <>
-              <p className="result-model">{resultModel}</p>
-              {outdated && (
-                <p className="write-warning" role="status">
-                  参考内容或要求已更改。旧预览已保留，重新生成后才能写入。
-                </p>
+            <p className="privacy-note">
+              <ShieldCheck size={14} />
+              {isDemoModel
+                ? '演示模式不会向模型发送内容，也不会修改 Office 文件。'
+                : '生成时仅将上方参考内容和要求发送给所选模型服务。'}
+            </p>
+          </section>
+          <section
+            ref={outputRef}
+            tabIndex={-1}
+            className={`result-area ${hasResult ? 'has-result' : ''}`}
+            aria-labelledby="result-heading"
+            aria-busy={busy === 'generating'}
+          >
+            <div className="section-heading">
+              <h2 id="result-heading">结果预览</h2>
+              {hasResult ? (
+                <span className={`result-status ${written ? 'applied' : ''}`}>
+                  {written ? <CheckCheck size={14} /> : <FileCheck2 size={14} />}
+                  {written ? '已写入' : outdated ? '旧预览' : formatError ? '待修正' : '待确认'}
+                </span>
+              ) : (
+                <span className="muted">生成后由你确认</span>
               )}
-              {busy === 'generating' && (
-                <p className="field-help" role="status">
-                  正在重新生成，当前预览已保留…
+            </div>
+            {!hasResult ? (
+              <div className="empty-result">
+                {busy === 'generating' ? (
+                  <>
+                    <LoaderCircle size={36} className="spin" />
+                    <h3>正在整理你的内容</h3>
+                    <p>
+                      生成过程中不会修改文档。
+                      <br />
+                      你可以随时停止请求。
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="preview-symbol">
+                      <FileCheck2 size={34} strokeWidth={1.5} />
+                    </div>
+                    <h3>下一稿，从这里开始</h3>
+                    <p>
+                      读取内容，选择任务。
+                      <br />
+                      AI 结果会先显示在这里，
+                      <br />
+                      检查后再写入文档。
+                    </p>
+                    <div className="flow-hint">
+                      <span>读取</span>
+                      <ArrowRight size={13} />
+                      <span>预览</span>
+                      <ArrowRight size={13} />
+                      <span>确认</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="result-model">{resultModel}</p>
+                {outdated && (
+                  <p className="write-warning" role="status">
+                    参考内容或要求已更改。旧预览已保留，重新生成后才能写入。
+                  </p>
+                )}
+                {busy === 'generating' && (
+                  <p className="field-help" role="status">
+                    正在重新生成，当前预览已保留…
+                  </p>
+                )}
+                <p className="result-summary">
+                  {slides
+                    ? `${slides.length} 页 · ${slides.reduce((count, slide) => count + slide.bullets.length, 0)} 条要点`
+                    : report
+                      ? `${report.sections.length} 节 · ${report.sections.filter((section) => section.table).length} 张表格`
+                      : table
+                        ? `${table.rows.length} 行数据 · ${table.headers.length} 列 · ${table.rows.flat().filter((cell) => cell && typeof cell === 'object').length} 个公式`
+                        : `${result.length.toLocaleString()} 字符`}
                 </p>
-              )}
-              <p className="result-summary">
-                {slides
-                  ? `${slides.length} 页 · ${slides.reduce((count, slide) => count + slide.bullets.length, 0)} 条要点`
-                  : report
-                    ? `${report.sections.length} 节 · ${report.sections.filter((section) => section.table).length} 张表格`
-                    : table
-                      ? `${table.rows.length} 行数据 · ${table.headers.length} 列 · ${table.rows.flat().filter((cell) => cell && typeof cell === 'object').length} 个公式`
-                      : `${result.length.toLocaleString()} 字符`}
-              </p>
-              <div
-                className="result-content"
-                tabIndex={editing ? undefined : 0}
-                role="region"
-                aria-label="结果内容"
-              >
-                {editing ? (
-                  task.output === 'document' && reportDraft ? (
-                    <ReportEditor
-                      report={reportDraft}
-                      disabled={active}
-                      onChange={(next) => {
-                        setReportDraft(next);
-                        setResult(JSON.stringify(next, null, 2));
-                        setWritten(false);
-                      }}
-                    />
-                  ) : task.output === 'table' && tableDraft ? (
-                    <TableEditor
-                      table={tableDraft}
-                      disabled={active}
-                      onPendingChange={setPendingCell}
-                      onChange={(next) => {
-                        setTableDraft(next);
-                        setResult(JSON.stringify(next, null, 2));
-                        setWritten(false);
-                      }}
-                    />
-                  ) : task.output === 'outline' && slideDraft ? (
-                    <OutlineEditor
-                      slides={slideDraft}
-                      disabled={active}
-                      onChange={(next) => {
-                        setSlideDraft(next);
-                        setResult(JSON.stringify({ slides: next }, null, 2));
-                        setWritten(false);
-                      }}
-                    />
-                  ) : (
-                    <label className="result-edit-label">
-                      编辑结果
-                      <textarea
-                        className="result-editor"
-                        value={result}
+                <div
+                  className="result-content"
+                  tabIndex={editing ? undefined : 0}
+                  role="region"
+                  aria-label="结果内容"
+                >
+                  {editing ? (
+                    task.output === 'document' && reportDraft ? (
+                      <ReportEditor
+                        report={reportDraft}
                         disabled={active}
-                        aria-invalid={Boolean(formatError)}
-                        onChange={(e) => {
-                          setResult(e.target.value);
+                        onChange={(next) => {
+                          setReportDraft(next);
+                          setResult(JSON.stringify(next, null, 2));
                           setWritten(false);
                         }}
                       />
-                    </label>
-                  )
-                ) : report ? (
-                  <ReportPreview report={report} />
-                ) : table ? (
-                  <TablePreview table={table} />
-                ) : slides ? (
-                  <ol className="slide-outline">
-                    {slides.map((slide, i) => (
-                      <li key={i}>
-                        <span className="slide-number">{String(i + 1).padStart(2, '0')}</span>
-                        <div>
-                          <h3>{slide.title}</h3>
-                          <ul>
-                            {slide.bullets.map((bullet, b) => (
-                              <li key={b}>{bullet}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <pre className={`result-text ${task.output === 'formula' ? 'formula-text' : ''}`}>
-                    {result}
-                  </pre>
-                )}
-              </div>
-              {Boolean(denseSlides?.length) && (
-                <p className="write-warning">
-                  第 {denseSlides!.join('、')}{' '}
-                  页文字较多，自动适配可能缩小字号。建议拆分页面或精简要点后创建。
-                </p>
-              )}
-              {formatError && (
-                <div role="alert" className="notice error">
-                  {formatError}
+                    ) : task.output === 'table' && tableDraft ? (
+                      <TableEditor
+                        table={tableDraft}
+                        disabled={active}
+                        onPendingChange={setPendingCell}
+                        onChange={(next) => {
+                          setTableDraft(next);
+                          setResult(JSON.stringify(next, null, 2));
+                          setWritten(false);
+                        }}
+                      />
+                    ) : task.output === 'outline' && slideDraft ? (
+                      <OutlineEditor
+                        slides={slideDraft}
+                        disabled={active}
+                        onChange={(next) => {
+                          setSlideDraft(next);
+                          setResult(JSON.stringify({ slides: next }, null, 2));
+                          setWritten(false);
+                        }}
+                      />
+                    ) : (
+                      <label className="result-edit-label">
+                        编辑结果
+                        <textarea
+                          className="result-editor"
+                          value={result}
+                          disabled={active}
+                          aria-invalid={Boolean(formatError)}
+                          onChange={(e) => {
+                            setResult(e.target.value);
+                            setWritten(false);
+                          }}
+                        />
+                      </label>
+                    )
+                  ) : report ? (
+                    <ReportPreview report={report} />
+                  ) : table ? (
+                    <TablePreview table={table} />
+                  ) : slides ? (
+                    <ol className="slide-outline">
+                      {slides.map((slide, i) => (
+                        <li key={i}>
+                          <span className="slide-number">{String(i + 1).padStart(2, '0')}</span>
+                          <div>
+                            <h3>{slide.title}</h3>
+                            <ul>
+                              {slide.bullets.map((bullet, b) => (
+                                <li key={b}>{bullet}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <pre
+                      className={`result-text ${task.output === 'formula' ? 'formula-text' : ''}`}
+                    >
+                      {result}
+                    </pre>
+                  )}
                 </div>
-              )}
-              <div className="result-tools">
-                <button
-                  className="text-button"
-                  onClick={copy}
-                  disabled={active || pendingCell || Boolean(formatError)}
-                >
-                  <Copy size={16} />
-                  复制
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    if (!editing) {
-                      editOriginal.current = { text: result, written };
-                      setSlideDraft(slides || null);
-                      setReportDraft(report || null);
-                      setTableDraft(table || null);
-                    }
-                    setEditing(!editing);
-                  }}
-                  disabled={active || pendingCell}
-                >
-                  {editing ? <Check size={16} /> : <Pencil size={16} />}
-                  {editing ? '完成编辑' : '编辑'}
-                </button>
-                {editing && (
+                {Boolean(denseSlides?.length) && (
+                  <p className="write-warning">
+                    第 {denseSlides!.join('、')}{' '}
+                    页文字较多，自动适配可能缩小字号。建议拆分页面或精简要点后创建。
+                  </p>
+                )}
+                {formatError && (
+                  <div role="alert" className="notice error">
+                    {formatError}
+                  </div>
+                )}
+                <div className="result-tools">
                   <button
                     className="text-button"
-                    disabled={active}
+                    onClick={copy}
+                    disabled={active || pendingCell || Boolean(formatError)}
+                  >
+                    <Copy size={16} />
+                    复制
+                  </button>
+                  <button
+                    className="text-button"
                     onClick={() => {
-                      setResult(editOriginal.current.text);
-                      setWritten(editOriginal.current.written);
-                      setEditing(false);
-                      setPendingCell(false);
-                      setSlideDraft(null);
-                      setReportDraft(null);
-                      setTableDraft(null);
+                      if (!editing) {
+                        editOriginal.current = { text: result, written };
+                        setSlideDraft(slides || null);
+                        setReportDraft(report || null);
+                        setTableDraft(table || null);
+                      }
+                      setEditing(!editing);
                     }}
+                    disabled={active || pendingCell}
                   >
-                    取消本轮编辑
+                    {editing ? <Check size={16} /> : <Pencil size={16} />}
+                    {editing ? '完成编辑' : '编辑'}
                   </button>
-                )}
-                {editing && structured && (
+                  {editing && (
+                    <button
+                      className="text-button"
+                      disabled={active}
+                      onClick={() => {
+                        setResult(editOriginal.current.text);
+                        setWritten(editOriginal.current.written);
+                        setEditing(false);
+                        setPendingCell(false);
+                        setSlideDraft(null);
+                        setReportDraft(null);
+                        setTableDraft(null);
+                      }}
+                    >
+                      取消本轮编辑
+                    </button>
+                  )}
+                  {editing && structured && (
+                    <button
+                      className="text-button"
+                      disabled={
+                        active ||
+                        pendingCell ||
+                        (!structuredEditing && !slides && !report && !table)
+                      }
+                      onClick={toggleStructuredEditor}
+                    >
+                      {structuredEditing ? '编辑 JSON' : '可视化编辑'}
+                    </button>
+                  )}
                   <button
                     className="text-button"
-                    disabled={
-                      active || pendingCell || (!structuredEditing && !slides && !report && !table)
-                    }
-                    onClick={toggleStructuredEditor}
+                    onClick={download}
+                    disabled={active || pendingCell}
                   >
-                    {structuredEditing ? '编辑 JSON' : '可视化编辑'}
+                    <ArrowDownToLine size={16} />
+                    {structured ? '下载 JSON' : '下载文本'}
                   </button>
-                )}
-                <button className="text-button" onClick={download} disabled={active || pendingCell}>
-                  <ArrowDownToLine size={16} />
-                  {structured ? '下载 JSON' : '下载文本'}
-                </button>
-              </div>
-              <div className="write-actions">
-                {canDocument && (
-                  <button
-                    className="primary"
-                    disabled={writeBlocked}
-                    onClick={(event) => prepare('document', event.currentTarget)}
-                  >
-                    <FileInput size={17} />
-                    插入排版报告
-                  </button>
-                )}
-                {canTable && (
-                  <button
-                    className="primary"
-                    disabled={writeBlocked}
-                    onClick={(event) => prepare('table', event.currentTarget)}
-                  >
-                    <FileInput size={17} />
-                    创建新工作表
-                  </button>
-                )}
-                {canReplace && (
-                  <button
-                    className="primary"
-                    onClick={(event) => prepare('replace', event.currentTarget)}
-                    disabled={writeBlocked}
-                  >
-                    <FileInput size={17} />
-                    替换已读取选区
-                  </button>
-                )}
-                {canInsert && (
-                  <button
-                    className={canReplace ? 'secondary' : 'primary'}
-                    onClick={(event) => prepare('insert', event.currentTarget)}
-                    disabled={writeBlocked}
-                  >
-                    插入到光标处
-                  </button>
-                )}
-                {canFormula && (
-                  <button
-                    className="primary"
-                    onClick={(event) => prepare('formula', event.currentTarget)}
-                    disabled={writeBlocked}
-                  >
-                    <FileInput size={17} />
-                    写入选中单元格
-                  </button>
-                )}
-                {canSlides && (
-                  <button
-                    className="primary"
-                    onClick={(event) => prepare('slides', event.currentTarget)}
-                    disabled={writeBlocked}
-                  >
-                    <FileInput size={17} />
-                    创建幻灯片
-                  </button>
-                )}
-              </div>
-              <p className="field-help">
-                {canDocument
-                  ? '在当前光标或选区后新起段落，插入标题、正文和表格。原文保留，可在 Word 中继续排版。'
-                  : canTable
-                    ? '确认名称和范围后创建独立工作表，不覆盖原表。公式会在 Excel 中计算并检查错误。'
-                    : canFormula
-                      ? '先在 Excel 中选中一个目标单元格。确认时会显示位置和原内容。'
-                      : canSlides
-                        ? '确认后在演示文稿末尾添加页面；生成的是基础文字页，可在 Office 中排版。'
-                        : canReplace || canInsert
-                          ? '点击写入按钮后，还会展示目标和内容供你确认。'
-                          : bridge.host === 'excel' && task.output === 'text'
-                            ? '分析和解释供参考，可复制到你的工作记录。'
-                            : '当前宿主或选区不支持自动写入，可复制结果后手动粘贴。'}
-              </p>
-            </>
-          )}
-        </section>
+                </div>
+                <div className="write-actions">
+                  {canDocument && (
+                    <button
+                      className="primary"
+                      disabled={writeBlocked}
+                      onClick={(event) => prepare('document', event.currentTarget)}
+                    >
+                      <FileInput size={17} />
+                      插入排版报告
+                    </button>
+                  )}
+                  {canTable && (
+                    <button
+                      className="primary"
+                      disabled={writeBlocked}
+                      onClick={(event) => prepare('table', event.currentTarget)}
+                    >
+                      <FileInput size={17} />
+                      创建新工作表
+                    </button>
+                  )}
+                  {canReplace && (
+                    <button
+                      className="primary"
+                      onClick={(event) => prepare('replace', event.currentTarget)}
+                      disabled={writeBlocked}
+                    >
+                      <FileInput size={17} />
+                      替换已读取选区
+                    </button>
+                  )}
+                  {canInsert && (
+                    <button
+                      className={canReplace ? 'secondary' : 'primary'}
+                      onClick={(event) => prepare('insert', event.currentTarget)}
+                      disabled={writeBlocked}
+                    >
+                      插入到光标处
+                    </button>
+                  )}
+                  {canFormula && (
+                    <button
+                      className="primary"
+                      onClick={(event) => prepare('formula', event.currentTarget)}
+                      disabled={writeBlocked}
+                    >
+                      <FileInput size={17} />
+                      写入选中单元格
+                    </button>
+                  )}
+                  {canSlides && (
+                    <button
+                      className="primary"
+                      onClick={(event) => prepare('slides', event.currentTarget)}
+                      disabled={writeBlocked}
+                    >
+                      <FileInput size={17} />
+                      创建幻灯片
+                    </button>
+                  )}
+                </div>
+                <p className="field-help">
+                  {canDocument
+                    ? '在当前光标或选区后新起段落，插入标题、正文和表格。原文保留，可在 Word 中继续排版。'
+                    : canTable
+                      ? '确认名称和范围后创建独立工作表，不覆盖原表。公式会在 Excel 中计算并检查错误。'
+                      : canFormula
+                        ? '先在 Excel 中选中一个目标单元格。确认时会显示位置和原内容。'
+                        : canSlides
+                          ? '确认后在演示文稿末尾添加页面；生成的是基础文字页，可在 Office 中排版。'
+                          : canReplace || canInsert
+                            ? '点击写入按钮后，还会展示目标和内容供你确认。'
+                            : bridge.host === 'excel' && task.output === 'text'
+                              ? '分析和解释供参考，可复制到你的工作记录。'
+                              : '当前宿主或选区不支持自动写入，可复制结果后手动粘贴。'}
+                </p>
+              </>
+            )}
+          </section>
+        </div>
       </div>
       {notice && (
         <div

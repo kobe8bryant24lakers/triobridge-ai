@@ -1,8 +1,13 @@
 {
   "name": "triobridge-ai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
+  "overrides": {
+    "pptxgenjs": {
+      "image-size": "2.1.0"
+    }
+  },
   "engines": {
     "node": "^22.13.0 || >=24.0.0"
   },
@@ -30,7 +35,10 @@
   },
   "dependencies": {
     "@napi-rs/keyring": "2.1.2",
+    "fflate": "0.8.3",
     "lucide-react": "^1.77.0",
+    "pdfjs-dist": "6.5.438",
+    "pptxgenjs": "4.0.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
