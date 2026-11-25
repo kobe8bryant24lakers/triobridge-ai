@@ -19,6 +19,9 @@ for (const [path, lang] of [
       0,
     );
     await expect(page.locator('#guide')).toContainText('127.0.0.1:8001/v1');
+    await expect(
+      page.locator('#guide a[href="./assets/TrioBridge-AI-User-Guide-zh-CN.pptx"]'),
+    ).toBeVisible();
   });
   test(`${lang} keeps downloads and language links usable at phone and desktop widths`, async ({
     page,
@@ -40,6 +43,9 @@ for (const [path, lang] of [
 test('publishes only the guide, with no hosted application, manifest, installer or private docs', async ({
   request,
 }) => {
+  const guide = await request.get('assets/TrioBridge-AI-User-Guide-zh-CN.pptx');
+  expect(guide.status()).toBe(200);
+  expect((await guide.body()).subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
   for (const path of ['', 'zh-CN.html', 'site.css', 'assets/icon.svg', 'assets/workbench.png'])
     expect((await request.get(path)).status()).toBe(200);
   for (const path of [
