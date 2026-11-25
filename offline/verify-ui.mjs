@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -26,6 +27,7 @@ if (testModel)
     'Use an ephemeral hosted runner for the loopback model fixture.',
   );
 const requests = [];
+const fixtureKey = randomUUID();
 let model;
 try {
   if (testModel) {
@@ -38,7 +40,10 @@ try {
         model: JSON.parse(Buffer.concat(body)).model,
         hasKey: Boolean(request.headers.authorization),
       });
-      response.writeHead(200, { 'Content-Type': 'application/json' });
+      const second = requests.at(-1).model === 'acceptance-second';
+      const expectedKey = second && !mac ? 'Bearer ' + fixtureKey : undefined;
+      const status = request.headers.authorization === expectedKey ? 200 : 401;
+      response.writeHead(status, { 'Content-Type': 'application/json' });
       response.end(
         JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'OK' } }] }),
       );
@@ -82,7 +87,11 @@ try {
         'Shared catalog first-open check: ' + (result.detail || 'unknown'),
       );
       assert.ok(result.hasProfileList);
-      if (testModel && host !== 'word') assert.equal(result.activeModel, 'acceptance-local');
+      if (testModel && host !== 'word')
+        assert.equal(
+          result.activeModel,
+          host === 'excel' ? 'acceptance-local' : 'acceptance-second',
+        );
       assert.ok(result.resources.every((p) => ['file:', 'data:', 'blob:'].includes(p)));
       await page.getByRole('button', { name: '模型设置', exact: true }).first().click();
       await page.getByRole('button', { name: '返回工作台' }).waitFor();
@@ -111,6 +120,72 @@ try {
             },
           ]);
         }
+      }
+      if (testModel && host === 'excel') {
+        const saved = await page.evaluate(
+          async ({ url, key }) => {
+            const call = (action, payload) =>
+              window.trioWorkbench.model(crypto.randomUUID(), action, JSON.stringify(payload));
+            const { body: state } = await call('state', {});
+            const response = await call('upsert', {
+              expectedRevision: state.revision,
+              profile: {
+                id: 'fixture-second',
+                name: '验收备用模型',
+                baseUrl: url,
+                model: 'acceptance-second',
+                timeoutSeconds: 30,
+              },
+              credential: key ? { action: 'replace', value: key } : { action: 'remove' },
+              activate: true,
+              testConnection: true,
+            });
+            return {
+              status: response.status,
+              hasKey: response.body.profiles?.find((p) => p.id === 'fixture-second')?.hasKey,
+            };
+          },
+          {
+            url: 'http://127.0.0.1:' + model.address().port + '/v1',
+            key: mac ? undefined : fixtureKey,
+          },
+        );
+        assert.deepEqual(saved, { status: 200, hasKey: !mac });
+      }
+      if (testModel && host === 'powerpoint') {
+        const checked = await page.evaluate(async () => {
+          const call = (action, payload) =>
+            window.trioWorkbench.model(crypto.randomUUID(), action, JSON.stringify(payload));
+          const { body: state } = await call('state', {});
+          const active = state.profiles.find((p) => p.id === state.activeId);
+          const first = state.profiles.find((p) => p.model === 'acceptance-local');
+          const completion = await call('complete', {
+            profileId: active.id,
+            profileRevision: active.revision,
+            messages: [{ role: 'user', content: 'Reply with OK.' }],
+          });
+          const switched = await call('activate', {
+            expectedRevision: state.revision,
+            id: first.id,
+          });
+          return {
+            count: state.profiles.length,
+            completion: completion.status,
+            switched: switched.status === 200 && switched.body.activeId === first.id,
+          };
+        });
+        assert.deepEqual(checked, { count: 2, completion: 200, switched: true });
+        assert.deepEqual(
+          requests.map((r) => [r.model, r.hasKey]),
+          [
+            ['acceptance-local', false],
+            ['acceptance-second', !mac],
+            ['acceptance-second', !mac],
+          ],
+        );
+        console.log(
+          'Verified two model profiles, cross-host generation, and switching the active model.',
+        );
       }
       console.log(host + ': packaged file page, host, model catalog, and settings verified');
     } finally {
