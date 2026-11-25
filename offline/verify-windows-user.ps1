@@ -18,11 +18,18 @@ if ($Verify) {
     }
     # Start-Process can inherit paths from the elevated Actions worker. Use the
     # folders owned by the newly loaded profile for WebView2, DPAPI and TEMP.
-    $env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
-    $env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
-    $env:APPDATA = [Environment]::GetFolderPath('ApplicationData')
+    $profileKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$ExpectedSid"
+    $profilePath = (Get-ItemProperty -LiteralPath $profileKey).ProfileImagePath
+    $env:USERPROFILE = [Environment]::ExpandEnvironmentVariables($profilePath)
+    # A first, non-interactive logon can leave the user's shell folders uncreated.
+    $env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
+    $env:APPDATA = Join-Path $env:USERPROFILE 'AppData\Roaming'
     $env:TEMP = $env:TMP = Join-Path $env:LOCALAPPDATA 'Temp'
     [void][IO.Directory]::CreateDirectory($env:TEMP)
+    [void][IO.Directory]::CreateDirectory($env:APPDATA)
+    if ([Environment]::GetFolderPath('LocalApplicationData', 'Create') -ne $env:LOCALAPPDATA) {
+        throw 'The standard user profile did not resolve its application-data folder.'
+    }
     $env:TRIOBRIDGE_TEST_WINRAR = $WinRAR
     $env:RUNNER_ENVIRONMENT = 'github-hosted'
     Set-Location -LiteralPath $root
