@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+import { uiMessage } from '../i18n-errors';
 import { useEffect, useRef } from 'react';
 import { AlertCircle, ArrowRight, LoaderCircle } from 'lucide-react';
 import type { OutputKind, WritePlan } from '../core/types';
@@ -70,18 +72,18 @@ export function ConfirmWrite({
         if (!busy) onCancel();
       }}
     >
-      <h2 id="confirm-title">确认写入</h2>
-      <p className="target-label">{plan.label}</p>
+      <h2 id="confirm-title">{t('确认写入', 'Confirm Write')}</h2>
+      <p className="target-label">{uiMessage(plan.label)}</p>
       <div className="write-comparison">
         <div>
-          <h3 id="confirm-before-heading">目标当前内容</h3>
+          <h3 id="confirm-before-heading">{t('目标当前内容', 'Current content')}</h3>
           <pre tabIndex={0} role="region" aria-labelledby="confirm-before-heading">
-            {plan.before || '（空）'}
+            {plan.before || t('（空）', '(Empty)')}
           </pre>
         </div>
         <ArrowRight size={18} />
         <div>
-          <h3 id="confirm-after-heading">即将写入的结果</h3>
+          <h3 id="confirm-after-heading">{t('即将写入的结果', 'Content to write')}</h3>
           {wordText ? (
             <WordTextPreview
               text={output}
@@ -102,25 +104,31 @@ export function ConfirmWrite({
           )}
         </div>
       </div>
-      {plan.warning && <p className="write-warning">{plan.warning}</p>}
+      {plan.warning && <p className="write-warning">{uiMessage(plan.warning)}</p>}
       <p className="field-help">
         {outputKind === 'table'
-          ? '请检查新工作表名称和内容。需要恢复时，请核对表名后删除本次新建的工作表。'
-          : '请检查目标和内容。写入后可使用 Office 的撤销功能恢复；添加幻灯片可能需要多次撤销。'}
+          ? t(
+              '请检查新工作表名称和内容。需要恢复时，请核对表名后删除本次新建的工作表。',
+              "Check the new worksheet's name and contents. To reverse this change, verify the sheet name and delete the new worksheet.",
+            )
+          : t(
+              '请检查目标和内容。写入后可使用 Office 的撤销功能恢复；添加幻灯片可能需要多次撤销。',
+              'Check the destination and content. You can undo the change in Office. Adding slides may take more than one Undo.',
+            )}
       </p>
       {error && (
         <div className="notice error" role="alert">
           <AlertCircle size={17} />
-          {error}
+          {uiMessage(error)}
         </div>
       )}
       <div className="button-row">
         <button ref={cancel} className="secondary" onClick={onCancel} disabled={busy}>
-          返回检查
+          {t('返回检查', 'Back to Review')}
         </button>
         <button className="primary" onClick={onConfirm} disabled={busy || Boolean(error)}>
           {busy && <LoaderCircle size={16} className="spin" />}
-          {busy ? '正在写入…' : '确认写入'}
+          {busy ? t('正在写入…', 'Writing…') : t('确认写入', 'Confirm Write')}
         </button>
       </div>
     </dialog>

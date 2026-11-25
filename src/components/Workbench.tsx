@@ -1,3 +1,5 @@
+import { t, useUiLanguage } from '../i18n';
+import { uiMessage } from '../i18n-errors';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine,
@@ -46,7 +48,7 @@ import { parseReport, parseTable, reportToText, tableToText } from '../core/stru
 import { ReportPreview, TablePreview } from './StructuredPreview';
 import { ReportEditor } from './ReportEditor';
 import { TableEditor } from './TableEditor';
-import { COMPLEX_DESCRIPTIONS, type DemoScenario } from '../office/complex-samples';
+import { getComplexSamples, type DemoScenario } from '../office/complex-samples';
 import { PresentationWorkspace, type PresentationMode } from './PresentationWorkspace';
 
 interface Props {
@@ -61,6 +63,16 @@ interface Props {
   onPresentationModeChange?: (mode: PresentationMode) => void;
 }
 
+const TRANSLATION_LANGUAGES = [
+  ['英语', 'English'],
+  ['简体中文', 'Simplified Chinese'],
+  ['繁体中文', 'Traditional Chinese'],
+  ['日语', 'Japanese'],
+  ['韩语', 'Korean'],
+  ['法语', 'French'],
+  ['德语', 'German'],
+  ['西班牙语', 'Spanish'],
+] as const;
 async function copyText(text: string) {
   if (navigator.clipboard) {
     await navigator.clipboard.writeText(text);
@@ -73,7 +85,13 @@ async function copyText(text: string) {
   document.body.append(input);
   input.select();
   try {
-    if (!document.execCommand('copy')) throw new Error('复制失败，请选中结果手动复制。');
+    if (!document.execCommand('copy'))
+      throw new Error(
+        t(
+          '复制失败，请选中结果手动复制。',
+          "Couldn't copy the result. Select the text and copy it manually.",
+        ),
+      );
   } finally {
     input.remove();
   }
@@ -90,7 +108,8 @@ export function Workbench({
   presentationMode: savedPresentationMode,
   onPresentationModeChange,
 }: Props) {
-  const tasks = TASKS[bridge.host];
+  const uiLanguage = useUiLanguage();
+  const tasks = useMemo(() => TASKS[bridge.host], [bridge.host, uiLanguage]);
   const [localPresentationMode, setLocalPresentationMode] = useState<PresentationMode>('generate');
   const presentationMode = savedPresentationMode ?? localPresentationMode;
   const setPresentationMode = onPresentationModeChange ?? setLocalPresentationMode;
@@ -104,11 +123,13 @@ export function Workbench({
   const isDemoModel = bridge.mode === 'demo' && modelId === '__demo__';
   const [source, setSource] = useState('');
   const snapshot = useRef<SelectionSnapshot | undefined>(undefined);
-  const [sourceLabel, setSourceLabel] = useState('尚未读取选区');
+  const [sourceStatus, setSourceStatus] = useState<'empty' | 'manual' | 'read' | 'written'>(
+    'empty',
+  );
   const [instruction, setInstruction] = useState('');
-  const [language, setLanguage] = useState('英语');
+  const [language, setLanguage] = useState<string>(TRANSLATION_LANGUAGES[0][0]);
   const [result, setResult] = useState('');
-  const [resultModel, setResultModel] = useState('');
+  const [resultModel, setResultModel] = useState<{ label: string } | 'demo'>();
   const [editing, setEditing] = useState(false);
   const [slideDraft, setSlideDraft] = useState<SlideContent[] | null>(null);
   const [reportDraft, setReportDraft] = useState<ReportContent | null>(null);
@@ -117,7 +138,11 @@ export function Workbench({
   const editOriginal = useRef({ text: '', written: false });
   const [busy, setBusy] = useState<'reading' | 'generating' | 'preparing' | 'writing' | ''>('');
   const [switchingModel, setSwitchingModel] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; error?: boolean; warning?: boolean }>();
+  const [notice, setNotice] = useState<{
+    text: string | (() => string);
+    error?: boolean;
+    warning?: boolean;
+  }>();
   const [written, setWritten] = useState(false);
   const [outdated, setOutdated] = useState(false);
   const [plan, setPlan] = useState<WritePlan>();
@@ -135,11 +160,17 @@ export function Workbench({
   const hasResult = Boolean(resultModel);
   const sourceError =
     source.length > MAX_SOURCE_LENGTH
-      ? `参考内容超出 ${(source.length - MAX_SOURCE_LENGTH).toLocaleString()} 字符。内容已完整保留，请分段处理（每次最多 30,000 字符）。`
+      ? t(
+          `参考内容超出 ${(source.length - MAX_SOURCE_LENGTH).toLocaleString()} 字符。内容已完整保留，请分段处理（每次最多 30,000 字符）。`,
+          `The source is ${(source.length - MAX_SOURCE_LENGTH).toLocaleString()} characters over the limit. Your text is intact. Split it into sections of up to 30,000 characters.`,
+        )
       : '';
   const instructionError =
     instruction.length > MAX_INSTRUCTION_LENGTH
-      ? '要求超过 4,000 字符。内容已保留，请缩短后生成。'
+      ? t(
+          '要求超过 4,000 字符。内容已保留，请缩短后生成。',
+          'Instructions exceed 4,000 characters. Your text is intact. Shorten it before generating.',
+        )
       : '';
 
   async function chooseModel(id: string) {
@@ -178,7 +209,7 @@ export function Workbench({
   function invalidate(clear = false) {
     if (clear) {
       setResult('');
-      setResultModel('');
+      setResultModel(undefined);
     }
     setOutdated(!clear && hasResult);
     setSlideDraft(null);
@@ -196,7 +227,7 @@ export function Workbench({
   function editSource(value: string) {
     releaseSource();
     setSource(value);
-    setSourceLabel(value ? '手动输入 · 可发送给模型' : '尚未读取选区');
+    setSourceStatus(value ? 'manual' : 'empty');
     invalidate();
   }
   async function read() {
@@ -213,7 +244,7 @@ export function Workbench({
       releaseSource();
       snapshot.current = next;
       setSource(next.text);
-      setSourceLabel(next.label);
+      setSourceStatus('read');
       invalidate();
     } catch (error) {
       setNotice({ text: officeError(error), error: true });
@@ -227,10 +258,22 @@ export function Workbench({
     operation.current = true;
     setNotice(undefined);
     try {
-      const messages = buildMessages(task, source, instruction, language);
-      if (!model && !isDemoModel) throw new Error('请先添加并选择一个模型配置。');
+      const messages = buildMessages(
+        task,
+        source,
+        instruction,
+        TRANSLATION_LANGUAGES.find(([id]) => id === language)?.[uiLanguage === 'en' ? 1 : 0] ??
+          language,
+      );
+      if (!model && !isDemoModel)
+        throw new Error(t('请先添加并选择一个模型配置。', 'Add and select a model first.'));
       if (!isDemoModel && sharedUnavailable)
-        throw new Error('请在模型设置中重新读取共享配置后再生成。');
+        throw new Error(
+          t(
+            '请在模型设置中重新读取共享配置后再生成。',
+            'Reload the shared configuration in Model Settings before generating.',
+          ),
+        );
       const controller = new AbortController();
       request.current = controller;
       setBusy('generating');
@@ -243,7 +286,7 @@ export function Workbench({
       setWritten(false);
       setEditing(false);
       setSlideDraft(null);
-      setResultModel(isDemoModel ? '固定演示样例 · 未调用 AI' : `${model!.name} / ${model!.model}`);
+      setResultModel(isDemoModel ? 'demo' : { label: `${model!.name} / ${model!.model}` });
       setTimeout(() => outputRef.current?.focus(), 0);
     } catch (error) {
       if (!disposed.current)
@@ -269,9 +312,17 @@ export function Workbench({
       if (kind === 'slides') parseOutline(text);
       if (kind === 'document') parseReport(text);
       if (kind === 'table') parseTable(text);
-      if (!text.trim()) throw new Error('结果为空，请先生成内容。');
+      if (!text.trim())
+        throw new Error(
+          t('结果为空，请先生成内容。', 'The result is empty. Generate content first.'),
+        );
       if (task.output !== 'text' && text.length > MAX_RESULT_LENGTH)
-        throw new Error('结果超过 100,000 字符，请缩短后再写入。');
+        throw new Error(
+          t(
+            '结果超过 100,000 字符，请缩短后再写入。',
+            'The result exceeds 100,000 characters. Shorten it before writing.',
+          ),
+        );
       const next = await bridge.prepareWrite(kind, snapshot.current, text);
       if (disposed.current) {
         void next.dispose?.().catch(() => {});
@@ -302,21 +353,30 @@ export function Workbench({
       setWritten(true);
       dismissPlan();
       releaseSource();
-      setSourceLabel('写入完成 · 再次处理前请重新读取');
+      setSourceStatus('written');
       setNotice({
         warning: Boolean(outcome?.warning),
-        text:
+        text: () =>
           outcome?.warning ||
           (bridge.mode === 'demo'
-            ? '已写入模拟文档，可展开下方文档查看。真实 Office 文件未被修改。'
+            ? t(
+                '已写入模拟文档，可展开下方文档查看。真实 Office 文件未被修改。',
+                'Written to the demo document. Expand the document below to review the result. Your Office files have not changed.',
+              )
             : task.output === 'table'
-              ? '已创建新工作表，请在 Excel 中查看表格与公式结果。需要恢复时，可删除本次新建的工作表。'
-              : '已写入 Office。需要恢复时，请使用 Office 撤销。'),
+              ? t(
+                  '已创建新工作表，请在 Excel 中查看表格与公式结果。需要恢复时，可删除本次新建的工作表。',
+                  'New worksheet created. Check its data and formulas in Excel. To undo the change, delete the new worksheet.',
+                )
+              : t(
+                  '已写入 Office。需要恢复时，请使用 Office 撤销。',
+                  'Written to Office. Use Undo in Office to reverse the change.',
+                )),
       });
       requestAnimationFrame(() => outputRef.current?.focus());
     } catch (error) {
       setWriteError(
-        `${officeError(error)}${task.output === 'outline' ? ' 如已出现部分新页面，请先检查并撤销，再重试。' : ''}`,
+        `${officeError(error)}${task.output === 'outline' ? t(' 如已出现部分新页面，请先检查并撤销，再重试。', ' If any slides have already been added, check and undo those changes before trying again.') : ''}`,
       );
     } finally {
       operation.current = false;
@@ -334,7 +394,7 @@ export function Workbench({
               ? tableToText(parseTable(result))
               : result,
       );
-      setNotice({ text: '结果已复制。' });
+      setNotice({ text: () => t('结果已复制。', 'Result copied.') });
     } catch (error) {
       setNotice({ text: officeError(error), error: true });
     }
@@ -349,9 +409,20 @@ export function Workbench({
   }
   const { slides, report, table, formatError } = useMemo(() => {
     if (!hasResult) return { formatError: '' };
-    if (!result.trim()) return { formatError: '结果为空，请输入内容后再写入。' };
+    if (!result.trim())
+      return {
+        formatError: t(
+          '结果为空，请输入内容后再写入。',
+          'The result is empty. Enter content before writing.',
+        ),
+      };
     if (task.output !== 'text' && result.length > MAX_RESULT_LENGTH)
-      return { formatError: '结果超过 100,000 字符。内容已保留，请缩短后再写入。' };
+      return {
+        formatError: t(
+          '结果超过 100,000 字符。内容已保留，请缩短后再写入。',
+          'The result exceeds 100,000 characters. Your content is intact. Shorten it before writing.',
+        ),
+      };
     try {
       if (task.output === 'outline') return { slides: parseOutline(result), formatError: '' };
       if (task.output === 'document') return { report: parseReport(result), formatError: '' };
@@ -361,7 +432,7 @@ export function Workbench({
     } catch (error) {
       return { formatError: officeError(error) };
     }
-  }, [result, task.output, hasResult]);
+  }, [result, task.output, hasResult, uiLanguage]);
   const denseSlides = slides?.flatMap((slide, i) =>
     slide.bullets.join('').length > 450 ? [i + 1] : [],
   );
@@ -391,23 +462,34 @@ export function Workbench({
     <>
       <div className="page-heading work-heading">
         <div>
-          <h1>{HOST_NAMES[bridge.host]} 工作台</h1>
+          <h1>
+            {HOST_NAMES[bridge.host]}
+            {t(' 工作台', ' Workspace')}
+          </h1>
           <p>
             {bridge.host === 'word'
-              ? '从你的文字出发，让下一稿更好。'
+              ? t(
+                  '从你的文字出发，让下一稿更好。',
+                  'Start with your text and shape the next draft.',
+                )
               : bridge.host === 'excel'
-                ? '理解表格，让计算更有把握。'
-                : '从素材生成整稿，也能直接编辑现有页面。'}
+                ? t('理解表格，让计算更有把握。', 'Explore your data and check your calculations.')
+                : t(
+                    '从素材生成整稿，也能直接编辑现有页面。',
+                    'Create a deck from source files or edit existing slides.',
+                  )}
           </p>
         </div>
         <span className="connection-badge">
           <span />
-          {bridge.mode === 'demo' ? '浏览器演示' : '已连接 Office'}
+          {bridge.mode === 'demo'
+            ? t('浏览器演示', 'Browser demo')
+            : t('已连接 Office', 'Connected to Office')}
         </span>
       </div>
       <div className="model-strip">
         <div className="model-select">
-          <label htmlFor="active-model">当前模型</label>
+          <label htmlFor="active-model">{t('当前模型', 'Current Model')}</label>
           <select
             id="active-model"
             value={modelId}
@@ -415,9 +497,13 @@ export function Workbench({
             onChange={(e) => chooseModel(e.target.value)}
           >
             <option value="" disabled>
-              请添加模型
+              {t('请添加模型', 'Add a model')}
             </option>
-            {bridge.mode === 'demo' && <option value="__demo__">演示模型 · 无需 API Key</option>}
+            {bridge.mode === 'demo' && (
+              <option value="__demo__">
+                {t('演示模型 · 无需 API Key', 'Demo model · No API key required')}
+              </option>
+            )}
             {profiles.profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} · {p.model}
@@ -428,8 +514,8 @@ export function Workbench({
         </div>
         <button
           className="icon-button"
-          aria-label="打开模型设置"
-          title="模型设置"
+          aria-label={t('打开模型设置', 'Open Model Settings')}
+          title={t('模型设置', 'Model Settings')}
           onClick={onSettings}
           disabled={active}
         >
@@ -440,8 +526,14 @@ export function Workbench({
         <p className="demo-note">
           <ShieldCheck size={16} />
           {isDemoModel
-            ? '当前使用示例内容与固定输出，体验流程无需连接模型。'
-            : '当前文档为模拟文档；生成时会实际调用选中的模型服务。'}
+            ? t(
+                '当前使用示例内容与固定输出，体验流程无需连接模型。',
+                'Explore the workflow with sample content and fixed responses.',
+              )
+            : t(
+                '当前文档为模拟文档；生成时会实际调用选中的模型服务。',
+                'This document is simulated. Generating will call the selected model service.',
+              )}
         </p>
       )}
       {bridge.mode === 'demo' &&
@@ -449,33 +541,43 @@ export function Workbench({
         (bridge.host !== 'powerpoint' || presentationMode === 'text') && (
           <div className="demo-scenario">
             <label>
-              示例文档
+              {t('示例文档', 'Sample document')}
               <select
                 disabled={active || pendingCell}
                 value={demoScenario}
                 onChange={(e) => onDemoScenarioChange(e.target.value as DemoScenario)}
               >
-                <option value="basic">基础示例</option>
-                <option value="complex">复杂文档示例</option>
+                <option value="basic">{t('基础示例', 'Basic example')}</option>
+                <option value="complex">{t('复杂文档示例', 'Complex example')}</option>
               </select>
             </label>
             <p className="field-help">
               {demoScenario === 'complex'
-                ? COMPLEX_DESCRIPTIONS[bridge.host]
-                : '使用简短内容熟悉读取、预览和写入。'}{' '}
-              切换示例会重置当前演示工作稿。
+                ? getComplexSamples().descriptions[bridge.host]
+                : t(
+                    '使用简短内容熟悉读取、预览和写入。',
+                    'Practice reading, previewing, and writing with a short example.',
+                  )}{' '}
+              {t(
+                '切换示例会重置当前演示工作稿。',
+                'Switching examples resets the current demo draft.',
+              )}
             </p>
           </div>
         )}
       {bridge.host === 'powerpoint' && (
         <>
-          <div className="ppt-mode-nav" role="group" aria-label="PPT 工作模式">
+          <div
+            className="ppt-mode-nav"
+            role="group"
+            aria-label={t('PPT 工作模式', 'PowerPoint mode')}
+          >
             {(
               [
-                ['generate', '素材生成'],
-                ['edit', '编辑现有'],
-                ['chart', '数据图表'],
-                ['text', '文案与大纲'],
+                ['generate', t('素材生成', 'Create from Files')],
+                ['edit', t('编辑现有', 'Edit Slides')],
+                ['chart', t('数据图表', 'Data Charts')],
+                ['text', t('文案与大纲', 'Text and Outlines')],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -501,12 +603,15 @@ export function Workbench({
       )}
       <div hidden={bridge.host === 'powerpoint' && presentationMode !== 'text'}>
         <div className="workspace-grid">
-          <section className="compose-area" aria-label="输入与任务">
+          <section className="compose-area" aria-label={t('输入与任务', 'Input and tasks')}>
             <div className="section-heading">
-              <h2>选择任务</h2>
-              <span className="muted">{tasks.length} 项能力</span>
+              <h2>{t('选择任务', 'Choose a task')}</h2>
+              <span className="muted">
+                {tasks.length}
+                {t(' 项能力', ' tasks')}
+              </span>
             </div>
-            <div className="task-options" role="group" aria-label="选择任务">
+            <div className="task-options" role="group" aria-label={t('选择任务', 'Choose a task')}>
               {tasks.map((item) => (
                 <button
                   key={item.id}
@@ -526,7 +631,7 @@ export function Workbench({
             <p className="task-description">{task.description}</p>
             <div className="section-heading source-heading">
               <h2>
-                <label htmlFor="source-text">参考内容</label>
+                <label htmlFor="source-text">{t('参考内容', 'Source text')}</label>
               </h2>
               <button
                 className="text-button"
@@ -538,7 +643,9 @@ export function Workbench({
                 ) : (
                   <ScanText size={16} />
                 )}
-                {bridge.mode === 'demo' ? '读取示例选区' : '读取选区'}
+                {bridge.mode === 'demo'
+                  ? t('读取示例选区', 'Read Sample Selection')
+                  : t('读取选区', 'Read Selection')}
               </button>
             </div>
             <textarea
@@ -549,17 +656,40 @@ export function Workbench({
               onChange={(e) => editSource(e.target.value)}
               placeholder={
                 bridge.host === 'excel'
-                  ? '在 Excel 中选中数据或公式，点击「读取选区」。也可以粘贴表格内容。'
+                  ? t(
+                      '在 Excel 中选中数据或公式，点击「读取选区」。也可以粘贴表格内容。',
+                      'Select data or a formula in Excel, then click Read Selection. You can also paste table data here.',
+                    )
                   : bridge.host === 'powerpoint'
-                    ? '在幻灯片中进入文本编辑状态并选中文字，点击「读取选区」。也可以直接粘贴文案。'
-                    : '选中文档中的一段文字，再点击「读取选区」。也可以直接在这里粘贴内容。'
+                    ? t(
+                        '在幻灯片中进入文本编辑状态并选中文字，点击「读取选区」。也可以直接粘贴文案。',
+                        'Select text in a slide and click Read Selection, or paste text here.',
+                      )
+                    : t(
+                        '选中文档中的一段文字，再点击「读取选区」。也可以直接在这里粘贴内容。',
+                        'Select text in the document and click Read Selection, or paste it here.',
+                      )
               }
               aria-invalid={Boolean(sourceError)}
               aria-describedby={`source-info${sourceError ? ' source-error' : ''}`}
             />
             <div className="source-meta" id="source-info">
-              <span>{sourceLabel}</span>
-              <span>{source.length.toLocaleString()} / 30,000 字符</span>
+              <span>
+                {sourceStatus === 'read' && snapshot.current
+                  ? uiMessage(snapshot.current.label)
+                  : sourceStatus === 'written'
+                    ? t(
+                        '写入完成 · 再次处理前请重新读取',
+                        'Write complete · Read the selection again to continue',
+                      )
+                    : sourceStatus === 'manual'
+                      ? t('手动输入 · 可发送给模型', 'Manual input · Ready to send')
+                      : t('尚未读取选区', 'No selection read yet')}
+              </span>
+              <span>
+                {source.length.toLocaleString()}
+                {t(' / 30,000 字符', ' / 30,000 characters')}
+              </span>
             </div>
             {sourceError && (
               <p id="source-error" className="field-error" role="alert">
@@ -567,11 +697,11 @@ export function Workbench({
               </p>
             )}
             {snapshot.current?.warning && (
-              <p className="write-warning">{snapshot.current.warning}</p>
+              <p className="write-warning">{uiMessage(snapshot.current.warning)}</p>
             )}
             {task.id === 'translate' && (
               <label className="language-field">
-                目标语言
+                {t('目标语言', 'Target language')}
                 <select
                   value={language}
                   disabled={active}
@@ -580,17 +710,21 @@ export function Workbench({
                     invalidate();
                   }}
                 >
-                  {['英语', '简体中文', '繁体中文', '日语', '韩语', '法语', '德语', '西班牙语'].map(
-                    (lang) => (
-                      <option key={lang}>{lang}</option>
-                    ),
-                  )}
+                  {TRANSLATION_LANGUAGES.map(([id, en]) => (
+                    <option key={id} value={id}>
+                      {t(id, en)}
+                    </option>
+                  ))}
                 </select>
               </label>
             )}
             <label className="instruction-label" htmlFor="instruction">
-              {task.needsInstruction ? '具体要求' : '补充要求'}{' '}
-              <span className="muted">{task.needsInstruction ? '必填' : '可选'}</span>
+              {task.needsInstruction
+                ? t('具体要求', 'Requirements')
+                : t('补充要求', 'Additional instructions')}{' '}
+              <span className="muted">
+                {task.needsInstruction ? t('必填', 'Required') : t('可选', 'Optional')}
+              </span>
             </label>
             <textarea
               id="instruction"
@@ -605,18 +739,39 @@ export function Workbench({
               }}
               placeholder={
                 task.id === 'formula'
-                  ? '例如：计算 B2:B4 的合计，结果放在 B6'
+                  ? t(
+                      '例如：计算 B2:B4 的合计，结果放在 B6',
+                      'Example: Total B2:B4 and put the result in B6.',
+                    )
                   : task.id === 'outline'
-                    ? '例如：为季度工作回顾生成 5 页演示大纲，面向团队成员'
+                    ? t(
+                        '例如：为季度工作回顾生成 5 页演示大纲，面向团队成员',
+                        "Example: Create a five-slide outline for the team's quarterly review.",
+                      )
                     : task.id === 'ask'
-                      ? '例如：哪个区域的季度合计最高？'
+                      ? t(
+                          '例如：哪个区域的季度合计最高？',
+                          'Example: Which region has the highest quarterly total?',
+                        )
                       : task.id === 'generate'
-                        ? '例如：写一封项目进度邮件，包含已完成事项和下周计划'
+                        ? t(
+                            '例如：写一封项目进度邮件，包含已完成事项和下周计划',
+                            "Example: Draft a project update email with completed tasks and next week's plan.",
+                          )
                         : task.id === 'report'
-                          ? '例如：生成项目验收报告，包含指标对比表、风险与行动计划'
+                          ? t(
+                              '例如：生成项目验收报告，包含指标对比表、风险与行动计划',
+                              'Example: Create an acceptance report with a metrics table, risks, and an action plan.',
+                            )
                           : task.id === 'table'
-                            ? '例如：创建项目进度表，包含负责人、计划工时、实际工时和差异公式'
-                            : '例如：语气更简洁，保留所有数字与专业术语'
+                            ? t(
+                                '例如：创建项目进度表，包含负责人、计划工时、实际工时和差异公式',
+                                'Example: Create a project tracker with an owner, planned hours, actual hours, and a variance formula.',
+                              )
+                            : t(
+                                '例如：语气更简洁，保留所有数字与专业术语',
+                                'Example: Use a concise tone and keep all numbers and technical terms.',
+                              )
               }
             />
             {instructionError && (
@@ -643,21 +798,31 @@ export function Workbench({
                 ) : (
                   <Sparkles size={18} />
                 )}
-                {busy === 'generating' ? '正在生成…' : isDemoModel ? '生成演示预览' : '生成预览'}
+                {busy === 'generating'
+                  ? t('正在生成…', 'Generating…')
+                  : isDemoModel
+                    ? t('生成演示预览', 'Generate Demo Preview')
+                    : t('生成预览', 'Generate Preview')}
                 {!busy && <ArrowRight size={17} />}
               </button>
               {busy === 'generating' && (
                 <button className="secondary" onClick={() => request.current?.abort()}>
                   <Square size={14} />
-                  停止
+                  {t('停止', 'Stop')}
                 </button>
               )}
             </div>
             <p className="privacy-note">
               <ShieldCheck size={14} />
               {isDemoModel
-                ? '演示模式不会向模型发送内容，也不会修改 Office 文件。'
-                : '生成时仅将上方参考内容和要求发送给所选模型服务。'}
+                ? t(
+                    '演示模式不会向模型发送内容，也不会修改 Office 文件。',
+                    'The demo model does not send content to a model service or change Office files.',
+                  )
+                : t(
+                    '生成时仅将上方参考内容和要求发送给所选模型服务。',
+                    'Only the source and instructions above are sent to your selected model service when you generate.',
+                  )}
             </p>
           </section>
           <section
@@ -668,14 +833,20 @@ export function Workbench({
             aria-busy={busy === 'generating'}
           >
             <div className="section-heading">
-              <h2 id="result-heading">结果预览</h2>
+              <h2 id="result-heading">{t('结果预览', 'Result Preview')}</h2>
               {hasResult ? (
                 <span className={`result-status ${written ? 'applied' : ''}`}>
                   {written ? <CheckCheck size={14} /> : <FileCheck2 size={14} />}
-                  {written ? '已写入' : outdated ? '旧预览' : formatError ? '待修正' : '待确认'}
+                  {written
+                    ? t('已写入', 'Written')
+                    : outdated
+                      ? t('旧预览', 'Outdated preview')
+                      : formatError
+                        ? t('待修正', 'Needs correction')
+                        : t('待确认', 'Awaiting confirmation')}
                 </span>
               ) : (
-                <span className="muted">生成后由你确认</span>
+                <span className="muted">{t('生成后由你确认', 'Review before writing')}</span>
               )}
             </div>
             {!hasResult ? (
@@ -683,11 +854,11 @@ export function Workbench({
                 {busy === 'generating' ? (
                   <>
                     <LoaderCircle size={36} className="spin" />
-                    <h3>正在整理你的内容</h3>
+                    <h3>{t('正在整理你的内容', 'Preparing your content')}</h3>
                     <p>
-                      生成过程中不会修改文档。
+                      {t('生成过程中不会修改文档。', 'Generating will not change your document.')}
                       <br />
-                      你可以随时停止请求。
+                      {t('你可以随时停止请求。', 'You can stop the request at any time.')}
                     </p>
                   </>
                 ) : (
@@ -695,51 +866,73 @@ export function Workbench({
                     <div className="preview-symbol">
                       <FileCheck2 size={34} strokeWidth={1.5} />
                     </div>
-                    <h3>下一稿，从这里开始</h3>
+                    <h3>{t('下一稿，从这里开始', 'Your next draft starts here')}</h3>
                     <p>
-                      读取内容，选择任务。
+                      {t('读取内容，选择任务。', 'Read the source and choose a task.')}
                       <br />
-                      AI 结果会先显示在这里，
+                      {t('AI 结果会先显示在这里，', 'Your result will appear here.')}
                       <br />
-                      检查后再写入文档。
+                      {t('检查后再写入文档。', 'Review it before writing to the document.')}
                     </p>
                     <div className="flow-hint">
-                      <span>读取</span>
+                      <span>{t('读取', 'Read')}</span>
                       <ArrowRight size={13} />
-                      <span>预览</span>
+                      <span>{t('预览', 'Preview')}</span>
                       <ArrowRight size={13} />
-                      <span>确认</span>
+                      <span>{t('确认', 'Confirm')}</span>
                     </div>
                   </>
                 )}
               </div>
             ) : (
               <>
-                <p className="result-model">{resultModel}</p>
+                <p className="result-model">
+                  {resultModel === 'demo'
+                    ? t('固定演示样例 · 未调用 AI', 'Fixed demo result · No AI call')
+                    : resultModel?.label}
+                </p>
                 {outdated && (
                   <p className="write-warning" role="status">
-                    参考内容或要求已更改。旧预览已保留，重新生成后才能写入。
+                    {t(
+                      '参考内容或要求已更改。旧预览已保留，重新生成后才能写入。',
+                      'The source or instructions have changed. Generate a new preview before writing.',
+                    )}
                   </p>
                 )}
                 {busy === 'generating' && (
                   <p className="field-help" role="status">
-                    正在重新生成，当前预览已保留…
+                    {t(
+                      '正在重新生成，当前预览已保留…',
+                      'Generating again. Your current preview is still available…',
+                    )}
                   </p>
                 )}
                 <p className="result-summary">
                   {slides
-                    ? `${slides.length} 页 · ${slides.reduce((count, slide) => count + slide.bullets.length, 0)} 条要点`
+                    ? t(
+                        `${slides.length} 页 · ${slides.reduce((count, slide) => count + slide.bullets.length, 0)} 条要点`,
+                        `Slides: ${slides.length} · Bullets: ${slides.reduce((count, slide) => count + slide.bullets.length, 0)}`,
+                      )
                     : report
-                      ? `${report.sections.length} 节 · ${report.sections.filter((section) => section.table).length} 张表格`
+                      ? t(
+                          `${report.sections.length} 节 · ${report.sections.filter((section) => section.table).length} 张表格`,
+                          `Sections: ${report.sections.length} · Tables: ${report.sections.filter((section) => section.table).length}`,
+                        )
                       : table
-                        ? `${table.rows.length} 行数据 · ${table.headers.length} 列 · ${table.rows.flat().filter((cell) => cell && typeof cell === 'object').length} 个公式`
-                        : `${result.length.toLocaleString()} 字符`}
+                        ? t(
+                            `${table.rows.length} 行数据 · ${table.headers.length} 列 · ${table.rows.flat().filter((cell) => cell && typeof cell === 'object').length} 个公式`,
+                            `Data rows: ${table.rows.length} · Columns: ${table.headers.length} · Formulas: ${table.rows.flat().filter((cell) => cell && typeof cell === 'object').length}`,
+                          )
+                        : t(
+                            `${result.length.toLocaleString()} 字符`,
+                            `Characters: ${result.length.toLocaleString()}`,
+                          )}
                 </p>
                 <div
                   className="result-content"
                   tabIndex={editing ? undefined : 0}
                   role="region"
-                  aria-label="结果内容"
+                  aria-label={t('结果内容', 'Result content')}
                 >
                   {editing ? (
                     task.output === 'document' && reportDraft ? (
@@ -775,7 +968,7 @@ export function Workbench({
                       />
                     ) : (
                       <label className="result-edit-label">
-                        编辑结果
+                        {t('编辑结果', 'Edit result')}
                         <textarea
                           className="result-editor"
                           value={result}
@@ -820,13 +1013,15 @@ export function Workbench({
                 </div>
                 {Boolean(denseSlides?.length) && (
                   <p className="write-warning">
-                    第 {denseSlides!.join('、')}{' '}
-                    页文字较多，自动适配可能缩小字号。建议拆分页面或精简要点后创建。
+                    {t(
+                      `第 ${denseSlides!.join('、')} 页文字较多，自动适配可能缩小字号。建议拆分页面或精简要点后创建。`,
+                      `Text is dense on slides ${denseSlides!.join(', ')}. Split the slides or shorten the bullets to avoid small text.`,
+                    )}
                   </p>
                 )}
                 {formatError && (
                   <div role="alert" className="notice error">
-                    {formatError}
+                    {uiMessage(formatError)}
                   </div>
                 )}
                 <div className="result-tools">
@@ -836,7 +1031,7 @@ export function Workbench({
                     disabled={active || pendingCell || Boolean(formatError)}
                   >
                     <Copy size={16} />
-                    复制
+                    {t('复制', 'Copy')}
                   </button>
                   <button
                     className="text-button"
@@ -852,7 +1047,7 @@ export function Workbench({
                     disabled={active || pendingCell}
                   >
                     {editing ? <Check size={16} /> : <Pencil size={16} />}
-                    {editing ? '完成编辑' : '编辑'}
+                    {editing ? t('完成编辑', 'Done Editing') : t('编辑', 'Edit')}
                   </button>
                   {editing && (
                     <button
@@ -868,7 +1063,7 @@ export function Workbench({
                         setTableDraft(null);
                       }}
                     >
-                      取消本轮编辑
+                      {t('取消本轮编辑', 'Cancel Edits')}
                     </button>
                   )}
                   {editing && structured && (
@@ -881,7 +1076,9 @@ export function Workbench({
                       }
                       onClick={toggleStructuredEditor}
                     >
-                      {structuredEditing ? '编辑 JSON' : '可视化编辑'}
+                      {structuredEditing
+                        ? t('编辑 JSON', 'Edit JSON')
+                        : t('可视化编辑', 'Visual Editor')}
                     </button>
                   )}
                   <button
@@ -890,7 +1087,7 @@ export function Workbench({
                     disabled={active || pendingCell}
                   >
                     <ArrowDownToLine size={16} />
-                    {structured ? '下载 JSON' : '下载文本'}
+                    {structured ? t('下载 JSON', 'Download JSON') : t('下载文本', 'Download Text')}
                   </button>
                 </div>
                 <div className="write-actions">
@@ -901,7 +1098,7 @@ export function Workbench({
                       onClick={(event) => prepare('document', event.currentTarget)}
                     >
                       <FileInput size={17} />
-                      插入排版报告
+                      {t('插入排版报告', 'Insert Formatted Report')}
                     </button>
                   )}
                   {canTable && (
@@ -911,7 +1108,7 @@ export function Workbench({
                       onClick={(event) => prepare('table', event.currentTarget)}
                     >
                       <FileInput size={17} />
-                      创建新工作表
+                      {t('创建新工作表', 'Create New Sheet')}
                     </button>
                   )}
                   {canReplace && (
@@ -921,7 +1118,7 @@ export function Workbench({
                       disabled={writeBlocked}
                     >
                       <FileInput size={17} />
-                      替换已读取选区
+                      {t('替换已读取选区', 'Replace Read Selection')}
                     </button>
                   )}
                   {canInsert && (
@@ -930,7 +1127,7 @@ export function Workbench({
                       onClick={(event) => prepare('insert', event.currentTarget)}
                       disabled={writeBlocked}
                     >
-                      插入到光标处
+                      {t('插入到光标处', 'Insert at Cursor')}
                     </button>
                   )}
                   {canFormula && (
@@ -940,7 +1137,7 @@ export function Workbench({
                       disabled={writeBlocked}
                     >
                       <FileInput size={17} />
-                      写入选中单元格
+                      {t('写入选中单元格', 'Write to Selected Cell')}
                     </button>
                   )}
                   {canSlides && (
@@ -950,24 +1147,45 @@ export function Workbench({
                       disabled={writeBlocked}
                     >
                       <FileInput size={17} />
-                      创建幻灯片
+                      {t('创建幻灯片', 'Create Slides')}
                     </button>
                   )}
                 </div>
                 <p className="field-help">
                   {canDocument
-                    ? '在当前光标或选区后新起段落，插入标题、正文和表格。原文保留，可在 Word 中继续排版。'
+                    ? t(
+                        '在当前光标或选区后新起段落，插入标题、正文和表格。原文保留，可在 Word 中继续排版。',
+                        'Insert headings, text, and tables in a new paragraph after the cursor or selection. The original stays in place. Continue formatting in Word.',
+                      )
                     : canTable
-                      ? '确认名称和范围后创建独立工作表，不覆盖原表。公式会在 Excel 中计算并检查错误。'
+                      ? t(
+                          '确认名称和范围后创建独立工作表，不覆盖原表。公式会在 Excel 中计算并检查错误。',
+                          'Check the sheet name and range. Excel creates a separate sheet, calculates its formulas, and checks for errors.',
+                        )
                       : canFormula
-                        ? '先在 Excel 中选中一个目标单元格。确认时会显示位置和原内容。'
+                        ? t(
+                            '先在 Excel 中选中一个目标单元格。确认时会显示位置和原内容。',
+                            'Select one destination cell in Excel. You can check its address and current contents before writing.',
+                          )
                         : canSlides
-                          ? '确认后在演示文稿末尾添加页面；生成的是基础文字页，可在 Office 中排版。'
+                          ? t(
+                              '确认后在演示文稿末尾添加页面；生成的是基础文字页，可在 Office 中排版。',
+                              'Confirmation adds basic text slides at the end of the presentation. Format them in PowerPoint.',
+                            )
                           : canReplace || canInsert
-                            ? '点击写入按钮后，还会展示目标和内容供你确认。'
+                            ? t(
+                                '点击写入按钮后，还会展示目标和内容供你确认。',
+                                'The next step shows the destination and content for you to confirm.',
+                              )
                             : bridge.host === 'excel' && task.output === 'text'
-                              ? '分析和解释供参考，可复制到你的工作记录。'
-                              : '当前宿主或选区不支持自动写入，可复制结果后手动粘贴。'}
+                              ? t(
+                                  '分析和解释供参考，可复制到你的工作记录。',
+                                  'Copy the analysis or explanation to your notes.',
+                                )
+                              : t(
+                                  '当前宿主或选区不支持自动写入，可复制结果后手动粘贴。',
+                                  'This app or selection does not support writing here. Copy and paste the result manually.',
+                                )}
                 </p>
               </>
             )}
@@ -979,10 +1197,10 @@ export function Workbench({
           className={`notice global-notice ${notice.error ? 'error' : notice.warning ? 'warning' : 'success'}`}
           role={notice.error ? 'alert' : 'status'}
         >
-          <span>{notice.text}</span>
+          <span>{uiMessage(typeof notice.text === 'function' ? notice.text() : notice.text)}</span>
           <button
             className="icon-button"
-            aria-label="关闭提示"
+            aria-label={t('关闭提示', 'Dismiss notification')}
             onClick={() => setNotice(undefined)}
           >
             <X size={16} />
@@ -997,7 +1215,7 @@ export function Workbench({
           wordText={bridge.host === 'word' && task.output === 'text'}
           returnFocus={writeTrigger.current}
           busy={busy === 'writing'}
-          error={writeError}
+          error={uiMessage(writeError)}
           onCancel={dismissPlan}
           onConfirm={commit}
         />

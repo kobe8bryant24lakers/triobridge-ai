@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { cellText, columnName } from '../core/structured-output';
 import { parseFormula } from '../core/output';
@@ -39,7 +40,9 @@ export function TableEditor({
   }, [dirty, onPendingChange]);
   function select(r: number, c: number) {
     if (dirty) {
-      setError('请先应用或取消当前单元格的修改。');
+      setError(
+        t('请先应用或取消当前单元格的修改。', 'Apply or cancel your changes to this cell first.'),
+      );
       return;
     }
     setSelected([r, c]);
@@ -53,15 +56,26 @@ export function TableEditor({
       if (type === 'empty') next = null;
       if (type === 'number') {
         if (!value.trim() || !Number.isFinite(Number(value)))
-          throw new Error('请输入有效数字，如 1200.5；百分比 12% 输入 0.12。');
+          throw new Error(
+            t(
+              '请输入有效数字，如 1200.5；百分比 12% 输入 0.12。',
+              'Enter a valid number, such as 1200.5. For 12%, enter 0.12.',
+            ),
+          );
         next = Number(value);
       }
       if (type === 'boolean') {
-        if (!['true', 'false'].includes(value)) throw new Error('布尔值请输入 true 或 false。');
+        if (!['true', 'false'].includes(value))
+          throw new Error(
+            t('布尔值请输入 true 或 false。', 'Enter true or false for a Boolean value.'),
+          );
         next = value === 'true';
       }
       if (type === 'formula') next = { formula: parseFormula(value) };
-      if (type === 'text' && value.length > 4000) throw new Error('单元格文本最多 4,000 字符。');
+      if (type === 'text' && value.length > 4000)
+        throw new Error(
+          t('单元格文本最多 4,000 字符。', 'Cell text can contain up to 4,000 characters.'),
+        );
       onChange({
         ...table,
         rows: table.rows.map((row, r) =>
@@ -77,7 +91,7 @@ export function TableEditor({
   return (
     <div className="table-editor">
       <label>
-        新工作表名称
+        {t('新工作表名称', 'New worksheet name')}
         <input
           disabled={disabled}
           value={table.name}
@@ -85,13 +99,21 @@ export function TableEditor({
         />
       </label>
       <p className="field-help" id="table-keyboard-help">
-        选择单元格后在下方修改。方向键切换单元格，Tab 进入编辑区。
+        {t(
+          '选择单元格后在下方修改。方向键切换单元格，Tab 进入编辑区。',
+          'Select a cell to edit it below. Use arrow keys to change cells and Tab to enter the editor.',
+        )}
       </p>
-      <div className="table-scroll" tabIndex={0} role="region" aria-label="选择要编辑的单元格">
+      <div
+        className="table-scroll"
+        tabIndex={0}
+        role="region"
+        aria-label={t('选择要编辑的单元格', 'Choose a cell to edit')}
+      >
         <table>
           <thead>
             <tr>
-              <th scope="col">行</th>
+              <th scope="col">{t('行', 'Row')}</th>
               {table.headers.map((header, c) => (
                 <th scope="col" key={c}>
                   {header}
@@ -115,7 +137,7 @@ export function TableEditor({
                       tabIndex={selected[0] === r && selected[1] === c ? 0 : -1}
                       aria-describedby="table-keyboard-help"
                       aria-pressed={selected[0] === r && selected[1] === c}
-                      aria-label={`${columnName(c)}${r + 2} ${cellText(cell) || '空值'}`}
+                      aria-label={`${columnName(c)}${r + 2} ${cellText(cell) || t('空值', 'Empty cell')}`}
                       onClick={() => select(r, c)}
                       onKeyDown={(event) => {
                         const offsets: Record<string, [number, number]> = {
@@ -136,7 +158,7 @@ export function TableEditor({
                         if (!dirty) cells.current.get(`${nextRow}:${nextColumn}`)?.focus();
                       }}
                     >
-                      {cellText(cell) || '空值'}
+                      {cellText(cell) || t('空值', 'Empty cell')}
                     </button>
                   </td>
                 ))}
@@ -147,11 +169,12 @@ export function TableEditor({
       </div>
       <fieldset className="cell-inspector" disabled={disabled}>
         <legend>
-          编辑 {columnName(selected[1])}
+          {t('编辑 ', 'Edit ')}
+          {columnName(selected[1])}
           {selected[0] + 2} · {table.headers[selected[1]]}
         </legend>
         <label>
-          当前列名称
+          {t('当前列名称', 'Column name')}
           <input
             value={table.headers[selected[1]]}
             onChange={(e) =>
@@ -165,7 +188,7 @@ export function TableEditor({
           />
         </label>
         <label>
-          本列显示格式
+          {t('本列显示格式', 'Column display format')}
           <select
             value={table.formats[selected[1]]}
             onChange={(e) =>
@@ -179,11 +202,11 @@ export function TableEditor({
           >
             {(
               [
-                ['general', '常规'],
-                ['text', '文本'],
-                ['integer', '整数'],
-                ['number', '两位小数'],
-                ['percent', '百分比'],
+                ['general', t('常规', 'General')],
+                ['text', t('文本', 'Text')],
+                ['integer', t('整数', 'Integer')],
+                ['number', t('两位小数', 'Two decimal places')],
+                ['percent', t('百分比', 'Percentage')],
               ] as const
             ).map(([format, label]) => (
               <option key={format} value={format}>
@@ -193,7 +216,7 @@ export function TableEditor({
           </select>
         </label>
         <label>
-          单元格类型
+          {t('单元格类型', 'Cell type')}
           <select
             value={type}
             onChange={(e) => {
@@ -202,11 +225,11 @@ export function TableEditor({
             }}
           >
             {[
-              ['text', '文本'],
-              ['number', '数字'],
-              ['formula', '公式'],
-              ['boolean', '布尔值'],
-              ['empty', '空值'],
+              ['text', t('文本', 'Text')],
+              ['number', t('数字', 'Number')],
+              ['formula', t('公式', 'Formula')],
+              ['boolean', t('布尔值', 'Boolean')],
+              ['empty', t('空值', 'Empty cell')],
             ].map(([kind, label]) => (
               <option value={kind} key={kind}>
                 {label}
@@ -215,7 +238,7 @@ export function TableEditor({
           </select>
         </label>
         <label>
-          单元格内容
+          {t('单元格内容', 'Cell content')}
           <textarea
             rows={3}
             value={value}
@@ -233,7 +256,7 @@ export function TableEditor({
         )}
         <div className="button-row">
           <button className="secondary" onClick={apply} disabled={disabled || !dirty}>
-            应用单元格修改
+            {t('应用单元格修改', 'Apply Cell Changes')}
           </button>
           <button
             className="text-button"
@@ -245,12 +268,15 @@ export function TableEditor({
               setType(cellType(table.rows[selected[0]][selected[1]]));
             }}
           >
-            取消修改
+            {t('取消修改', 'Cancel Changes')}
           </button>
         </div>
         {dirty && (
           <p className="field-help" role="status">
-            单元格修改尚未应用，预览与写入仍使用原值。
+            {t(
+              '单元格修改尚未应用，预览与写入仍使用原值。',
+              'This cell has unapplied changes. The preview and written output still use its previous value.',
+            )}
           </p>
         )}
       </fieldset>

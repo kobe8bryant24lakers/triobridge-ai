@@ -3,11 +3,44 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../src/App';
 import { ModelSettings } from '../src/components/ModelSettings';
+import { setUiLanguage } from '../src/i18n';
 import { emptyProfile, PROFILE_KEY } from '../src/core/profile-store';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('quick model setup', () => {
+  it('switches validation, service presets and key controls without clearing the current draft', async () => {
+    const props = { state: { profiles: [], activeId: '' }, onSave: vi.fn(), onBack: vi.fn() };
+    const user = userEvent.setup();
+    const view = render(<ModelSettings {...props} />);
+    try {
+      await user.selectOptions(screen.getByLabelText('模型服务'), 'deepseek');
+      await user.click(screen.getByRole('button', { name: '连接并保存' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('请填写所选服务的 API Key。');
+      setUiLanguage('en');
+      view.rerender(<ModelSettings {...props} />);
+      expect(screen.getByRole('alert')).toHaveTextContent('Enter the API key for this service.');
+      expect(screen.getByLabelText('Model service')).toHaveValue('deepseek');
+      expect(screen.getByRole('option', { name: 'Qwen (Beijing)' })).toBeInTheDocument();
+      await user.type(screen.getByLabelText('API Key'), 'fixture-key');
+      await user.click(screen.getByRole('button', { name: 'Show API key' }));
+      expect(screen.getByRole('button', { name: 'Hide API key' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      setUiLanguage('zh-CN');
+      view.rerender(<ModelSettings {...props} />);
+      expect(screen.getByRole('button', { name: '隐藏密钥' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByLabelText('API Key')).toHaveValue('fixture-key');
+      expect(props.onSave).not.toHaveBeenCalled();
+    } finally {
+      setUiLanguage('zh-CN');
+    }
+  });
+
   it('reveals the key only on explicit keyboard action without submitting or persisting it', async () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);

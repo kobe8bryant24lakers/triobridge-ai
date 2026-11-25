@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { ProfileDetails } from './types';
 
 // Defaults verified against the providers' API documentation on 2026-11-21.
@@ -19,7 +20,9 @@ export const MODEL_PRESETS = [
   },
   {
     id: 'qwen',
-    name: '通义千问（北京）',
+    get name() {
+      return t('通义千问（北京）', 'Qwen (Beijing)');
+    },
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen-plus',
     docsUrl: 'https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope',
@@ -38,5 +41,7 @@ export function presetFor(profile: ProfileDetails): string {
 
 export function customFormatSuffix(profile: ProfileDetails): string {
   if (presetFor(profile) !== 'custom') return '';
-  return profile.apiFormat === 'anthropic' ? ' · Claude 格式' : ' · OpenAI 格式';
+  return profile.apiFormat === 'anthropic'
+    ? t(' · Claude 格式', ' · Claude format')
+    : t(' · OpenAI 格式', ' · OpenAI format');
 }

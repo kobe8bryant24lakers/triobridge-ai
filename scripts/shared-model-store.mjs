@@ -408,6 +408,10 @@ export function createSharedModelStore({
         activeId: value.activeId,
         profiles,
         retiredCredentials: value.retiredCredentials,
+        ...((value.uiLanguage === 'en' || value.uiLanguage === 'zh-CN') &&
+        integer(value.languageRevision)
+          ? { uiLanguage: value.uiLanguage, languageRevision: value.languageRevision }
+          : {}),
       };
     } catch {
       failStorage('CATALOG_SCHEMA');
@@ -419,6 +423,9 @@ export function createSharedModelStore({
       revision: state.revision,
       activeId: state.activeId,
       storage: vault.kind,
+      ...(state.uiLanguage
+        ? { uiLanguage: state.uiLanguage, languageRevision: state.languageRevision }
+        : {}),
       profiles: state.profiles.map(({ credentialRef, endpoint: _endpoint, ...profile }) => ({
         ...profile,
         hasKey: Boolean(credentialRef),
@@ -586,6 +593,19 @@ export function createSharedModelStore({
   return {
     async state() {
       return publicState(await load());
+    },
+    async language({ uiLanguage }) {
+      if (uiLanguage !== 'zh-CN' && uiLanguage !== 'en') fail('request', '不支持此界面语言。');
+      return locked(async () => {
+        const current = await load();
+        if (current.uiLanguage !== uiLanguage) {
+          current.uiLanguage = uiLanguage;
+          current.languageRevision = (current.languageRevision ?? 0) + 1;
+          // A display preference must not invalidate an open model configuration or generation.
+          await write(current);
+        }
+        return publicState(current);
+      });
     },
     async upsert(input, signal) {
       const profile = profileFields(input.profile);

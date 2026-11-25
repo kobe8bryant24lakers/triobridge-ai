@@ -1,3 +1,4 @@
+import { isUiLanguage, type UiLanguage } from '../i18n';
 import { nativeWorkbench } from '../offline/transport';
 import type { ProfileDetails, SharedModelProfile } from './types';
 import { getLocalCapability } from './local-capability';
@@ -19,6 +20,8 @@ export interface SharedImportRequest {
 }
 export interface SharedStateSnapshot {
   version: 2;
+  uiLanguage?: UiLanguage;
+  languageRevision?: number;
   revision: number;
   activeId: string;
   profiles: SharedModelProfile[];
@@ -102,6 +105,11 @@ export function parseSharedState(value: unknown): SharedStateSnapshot {
   return {
     version: 2,
     revision: value.revision as number,
+    ...(isUiLanguage(value.uiLanguage) &&
+    Number.isSafeInteger(value.languageRevision) &&
+    (value.languageRevision as number) > 0
+      ? { uiLanguage: value.uiLanguage, languageRevision: value.languageRevision as number }
+      : {}),
     activeId: value.activeId,
     profiles,
     storage: value.storage as SharedStateSnapshot['storage'],
@@ -154,7 +162,7 @@ export function createSharedModelClient(
   capability: () => string | undefined = getLocalCapability,
 ) {
   async function request(
-    action: 'state' | 'upsert' | 'delete' | 'activate' | 'import',
+    action: 'language' | 'state' | 'upsert' | 'delete' | 'activate' | 'import',
     body: unknown,
     signal?: AbortSignal,
   ): Promise<SharedStateSnapshot> {
@@ -250,6 +258,8 @@ export function createSharedModelClient(
     }
   }
   return {
+    language: (uiLanguage: UiLanguage, signal?: AbortSignal) =>
+      request('language', { uiLanguage }, signal),
     state: (signal?: AbortSignal) => request('state', {}, signal),
     upsert: (input: SharedUpsertRequest, signal?: AbortSignal) => request('upsert', input, signal),
     remove: (input: { expectedRevision: number; id: string }, signal?: AbortSignal) =>

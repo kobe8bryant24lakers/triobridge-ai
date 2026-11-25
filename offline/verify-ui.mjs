@@ -73,6 +73,19 @@ try {
     });
     try {
       const page = await application.firstWindow({ timeout: 30000 });
+      if (testModel && host === 'excel') {
+        await page
+          .getByRole('heading', { name: 'Excel Workspace', exact: true })
+          .waitFor({ timeout: 20000 });
+        const selector = page.getByRole('combobox', { name: 'Interface language' });
+        assert.equal(await selector.inputValue(), 'en');
+        await selector.selectOption('zh-CN');
+        await page.waitForFunction(
+          () =>
+            document.documentElement.lang === 'zh-CN' &&
+            !document.querySelector('.language-control select').disabled,
+        );
+      }
       await page.getByRole('heading', { name: heading, exact: true }).waitFor({ timeout: 20000 });
       assert.equal(new URL(page.url()).protocol, 'file:');
       const result = await page.evaluate(async () => {
@@ -177,6 +190,18 @@ try {
         console.log(
           'Verified two model profiles, cross-host generation, and switching the active model.',
         );
+      }
+      if (testModel && host === 'word') {
+        await page.getByRole('combobox', { name: /Interface language/ }).selectOption('en');
+        await page.getByRole('button', { name: 'Back to workspace' }).waitFor();
+        await page.waitForFunction(
+          () => !document.querySelector('.language-control select').disabled,
+        );
+        const language = await page.evaluate(
+          async () =>
+            (await window.trioWorkbench.model(crypto.randomUUID(), 'state', '{}')).body.uiLanguage,
+        );
+        assert.equal(language, 'en');
       }
       console.log(host + ': packaged file page, host, model catalog, and settings verified');
     } finally {

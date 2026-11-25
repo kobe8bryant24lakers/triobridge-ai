@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Square, X } from 'lucide-react';
 import type { ChatMessage, HostBridge, RuntimeModelProfile } from '../core/types';
@@ -27,7 +28,7 @@ export function PresentationWorkspace({
   onBusyChange: (busy: boolean) => void;
 }) {
   const [context, setContext] = useState<MaterialContext>({ materials: [], includeImages: false }),
-    [busy, setBusy] = useState(''),
+    [busy, setBusy] = useState<{ label: string; cancellable: boolean }>(),
     [notice, setNotice] = useState<{ text: string; error?: boolean }>();
   const operation = useRef<AbortController | null>(null),
     alive = useRef(true);
@@ -43,31 +44,57 @@ export function PresentationWorkspace({
     return () => onBusyChange(false);
   }, [busy, onBusyChange]);
   useEffect(() => setNotice(undefined), [mode]);
-  async function run(label: string, work: (signal: AbortSignal) => Promise<void>) {
+  async function run(
+    label: string,
+    work: (signal: AbortSignal) => Promise<void>,
+    cancellable = false,
+  ) {
     if (operation.current) return;
     const controller = new AbortController();
     operation.current = controller;
-    setBusy(label);
+    setBusy({ label, cancellable });
     setNotice(undefined);
     try {
       await work(controller.signal);
       if (alive.current && controller.signal.aborted)
-        setNotice({ text: '已停止，之前的资料与预览仍保留。' });
+        setNotice({
+          text: t(
+            '已停止，之前的资料与预览仍保留。',
+            'Stopped. Your earlier sources and preview have been kept.',
+          ),
+        });
     } catch (e) {
       if (alive.current)
         setNotice({
-          text: controller.signal.aborted ? '已停止，之前的资料与预览仍保留。' : officeError(e),
+          text: controller.signal.aborted
+            ? t(
+                '已停止，之前的资料与预览仍保留。',
+                'Stopped. Your earlier sources and preview have been kept.',
+              )
+            : officeError(e),
           error: !controller.signal.aborted,
         });
     } finally {
       operation.current = null;
-      if (alive.current) setBusy('');
+      if (alive.current) setBusy(undefined);
     }
   }
   async function request(messages: ChatMessage[], signal: AbortSignal, demoResult: string) {
     if (demoModel) return demoResult;
-    if (!model) throw new Error('请先在模型设置中连接模型，再生成 PPT。');
-    if (sharedUnavailable) throw new Error('本机共享模型服务尚未连接，请检查模型设置。');
+    if (!model)
+      throw new Error(
+        t(
+          '请先在模型设置中连接模型，再生成 PPT。',
+          'Connect a model in Model Settings before generating a deck.',
+        ),
+      );
+    if (sharedUnavailable)
+      throw new Error(
+        t(
+          '本机共享模型服务尚未连接，请检查模型设置。',
+          'The shared model service is unavailable. Check Model Settings.',
+        ),
+      );
     return complete(model, messages, signal);
   }
   const runtime: PresentationRuntime = {
@@ -82,7 +109,6 @@ export function PresentationWorkspace({
       if (alive.current) setNotice({ text });
     },
   };
-  const cancellable = /生成整套|生成已有|推荐图表|读取本地|读取现有/.test(busy);
   return (
     <div
       className="presentation-workspace"
@@ -95,11 +121,11 @@ export function PresentationWorkspace({
       {busy && (
         <div className="ppt-progress" role="status">
           <LoaderCircle size={18} className="spin" />
-          <span>{busy}…</span>
-          {cancellable && (
+          <span>{busy.label}…</span>
+          {busy.cancellable && (
             <button className="text-button" onClick={() => operation.current?.abort()}>
               <Square size={13} />
-              停止
+              {t('停止', 'Stop')}
             </button>
           )}
         </div>
@@ -112,7 +138,7 @@ export function PresentationWorkspace({
           <span>{notice.text}</span>
           <button
             className="icon-button"
-            aria-label="关闭 PPT 提示"
+            aria-label={t('关闭 PPT 提示', 'Dismiss PowerPoint notice')}
             onClick={() => setNotice(undefined)}
           >
             <X size={16} />

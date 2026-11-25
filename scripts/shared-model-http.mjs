@@ -5,6 +5,7 @@ import { storageDetailHeader, storageDetailMessage } from './model-storage-diagn
 
 const fields = {
   state: [],
+  language: ['uiLanguage'],
   upsert: ['expectedRevision', 'profile', 'credential', 'activate', 'testConnection'],
   import: ['expectedRevision', 'profiles', 'activeId'],
   delete: ['expectedRevision', 'id'],

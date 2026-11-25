@@ -1,21 +1,26 @@
+import { t } from '../i18n';
 import type { PresentationAccess, PresentationSnapshot } from '../presentation/types';
 import { assertSnapshotUnchanged, reorderedIds, validateEdit } from '../presentation/editing';
 
 export function createDemoPresentation(onWrite: (text: string) => void): PresentationAccess {
-  let snapshot: PresentationSnapshot = {
+  const initialSnapshot = (): PresentationSnapshot => ({
     scope: 'selected',
     slideIds: ['demo-1', 'demo-2', 'demo-3'],
     selectedShapeIds: ['body-1', 'body-2', 'body-3'],
     size: { width: 960, height: 540 },
     skipped: 0,
-    slides: ['季度业务回顾', '增长与挑战', '下季度行动'].map((title, i) => ({
+    slides: [
+      t('季度业务回顾', 'Quarterly business review'),
+      t('增长与挑战', 'Growth and challenges'),
+      t('下季度行动', "Next quarter's actions"),
+    ].map((title, i) => ({
       id: `demo-${i + 1}`,
       index: i,
       title,
       shapes: [
         {
           id: 'title',
-          name: '标题',
+          name: t('标题', 'Title'),
           type: 'TextBox',
           role: 'title',
           text: title,
@@ -26,34 +31,41 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
           font: { name: 'Arial', size: 32, color: '#333333', bold: true },
           alignment: 'Left',
         },
-        ...['客户响应时间从 24 小时缩短至 8 小时', '新版入门指南已上线', '优化跨团队协作流程'].map(
-          (text, n) => ({
-            id: `body-${n + 1}`,
-            name: `要点 ${n + 1}`,
-            type: 'TextBox',
-            role: 'body' as const,
-            text,
-            left: 40 + n * 280,
-            top: 150,
-            width: 240,
-            height: 180,
-            font: {
-              name: n === 1 ? 'Aptos' : 'Arial',
-              size: n === 1 ? 18 : 20,
-              color: '#444444',
-              bold: false,
-            },
-            alignment: 'Left',
-          }),
-        ),
+        ...[
+          t(
+            '客户响应时间从 24 小时缩短至 8 小时',
+            'Customer response time fell from 24 hours to 8 hours',
+          ),
+          t('新版入门指南已上线', 'The new onboarding guide is live'),
+          t('优化跨团队协作流程', 'Improve cross-team handovers'),
+        ].map((text, n) => ({
+          id: `body-${n + 1}`,
+          name: t(`要点 ${n + 1}`, `Bullet ${n + 1}`),
+          type: 'TextBox',
+          role: 'body' as const,
+          text,
+          left: 40 + n * 280,
+          top: 150,
+          width: 240,
+          height: 180,
+          font: {
+            name: n === 1 ? 'Aptos' : 'Arial',
+            size: n === 1 ? 18 : 20,
+            color: '#444444',
+            bold: false,
+          },
+          alignment: 'Left',
+        })),
       ],
     })),
-  };
+  });
+  let stored: PresentationSnapshot | undefined;
+  const current = () => (stored ??= initialSnapshot());
   const read = async (scope: 'selected' | 'all') =>
     structuredClone({
-      ...snapshot,
+      ...current(),
       scope,
-      slides: scope === 'all' ? snapshot.slides : snapshot.slides.slice(0, 1),
+      slides: scope === 'all' ? current().slides : current().slides.slice(0, 1),
     });
   return {
     capabilities: {
@@ -67,8 +79,9 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
     },
     read,
     prepareInsert: async () =>
-      structuredClone({ slideIds: snapshot.slideIds, size: snapshot.size }),
+      structuredClone({ slideIds: current().slideIds, size: current().size }),
     apply: async (before, input) => {
+      const snapshot = current();
       assertSnapshotUnchanged(before, await read(before.scope));
       const plan = validateEdit(input, before);
       for (const p of plan.changes) {
@@ -89,17 +102,33 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
         );
         snapshot.slides.forEach((s, i) => (s.index = i));
       }
-      onWrite(`演示编辑：${plan.summary}\n${JSON.stringify(plan, null, 2)}`);
+      onWrite(
+        t(
+          `演示编辑：${plan.summary}\n${JSON.stringify(plan, null, 2)}`,
+          `Demo edit: ${plan.summary}
+${JSON.stringify(plan, null, 2)}`,
+        ),
+      );
     },
     insert: async (_base64, count) => {
-      onWrite(`演示：已模拟在末尾插入 ${count} 页。下载 PPTX 可查看实际可编辑文件。`);
+      onWrite(
+        t(
+          `演示：已模拟在末尾插入 ${count} 页。下载 PPTX 可查看实际可编辑文件。`,
+          `Demo: ${count} slides appended to the simulated presentation. Download the PPTX to see the editable file.`,
+        ),
+      );
     },
     create: async () => {
-      throw new Error('浏览器演示请下载 PPTX，在 PowerPoint 中打开。');
+      throw new Error(
+        t(
+          '浏览器演示请下载 PPTX，在 PowerPoint 中打开。',
+          'Download the PPTX from the browser demo and open it in PowerPoint.',
+        ),
+      );
     },
     thumbnail: async () => '',
     backup: async () => {
-      throw new Error('演示文档无需备份。');
+      throw new Error(t('演示文档无需备份。', 'Demo presentations do not need a backup.'));
     },
   };
 }

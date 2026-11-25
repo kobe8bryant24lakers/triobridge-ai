@@ -1,3 +1,4 @@
+import { setUiLanguage, type UiLanguage } from '../i18n';
 import { modelTransport, nativeWorkbench } from '../offline/transport';
 import type {
   ModelProfile,
@@ -233,12 +234,23 @@ export function createProfileController(options: ControllerOptions = {}) {
   let interval: ReturnType<typeof setInterval> | undefined;
   let refreshing: Promise<SharedProfileState> | undefined;
   let mutating = false;
+  let savingLanguage = false;
+  let languageRevision = 0;
   let localWarning: string | undefined;
   const publish = (next: ProfileState) => {
     state = next;
     subscribers.forEach((listener) => listener());
   };
   function apply(snapshot: SharedStateSnapshot): SharedProfileState {
+    if (
+      !savingLanguage &&
+      snapshot.uiLanguage &&
+      snapshot.languageRevision &&
+      snapshot.languageRevision > languageRevision
+    ) {
+      languageRevision = snapshot.languageRevision;
+      setUiLanguage(snapshot.uiLanguage);
+    }
     if (state.mode === 'shared' && snapshot.revision < state.revision) return state;
     const next: SharedProfileState = {
       mode: 'shared',
@@ -439,6 +451,18 @@ export function createProfileController(options: ControllerOptions = {}) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', backgroundRefresh);
       window.removeEventListener(SHARED_STATE_EVENT, onSharedState);
+    },
+    async chooseLanguage(next: UiLanguage) {
+      setUiLanguage(next);
+      if (!capability() && !requireShared) return;
+      savingLanguage = true;
+      try {
+        const snapshot = await client.language(next, lifetime?.signal);
+        savingLanguage = false;
+        apply(snapshot);
+      } finally {
+        savingLanguage = false;
+      }
     },
     saveLocal(next: LocalProfileState) {
       if (state.mode === 'shared' || state.mode === 'checking')

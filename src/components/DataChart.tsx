@@ -1,3 +1,4 @@
+import { t, getUiLanguage } from '../i18n';
 import { useMemo, useState } from 'react';
 import { Download, Sparkles } from 'lucide-react';
 import { CHART_LABELS, chartData, tableFromText } from '../presentation/charts';
@@ -13,7 +14,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
   const tables = allTables(context),
     [source, setSource] = useState('paste'),
     [pasted, setPasted] = useState(''),
-    [title, setTitle] = useState('业务数据对比'),
+    [customTitle, setTitle] = useState<string>(),
     [kind, setKind] = useState<ChartKind>('column'),
     [unit, setUnit] = useState('');
   const [category, setCategory] = useState(0),
@@ -23,6 +24,8 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
     [reason, setReason] = useState(''),
     [confirm, setConfirm] = useState(false),
     [inserted, setInserted] = useState('');
+  const title = customTitle ?? t('业务数据对比', 'Business comparison');
+  const language = getUiLanguage();
   const start = Number(startInput),
     length = Number(lengthInput);
   const parsed = useMemo(() => {
@@ -35,12 +38,22 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
         length < 1 ||
         length > 30
       )
-        throw new Error('起始行请输入 1–1,000，纳入行数请输入 1–30。');
+        throw new Error(
+          t(
+            '起始行请输入 1–1,000，纳入行数请输入 1–30。',
+            'Enter a starting row from 1 to 1,000 and a row count from 1 to 30.',
+          ),
+        );
       const original =
         source === 'paste' ? tableFromText(pasted) : tables.find((t) => t.id === source);
-      if (!original) throw new Error('请重新选择素材表格。');
+      if (!original) throw new Error(t('请重新选择素材表格。', 'Select the source table again.'));
       if (start > original.rows.length)
-        throw new Error(`起始数据行超过总行数 ${original.rows.length}。`);
+        throw new Error(
+          t(
+            `起始数据行超过总行数 ${original.rows.length}。`,
+            `The starting row exceeds the ${original.rows.length} data rows available.`,
+          ),
+        );
       const table: MaterialTable = {
         ...original,
         rows: original.rows.slice(start - 1, start - 1 + length),
@@ -52,9 +65,9 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
         error: '',
       };
     } catch (e) {
-      return { error: e instanceof Error ? e.message : '数据无效。' };
+      return { error: e instanceof Error ? e.message : t('数据无效。', 'Invalid data.') };
     }
-  }, [source, pasted, context, start, length, category, series, kind]);
+  }, [source, pasted, context, start, length, category, series, kind, language]);
   const fingerprint = JSON.stringify([
     source,
     pasted,
@@ -71,87 +84,127 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
   }
   async function recommend() {
     if (!parsed.data) return;
-    await run('根据数据推荐图表', async (signal) => {
-      const raw = await request(
-        materialMessages(
-          { materials: [], includeImages: false },
-          '你是数据可视化助手。根据提供的数据推荐图表类型与简明标题，不修改数字。只返回 JSON：{"type":"column|bar|line|pie|doughnut","title":"≤64字符","reason":"≤300字符"}。饼图和圆环图只能一个系列、最多8个分类，不能包含负数、空值或全零；趋势适用折线，比较适用柱形或条形。',
-          { title, unit, data: parsed.data },
-        ),
-        signal,
-        JSON.stringify({
-          type: 'column',
-          title: '业务数据对比 · 演示建议',
-          reason: '固定演示：用柱形图比较各分类；真实模型会根据数据推荐。',
-        }),
-      );
-      if (signal.aborted) return;
-      const result = json(raw);
-      fields(result, ['type', 'title', 'reason'], '图表建议');
-      chartData(parsed.table!, category, series, result.type as ChartKind);
-      setKind(result.type as ChartKind);
-      setTitle(text(result.title, 64, '图表标题'));
-      setReason(text(result.reason, 300, '推荐理由'));
-      setConfirm(false);
-    });
+    await run(
+      t('根据数据推荐图表', 'Recommending a chart'),
+      async (signal) => {
+        const raw = await request(
+          materialMessages(
+            { materials: [], includeImages: false },
+            t(
+              '你是数据可视化助手。根据提供的数据推荐图表类型与简明标题，不修改数字。只返回 JSON：{"type":"column|bar|line|pie|doughnut","title":"≤64字符","reason":"≤300字符"}。饼图和圆环图只能一个系列、最多8个分类，不能包含负数、空值或全零；趋势适用折线，比较适用柱形或条形。',
+              'Recommend a chart type and concise title for the supplied data without changing any numbers. Return only JSON with type (column, bar, line, pie or doughnut), title (up to 64 characters), and reason (up to 300 characters). Pie and doughnut charts require one complete nonnegative series, at most 8 categories and a positive total. Use a line for trends and bars or columns for comparisons.',
+            ),
+            { title, unit, data: parsed.data },
+          ),
+          signal,
+          JSON.stringify({
+            type: 'column',
+            title: t('业务数据对比 · 演示建议', 'Business comparison · Demo recommendation'),
+            reason: t(
+              '固定演示：用柱形图比较各分类；真实模型会根据数据推荐。',
+              'The demo compares categories with columns. A connected model can recommend a chart for your data.',
+            ),
+          }),
+        );
+        if (signal.aborted) return;
+        const result = json(raw);
+        fields(result, ['type', 'title', 'reason'], t('图表建议', 'Chart recommendation'));
+        chartData(parsed.table!, category, series, result.type as ChartKind);
+        setKind(result.type as ChartKind);
+        setTitle(text(result.title, 64, t('图表标题', 'Chart title')));
+        setReason(text(result.reason, 300, t('推荐理由', 'Recommendation')));
+        setConfirm(false);
+      },
+      true,
+    );
   }
   async function exportChart(target: 'download' | 'insert') {
     if (!parsed.table || !parsed.data || !title.trim()) return;
-    await run(target === 'insert' ? '插入并核对图表页' : '生成可编辑图表文件', async (signal) => {
-      const insertTarget = target === 'insert' && access ? await access.prepareInsert() : undefined;
-      if (target === 'insert' && !insertTarget?.size)
-        throw new Error('无法确认当前页面尺寸，请下载图表页后手动导入。');
-      const chartContext: MaterialContext = {
-        materials: [
-          {
-            id: 'chart-source',
-            name: `${parsed.table!.name} · 数据行 ${start}–${start + parsed.table!.rows.length - 1}`,
-            kind: 'spreadsheet',
-            text: '',
-            tables: [parsed.table!],
-          },
-        ],
-        includeImages: false,
-      };
-      const deck: DeckContent = {
-        title,
-        slides: [
-          {
-            title,
-            layout: 'chart',
-            chart: { type: kind, tableId: parsed.table!.id, category, series, unit },
-            notes: `数据源：${chartContext.materials[0].name}。空值保持为空，不作为零。`,
-            sources: ['chart-source'],
-          },
-        ],
-      };
-      const base64 = await renderDeck(
-        deck,
-        chartContext,
-        DEFAULT_THEME,
-        insertTarget?.size || WIDE,
-      );
-      if (signal.aborted) return;
-      if (target === 'download') {
-        downloadPresentation(base64, title);
-        notify('已生成图表 PPT；可在 PowerPoint 中右键图表编辑数据。');
-      } else if (access && insertTarget) {
-        setConfirm(false);
-        setInserted(fingerprint);
-        await access.insert(base64, 1, insertTarget);
-        notify('已在末尾插入 1 页原生图表，并核对页数。可右键图表编辑数据。');
-      }
-    });
+    await run(
+      target === 'insert'
+        ? t('插入并核对图表页', 'Inserting and verifying the chart slide')
+        : t('生成可编辑图表文件', 'Building an editable chart'),
+      async (signal) => {
+        const insertTarget =
+          target === 'insert' && access ? await access.prepareInsert() : undefined;
+        if (target === 'insert' && !insertTarget?.size)
+          throw new Error(
+            t(
+              '无法确认当前页面尺寸，请下载图表页后手动导入。',
+              'The slide size could not be confirmed. Download the chart slide and import it in PowerPoint.',
+            ),
+          );
+        const chartContext: MaterialContext = {
+          materials: [
+            {
+              id: 'chart-source',
+              name: t(
+                `${parsed.table!.name} · 数据行 ${start}–${start + parsed.table!.rows.length - 1}`,
+                `${parsed.table!.name} · Data rows ${start}–${start + parsed.table!.rows.length - 1}`,
+              ),
+              kind: 'spreadsheet',
+              text: '',
+              tables: [parsed.table!],
+            },
+          ],
+          includeImages: false,
+        };
+        const deck: DeckContent = {
+          title,
+          slides: [
+            {
+              title,
+              layout: 'chart',
+              chart: { type: kind, tableId: parsed.table!.id, category, series, unit },
+              notes: t(
+                `数据源：${chartContext.materials[0].name}。空值保持为空，不作为零。`,
+                `Data source: ${chartContext.materials[0].name}. Blank cells are preserved as missing values.`,
+              ),
+              sources: ['chart-source'],
+            },
+          ],
+        };
+        const base64 = await renderDeck(
+          deck,
+          chartContext,
+          DEFAULT_THEME,
+          insertTarget?.size || WIDE,
+        );
+        if (signal.aborted) return;
+        if (target === 'download') {
+          downloadPresentation(base64, title);
+          notify(
+            t(
+              '已生成图表 PPT；可在 PowerPoint 中右键图表编辑数据。',
+              'Chart slide downloaded. Right-click the chart in PowerPoint to edit its data.',
+            ),
+          );
+        } else if (access && insertTarget) {
+          setConfirm(false);
+          setInserted(fingerprint);
+          await access.insert(base64, 1, insertTarget);
+          notify(
+            t(
+              '已在末尾插入 1 页原生图表，并核对页数。可右键图表编辑数据。',
+              'One editable chart slide was appended and the slide count verified. Right-click the chart to edit its data.',
+            ),
+          );
+        }
+      },
+    );
   }
   return (
     <div className="ppt-flow">
-      <section className="ppt-compose" aria-label="数据图表设置">
-        <h2>把数据变成可编辑图表</h2>
+      <section className="ppt-compose" aria-label={t('数据图表设置', 'Chart settings')}>
+        <h2>{t('把数据变成可编辑图表', 'Create an editable chart')}</h2>
         <p className="field-help">
-          使用素材中的表格，或粘贴 Excel 区域。图表与内嵌数据一同写入 PPT，可继续编辑。
+          {t(
+            '使用素材中的表格，或粘贴 Excel 区域。图表与内嵌数据一同写入 PPT，可继续编辑。',
+            'Select a source table or paste cells from Excel. The slide includes the chart and its editable data.',
+          )}
         </p>
         <label>
-          数据来源
+          {t('数据来源', 'Data source')}
           <select
             value={source}
             disabled={busy}
@@ -163,17 +216,20 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
               reset();
             }}
           >
-            <option value="paste">粘贴 Excel / CSV 数据</option>
-            {tables.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} · {t.rows.length} 行 / {t.headers.length} 列
+            <option value="paste">{t('粘贴 Excel / CSV 数据', 'Paste Excel or CSV data')}</option>
+            {tables.map((sourceTable) => (
+              <option key={sourceTable.id} value={sourceTable.id}>
+                {sourceTable.name} · {sourceTable.rows.length}
+                {t(' 行 / ', ' rows / ')}
+                {sourceTable.headers.length}
+                {t(' 列', ' columns')}
               </option>
             ))}
           </select>
         </label>
         {source === 'paste' && (
           <label>
-            含表头的数据
+            {t('含表头的数据', 'Data with headers')}
             <textarea
               rows={7}
               value={pasted}
@@ -183,13 +239,16 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
                 setPasted(e.target.value);
                 reset();
               }}
-              placeholder={'月份\t华东\t华南\n1月\t128\t96\n2月\t156\t112\n3月\t184\t138'}
+              placeholder={t(
+                '月份\t华东\t华南\n1月\t128\t96\n2月\t156\t112\n3月\t184\t138',
+                'Month\tEast\tSouth\nJanuary\t128\t96\nFebruary\t156\t112\nMarch\t184\t138',
+              )}
             />
           </label>
         )}
         <div className="ppt-field-grid">
           <label>
-            起始数据行
+            {t('起始数据行', 'Starting data row')}
             <input
               type="number"
               min={1}
@@ -203,7 +262,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
             />
           </label>
           <label>
-            最多纳入行数
+            {t('最多纳入行数', 'Maximum rows')}
             <input
               type="number"
               min={1}
@@ -218,20 +277,24 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
           </label>
         </div>
         <p className="field-help">
-          数据行从表头之后算起。最多 30 个分类、6 个系列；空白单元格保留为空，百分数字符按比例解析。
+          {t(
+            '数据行从表头之后算起。最多 30 个分类、6 个系列；空白单元格保留为空，百分数字符按比例解析。',
+            'Count from the first row below the header. Use up to 30 categories and 6 series. Blanks remain empty. Percentages are parsed as proportions.',
+          )}
         </p>
         {(() => {
-          let t: MaterialTable | undefined;
+          let sourceTable: MaterialTable | undefined;
           try {
-            t = source === 'paste' ? tableFromText(pasted) : tables.find((v) => v.id === source);
+            sourceTable =
+              source === 'paste' ? tableFromText(pasted) : tables.find((v) => v.id === source);
           } catch {
             /* Parse error is displayed below. */
           }
           return (
-            t && (
+            sourceTable && (
               <>
                 <label>
-                  分类列
+                  {t('分类列', 'Category column')}
                   <select
                     value={category}
                     disabled={busy}
@@ -241,16 +304,16 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
                       reset();
                     }}
                   >
-                    {t.headers.map((h, i) => (
+                    {sourceTable.headers.map((h, i) => (
                       <option key={i} value={i}>
-                        {h || `列 ${i + 1}`}
+                        {h || t(`列 ${i + 1}`, `Column ${i + 1}`)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <fieldset className="chart-series">
-                  <legend>数值列</legend>
-                  {t.headers.map(
+                  <legend>{t('数值列', 'Value columns')}</legend>
+                  {sourceTable.headers.map(
                     (h, i) =>
                       i !== category && (
                         <label className="checkbox-label" key={i}>
@@ -265,7 +328,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
                               reset();
                             }}
                           />
-                          {h || `列 ${i + 1}`}
+                          {h || t(`列 ${i + 1}`, `Column ${i + 1}`)}
                         </label>
                       ),
                   )}
@@ -275,7 +338,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
           );
         })()}
         <label>
-          图表标题
+          {t('图表标题', 'Chart title')}
           <input
             value={title}
             maxLength={64}
@@ -288,7 +351,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
         </label>
         <div className="ppt-field-grid">
           <label>
-            图表类型
+            {t('图表类型', 'Chart type')}
             <select
               value={kind}
               disabled={busy}
@@ -305,12 +368,12 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
             </select>
           </label>
           <label>
-            单位
+            {t('单位', 'Unit')}
             <input
               value={unit}
               maxLength={24}
               disabled={busy}
-              placeholder="如：万元、%"
+              placeholder={t('如：万元、%', 'For example: USD, %')}
               onChange={(e) => {
                 setUnit(e.target.value);
                 reset();
@@ -324,7 +387,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
           onClick={() => void recommend()}
         >
           <Sparkles size={16} />
-          让模型推荐图表
+          {t('让模型推荐图表', 'Recommend a chart')}
         </button>
         {reason && <p className="field-help">{reason}</p>}
         {parsed.error && (pasted || source !== 'paste') && (
@@ -334,15 +397,22 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
         )}
       </section>
       {parsed.table && parsed.data && (
-        <section className="ppt-result" aria-label="图表预览">
-          <h2>{title || '图表预览'}</h2>
+        <section className="ppt-result" aria-label={t('图表预览', 'Chart preview')}>
+          <h2>{title || t('图表预览', 'Chart preview')}</h2>
           <ChartPreview data={parsed.data} kind={kind} unit={unit} />
           <p className="field-help">
-            数据行 {start}–{start + parsed.table.rows.length - 1} / 共 {parsed.originalRows} 行 ·{' '}
-            {parsed.data.series.length} 个系列。图表数据来自此范围，不由模型生成。
+            {t('数据行 ', 'Rows ')}
+            {start}–{start + parsed.table.rows.length - 1}
+            {t(' / 共 ', ' of ')}
+            {parsed.originalRows}
+            {t(' 行 ·', ' ·')} {parsed.data.series.length}
+            {t(
+              ' 个系列。图表数据来自此范围，不由模型生成。',
+              ' series. Chart values come from the selected rows.',
+            )}
           </p>
           <details>
-            <summary>核对实际图表数据</summary>
+            <summary>{t('核对实际图表数据', 'View chart data')}</summary>
             <div className="table-scroll">
               <table>
                 <thead>
@@ -358,7 +428,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
                     <tr key={i}>
                       <td>{c}</td>
                       {parsed.data.series.map((s, j) => (
-                        <td key={j}>{s.values[i] === null ? '空值' : s.values[i]}</td>
+                        <td key={j}>{s.values[i] === null ? t('空值', 'Blank') : s.values[i]}</td>
                       ))}
                     </tr>
                   ))}
@@ -373,7 +443,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
               onClick={() => void exportChart('download')}
             >
               <Download size={16} />
-              下载图表 PPT
+              {t('下载图表 PPT', 'Download chart slide')}
             </button>
             {access?.capabilities.insert && (
               <button
@@ -381,23 +451,30 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
                 disabled={busy || !title.trim() || inserted === fingerprint}
                 onClick={() => setConfirm(true)}
               >
-                {inserted === fingerprint ? '已尝试插入，请检查末尾' : '插入可编辑图表'}
+                {inserted === fingerprint
+                  ? t('已尝试插入，请检查末尾', 'Insertion attempted. Check the last slide.')
+                  : t('插入可编辑图表', 'Insert editable chart')}
               </button>
             )}
           </div>
           {confirm && (
             <div className="ppt-confirm">
-              <p>在当前演示稿末尾新增 1 页图表。图表可继续编辑，原有页面保留。</p>
+              <p>
+                {t(
+                  '在当前演示稿末尾新增 1 页图表。图表可继续编辑，原有页面保留。',
+                  'Append one editable chart slide to the end of the current deck.',
+                )}
+              </p>
               <div className="button-row">
                 <button
                   className="primary"
                   disabled={busy}
                   onClick={() => void exportChart('insert')}
                 >
-                  确认插入图表页
+                  {t('确认插入图表页', 'Confirm chart insertion')}
                 </button>
                 <button className="secondary" disabled={busy} onClick={() => setConfirm(false)}>
-                  返回预览
+                  {t('返回预览', 'Back to preview')}
                 </button>
               </div>
             </div>
