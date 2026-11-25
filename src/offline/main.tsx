@@ -1,10 +1,12 @@
 import { createRoot } from 'react-dom/client';
 import App from '../App';
+import { HOST_NAMES } from '../core/tasks';
 import { createNativeBridge } from './office';
 import { nativeWorkbench } from './transport';
 import '../styles.css';
 
 const native = nativeWorkbench();
+if (native) document.title = HOST_NAMES[native.host] + ' 工作台 · 三桥 AI';
 createRoot(document.getElementById('root')!).render(
   native ? (
     <App officeBridge={createNativeBridge(native)} />

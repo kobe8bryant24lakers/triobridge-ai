@@ -505,6 +505,18 @@ function LocalModelSettings({
   );
 }
 
+function sharedProvider(profile: ModelProfile) {
+  if (nativeWorkbench()) {
+    try {
+      if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(profile.baseUrl).hostname))
+        return 'device';
+    } catch {
+      /* A new profile starts without an address. */
+    }
+  }
+  return presetFor(profile);
+}
+
 function SharedModelSettings({
   state,
   actions,
@@ -522,10 +534,16 @@ function SharedModelSettings({
     baseUrl: initial?.baseUrl ?? '',
     hasKey: initial?.hasKey ?? false,
   }));
-  const [provider, setProvider] = useState(() => presetFor(sharedDraft(initial)));
-  const [advanced, setAdvanced] = useState(() => presetFor(sharedDraft(initial)) === 'custom');
+  const [provider, setProvider] = useState(() => sharedProvider(sharedDraft(initial)));
+  const [advanced, setAdvanced] = useState(() =>
+    ['custom', 'device'].includes(sharedProvider(sharedDraft(initial))),
+  );
   const [credential, setCredential] = useState<'keep' | 'replace' | 'remove'>(
-    initial?.hasKey ? 'keep' : 'replace',
+    initial?.hasKey
+      ? 'keep'
+      : sharedProvider(sharedDraft(initial)) === 'device'
+        ? 'remove'
+        : 'replace',
   );
   const [activate, setActivate] = useState(!initial || initial.id === state.activeId);
   const [dirty, setDirty] = useState(false);
@@ -557,9 +575,11 @@ function SharedModelSettings({
       baseUrl: profile?.baseUrl ?? '',
       hasKey: profile?.hasKey ?? false,
     });
-    setProvider(presetFor(value));
-    setAdvanced(presetFor(value) === 'custom');
-    setCredential(profile?.hasKey ? 'keep' : 'replace');
+    setProvider(sharedProvider(value));
+    setAdvanced(['custom', 'device'].includes(sharedProvider(value)));
+    setCredential(
+      profile?.hasKey ? 'keep' : sharedProvider(value) === 'device' ? 'remove' : 'replace',
+    );
     setActivate(!profile || profile.id === next.activeId);
     setDirty(false);
     setShowApiKey(false);
@@ -584,9 +604,10 @@ function SharedModelSettings({
       [key]: value,
       ...(key === 'baseUrl' && value !== current.baseUrl ? { apiKey: '' } : {}),
     }));
-    if (key === 'baseUrl') setCredential('replace');
+    if (key === 'baseUrl')
+      setCredential((current) => (current === 'remove' ? 'remove' : 'replace'));
     if (key === 'baseUrl' || key === 'model') {
-      setProvider('custom');
+      if (provider !== 'device') setProvider('custom');
       setShowApiKey(false);
     }
     setDirty(true);
@@ -1032,8 +1053,8 @@ function SharedModelSettings({
           </p>
           {state.storage === 'macos-keychain' && credential !== 'remove' && (
             <p className="field-help">
-              首次使用或升级后，macOS
-              可能请求允许本机服务访问钥匙串。请在系统窗口确认，无需在插件中重新填写已保存的密钥。
+              首次使用或升级后，macOS 可能请求允许三桥 AI
+              访问钥匙串。请在系统窗口确认，无需在插件中重新填写已保存的密钥。
             </p>
           )}
           <button

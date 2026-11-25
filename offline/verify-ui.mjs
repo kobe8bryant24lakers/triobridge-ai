@@ -41,6 +41,15 @@ try {
       assert.ok(result.resources.every((p) => ['file:', 'data:', 'blob:'].includes(p)));
       await page.getByRole('button', { name: '模型设置', exact: true }).first().click();
       await page.getByRole('button', { name: '返回工作台' }).waitFor();
+      if (host === 'word') {
+        await page.getByRole('button', { name: '新增', exact: true }).click();
+        const provider = page.getByLabel('模型服务', { exact: true });
+        await provider.selectOption('device');
+        await page.getByLabel('模型 ID', { exact: true }).fill('acceptance-local');
+        await page.getByLabel('API Base URL', { exact: true }).fill('http://127.0.0.1:8012/v1');
+        assert.equal(await provider.inputValue(), 'device');
+        assert.equal(await page.getByLabel('密钥操作', { exact: true }).inputValue(), 'remove');
+      }
       console.log(host + ': packaged file page, host, model catalog, and settings verified');
     } finally {
       await application.close();

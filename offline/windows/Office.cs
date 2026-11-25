@@ -53,14 +53,14 @@ namespace TrioBridge {
         Same(q["guard"],guard);Check(!book.ReadOnly,"工作簿为只读。");
         var t=D(q["value"]);var rows=A(t["matrix"]);var formats=A(t["formats"]);int cols=formats.Length;
         Check(rows.Length>1 && rows.Length<=1001 && cols>0 && cols<=40,"数据表尺寸无效。");
-        var values=new object[rows.Length,cols];
-        for(int i=0;i<rows.Length;i++){var row=A(rows[i]);Check(row.Length==cols,"数据表的列数不一致。");for(int j=0;j<cols;j++)values[i,j]=row[j];}
+        var tableValues=new object[rows.Length,cols];
+        for(int i=0;i<rows.Length;i++){var row=A(rows[i]);Check(row.Length==cols,"数据表的列数不一致。");for(int j=0;j<cols;j++)tableValues[i,j]=row[j];}
         string seed=S(t["name"]);foreach(char c in ":\\/?*[]")seed=seed.Replace(c,' ');seed=seed.Trim().Trim('\'');if(seed.Length>24)seed=seed.Substring(0,24);if(seed.Length==0)seed="AI 数据";
         string name=seed;int suffix=2;while(names.Contains(name,StringComparer.OrdinalIgnoreCase))name=seed+" "+suffix++;
         dynamic added=book.Worksheets.Add(After:book.Sheets[book.Sheets.Count]);
         try{
           added.Name=name;
-          dynamic at=added.Range["A1"].Resize[rows.Length,cols];at.Formula=values;
+          dynamic at=added.Range["A1"].Resize[rows.Length,cols];at.Formula=tableValues;
           for(int j=0;j<cols;j++) added.Cells[2,j+1].Resize[rows.Length-1,1].NumberFormat=S(formats[j]);
           added.ListObjects.Add(1,at,Type.Missing,1);at.Columns.AutoFit();
         }catch{bool alerts=app.DisplayAlerts;try{app.DisplayAlerts=false;added.Delete();}finally{app.DisplayAlerts=alerts;}throw;}
