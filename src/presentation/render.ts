@@ -1,3 +1,4 @@
+import { t, getUiLanguage } from '../i18n';
 import type PptxGenJS from 'pptxgenjs';
 import type {
   ChartData,
@@ -28,9 +29,9 @@ function validateTheme(theme: PresentationTheme, size: PageSize) {
     theme.font.length > 80 ||
     ![theme.accent, theme.ink, theme.background].every((s) => /^#[A-F\d]{6}$/i.test(s))
   )
-    throw new Error('演示稿主题无效。');
+    throw new Error(t('演示稿主题无效。', 'Invalid presentation theme.'));
   if (![size.width, size.height].every((n) => Number.isFinite(n) && n >= 200 && n <= 4000))
-    throw new Error('页面尺寸不支持。');
+    throw new Error(t('页面尺寸不支持。', 'Unsupported slide dimensions.'));
 }
 export function addNativeChart(
   pptx: PptxGenJS,
@@ -98,7 +99,10 @@ export async function renderDeck(
   pptx.defineLayout({ name: 'CUSTOM', width: size.width / 72, height: size.height / 72 });
   pptx.layout = 'CUSTOM';
   pptx.author = 'TrioBridge AI';
-  pptx.subject = '根据所选素材生成的可编辑演示稿';
+  pptx.subject = t(
+    '根据所选素材生成的可编辑演示稿',
+    'Editable presentation generated from selected sources',
+  );
   pptx.title = deck.title;
   pptx.company = '';
   pptx.theme = { headFontFace: theme.font, bodyFontFace: theme.font };
@@ -126,7 +130,7 @@ export async function renderDeck(
         h: height * h,
         fontSize: fontSize * scale,
         fontFace: theme.font,
-        lang: 'zh-CN',
+        lang: getUiLanguage() === 'en' ? 'en-US' : 'zh-CN',
         color: color(theme.ink),
         margin: 0,
         breakLine: false,
@@ -283,7 +287,10 @@ export async function renderDeck(
             theme,
             c.unit,
           );
-          if (c.unit) tx(`单位：${c.unit}`, 0.7, 0.205, 0.24, 0.035, 11, { align: 'right' });
+          if (c.unit)
+            tx(t(`单位：${c.unit}`, `Unit: ${c.unit}`), 0.7, 0.205, 0.24, 0.035, 11, {
+              align: 'right',
+            });
           break;
         }
         case 'table': {
@@ -316,7 +323,10 @@ export async function renderDeck(
           }
           if (heights.reduce((a, b) => a + b, 0) > 0.57 * size.height)
             throw new Error(
-              `第 ${index + 1} 页表格文字过密，无法保持 12 磅以上字号。请精简素材表格或改为文字总结后重新生成。`,
+              t(
+                `第 ${index + 1} 页表格文字过密，无法保持 12 磅以上字号。请精简素材表格或改为文字总结后重新生成。`,
+                `The table on slide ${index + 1} is too dense to maintain 12 pt text. Simplify the table or request a summary and generate again.`,
+              ),
             );
           s.addTable(
             [
@@ -351,7 +361,9 @@ export async function renderDeck(
       .map((id) => context.materials.find((m) => m.id === id)?.name)
       .filter(Boolean);
     tx(
-      sourceNames.length ? `来源：${sourceNames.join(' · ')}` : '请核对内容与数据',
+      sourceNames.length
+        ? t(`来源：${sourceNames.join(' · ')}`, `Sources: ${sourceNames.join(' · ')}`)
+        : t('请核对内容与数据', 'Verify the content and data'),
       page.layout === 'cover' || page.layout === 'closing' ? 0.42 : 0.055,
       0.925,
       page.layout === 'cover' || page.layout === 'closing' ? 0.43 : 0.79,
@@ -361,7 +373,12 @@ export async function renderDeck(
     );
     tx(`${index + 1} / ${deck.slides.length}`, 0.86, 0.925, 0.085, 0.035, 10, { align: 'right' });
     s.addNotes(
-      `${page.notes}\n\n素材来源：${sourceNames.join('；') || '未引用素材，请核实事实。'}`,
+      t(
+        `${page.notes}\n\n素材来源：${sourceNames.join('；') || '未引用素材，请核实事实。'}`,
+        `${page.notes}
+
+Sources: ${sourceNames.join('; ') || 'No sources cited. Verify the facts.'}`,
+      ),
     );
   }
   return preserveChartData(

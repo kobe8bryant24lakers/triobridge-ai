@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { cellText, hasExplicitListNumbers } from '../core/structured-output';
 import type { ReportContent, TableContent } from '../core/types';
 
@@ -33,7 +34,7 @@ export function ReportPreview({ report }: { report: ReportContent }) {
               className="table-scroll"
               tabIndex={0}
               role="region"
-              aria-label={`${section.heading}表格`}
+              aria-label={t(`${section.heading}表格`, `${section.heading} table`)}
             >
               <table>
                 <thead>
@@ -67,12 +68,22 @@ export function TablePreview({ table }: { table: TableContent }) {
   return (
     <div className="table-preview">
       <h3>{table.name}</h3>
-      <p className="field-help">表头从 A1 开始。公式显示为表达式，写入后由 Excel 计算。</p>
-      <div className="table-scroll" tabIndex={0} role="region" aria-label="数据表预览">
+      <p className="field-help">
+        {t(
+          '表头从 A1 开始。公式显示为表达式，写入后由 Excel 计算。',
+          'Headers start in A1. Formulas are shown here and calculated in Excel after writing.',
+        )}
+      </p>
+      <div
+        className="table-scroll"
+        tabIndex={0}
+        role="region"
+        aria-label={t('数据表预览', 'Data table preview')}
+      >
         <table>
           <thead>
             <tr>
-              <th scope="col">行</th>
+              <th scope="col">{t('行', 'Row')}</th>
               {table.headers.map((header, c) => (
                 <th scope="col" key={c}>
                   {header}
@@ -86,7 +97,11 @@ export function TablePreview({ table }: { table: TableContent }) {
                 <th scope="row">{r + 2}</th>
                 {row.map((cell, c) => (
                   <td key={c} className={cell && typeof cell === 'object' ? 'formula-cell' : ''}>
-                    {cell === null ? <span className="muted">空</span> : cellText(cell)}
+                    {cell === null ? (
+                      <span className="muted">{t('空', 'Empty')}</span>
+                    ) : (
+                      cellText(cell)
+                    )}
                   </td>
                 ))}
               </tr>

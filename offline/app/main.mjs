@@ -15,12 +15,16 @@ const requestedHost = (args) =>
   args.map((v) => /^--office=(word|excel|powerpoint)$/.exec(v)?.[1]).find(Boolean);
 const store = createSharedModelStore();
 app.commandLine.appendSwitch('disable-background-networking');
-function openHost(host) {
+async function prefersEnglish() {
+  return (await store.state().catch(() => undefined))?.uiLanguage === 'en';
+}
+async function openHost(host) {
   if (!host) {
+    const english = await prefersEnglish();
     const result = dialog.showMessageBoxSync({
       type: 'question',
-      message: '选择正在使用的 Office 应用',
-      buttons: ['Word', 'Excel', 'PowerPoint', '取消'],
+      message: english ? 'Choose the Office app you are using' : '选择正在使用的 Office 应用',
+      buttons: ['Word', 'Excel', 'PowerPoint', english ? 'Cancel' : '取消'],
       cancelId: 3,
     });
     host = ['word', 'excel', 'powerpoint'][result];
@@ -58,10 +62,13 @@ function openHost(host) {
         ? (file) => promisify(execFile)('/usr/bin/open', ['-b', 'com.microsoft.Powerpoint', file])
         : undefined,
     saveDeck: async () => {
+      const english = await prefersEnglish();
       const { filePath, canceled } = await dialog.showSaveDialog(window, {
-        title: '保存并在 PowerPoint 中打开',
-        defaultPath: '三桥演示稿.pptx',
-        filters: [{ name: 'PowerPoint 演示稿', extensions: ['pptx'] }],
+        title: english ? 'Save and open in PowerPoint' : '保存并在 PowerPoint 中打开',
+        defaultPath: english ? 'TrioBridge presentation.pptx' : '三桥演示稿.pptx',
+        filters: [
+          { name: english ? 'PowerPoint presentation' : 'PowerPoint 演示稿', extensions: ['pptx'] },
+        ],
       });
       return canceled ? undefined : filePath;
     },

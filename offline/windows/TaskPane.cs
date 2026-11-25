@@ -51,7 +51,8 @@ public sealed class TaskPane : UserControl, ITaskPane
     Process worker;
     StreamWriter workerInput;
     int stopped, generation;
-    bool attached, initializing, loaded;
+    bool attached, initializing, loaded, englishDialogs;
+    long languageRevision;
 
     static TaskPane()
     {
@@ -327,7 +328,7 @@ public sealed class TaskPane : UserControl, ITaskPane
         if (string.IsNullOrEmpty(id) || id.Length > 100) return false;
         if (method == "model")
             return Guid.TryParse(requestId, out guid) && Field(message, "payload") != null &&
-                   (action == "state" || action == "complete" || action == "activate" ||
+                   (action == "state" || action == "language" || action == "complete" || action == "activate" ||
                     action == "delete" || action == "import" || action == "upsert");
         return method == "office" &&
                (action == "release" || action == "selection" || action == "target" ||
@@ -461,7 +462,21 @@ public sealed class TaskPane : UserControl, ITaskPane
         string id = Field(message, "id");
         if (id != null && pending.Remove(id))
         {
-            requests.Remove(id);
+            if (requests.Remove(id))
+            {
+                object value, body;
+                var reply = message.TryGetValue("value", out value) ? value as Dictionary<string, object> : null;
+                var state = reply != null && reply.TryGetValue("body", out body) ? body as Dictionary<string, object> : null;
+                object revision;
+                long nextRevision;
+                if (state != null && state.TryGetValue("languageRevision", out revision) &&
+                    long.TryParse(Convert.ToString(revision, CultureInfo.InvariantCulture), out nextRevision) &&
+                    nextRevision > languageRevision)
+                {
+                    languageRevision = nextRevision;
+                    englishDialogs = Field(state, "uiLanguage") == "en";
+                }
+            }
             Post(message);
         }
     }
@@ -494,7 +509,7 @@ public sealed class TaskPane : UserControl, ITaskPane
                 Office.CheckWindow(officeApplication, officeWindow);
                 using (var dialog = new SaveFileDialog())
                 {
-                    dialog.Title = "保存文件";
+                    dialog.Title = englishDialogs ? "Save file" : "保存文件";
                     dialog.FileName = Path.GetFileName(e.ResultFilePath);
                     dialog.OverwritePrompt = true;
                     dialog.RestoreDirectory = true;
@@ -514,10 +529,10 @@ public sealed class TaskPane : UserControl, ITaskPane
         Office.CheckWindow(officeApplication, officeWindow);
         using (var dialog = new SaveFileDialog())
         {
-            dialog.Title = "保存 PowerPoint 文件";
-            dialog.FileName = "三桥演示稿.pptx";
+            dialog.Title = englishDialogs ? "Save PowerPoint file" : "保存 PowerPoint 文件";
+            dialog.FileName = englishDialogs ? "TrioBridge presentation.pptx" : "三桥演示稿.pptx";
             dialog.DefaultExt = "pptx";
-            dialog.Filter = "PowerPoint 演示文稿 (*.pptx)|*.pptx";
+            dialog.Filter = englishDialogs ? "PowerPoint presentation (*.pptx)|*.pptx" : "PowerPoint 演示文稿 (*.pptx)|*.pptx";
             dialog.AddExtension = true;
             dialog.OverwritePrompt = true;
             dialog.RestoreDirectory = true;

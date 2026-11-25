@@ -6,14 +6,16 @@ Use your own models in Word, Excel, and PowerPoint. Open the workbench in a sepa
 
 Learn how to connect a model, generate content, and confirm changes in each Office app. [Download the illustrated user guide in English (PowerPoint, 40 slides)](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-en.pptx)
 
+The workbench opens in Simplified Chinese by default. Use the language selector near the TrioBridge AI logo to choose **English** or **简体中文** in the standalone window or Office task pane. The installed workbench shares this preference across Word, Excel and PowerPoint.
+
 ## Download and install
 
 | System and processor | Installer |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Open Office normally under the same Windows account and choose **打开侧边栏** (task pane) or **打开独立窗口** (separate window) on the **三桥 AI** ribbon.
 

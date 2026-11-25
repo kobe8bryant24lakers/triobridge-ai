@@ -3,7 +3,11 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { initializeOffice } from './office/runtime';
 import { bootstrapLocalCapability } from './core/local-capability';
+import { getUiLanguage, t } from './i18n';
+import { uiMessage } from './i18n-errors';
 import './styles.css';
+
+document.documentElement.lang = getUiLanguage();
 
 bootstrapLocalCapability();
 
@@ -15,10 +19,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() {
     return this.state.failed ? (
       <div className="boot-screen">
-        <h1>界面暂时无法显示</h1>
-        <p>请重新加载。此操作不会修改 Office 文档。</p>
+        <h1>{t('界面暂时无法显示', 'The workbench could not be displayed')}</h1>
+        <p>
+          {t(
+            '请重新加载。此操作不会修改 Office 文档。',
+            'Reload to try again. Your Office document is unchanged.',
+          )}
+        </p>
         <button className="primary" onClick={() => location.reload()}>
-          重新加载
+          {t('重新加载', 'Reload')}
         </button>
       </div>
     ) : (
@@ -40,8 +49,10 @@ async function start() {
   root.render(
     <div className="boot-screen" role="status">
       <img src={`${import.meta.env.BASE_URL}icon.svg`} width="44" height="44" alt="" />
-      <h1>正在连接 Office</h1>
-      <p>首次加载需要访问 Office.js 服务。</p>
+      <h1>{t('正在连接 Office', 'Connecting to Office')}</h1>
+      <p>
+        {t('首次加载需要访问 Office.js 服务。', 'The first load requires access to Office.js.')}
+      </p>
     </div>,
   );
   try {
@@ -54,10 +65,14 @@ async function start() {
   } catch (error) {
     root.render(
       <div className="boot-screen">
-        <h1>未能连接 Office</h1>
-        <p role="alert">{error instanceof Error ? error.message : '请重新打开加载项。'}</p>
+        <h1>{t('未能连接 Office', 'Could not connect to Office')}</h1>
+        <p role="alert">
+          {error instanceof Error
+            ? uiMessage(error.message)
+            : t('请重新打开加载项。', 'Reopen the add-in.')}
+        </p>
         <button className="primary" onClick={() => location.reload()}>
-          重新连接
+          {t('重新连接', 'Reconnect')}
         </button>
       </div>,
     );

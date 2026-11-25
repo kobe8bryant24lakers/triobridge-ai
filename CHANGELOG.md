@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0 — 2026-11-25
+
+- Switch between English and Simplified Chinese below the TrioBridge AI logo in the standalone workbench and Office task pane. Simplified Chinese is the default. The installed workbench shares the interface preference across Word, Excel and PowerPoint.
+- Read task instructions, model settings, previews and write confirmations in the selected language. PowerPoint also localizes the source picker, chart controls, object edits and export prompts.
+
 ## 0.8.0 — 2026-11-25
 
 - Publish a 40-slide illustrated Chinese user guide with step-by-step instructions for Word, Excel and PowerPoint. [Download the PowerPoint guide](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-zh-CN.pptx)

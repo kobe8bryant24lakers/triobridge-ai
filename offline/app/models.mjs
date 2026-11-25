@@ -4,6 +4,7 @@ import { SharedModelError } from './shared/shared-model-store.mjs';
 const fields = new Map(
   Object.entries({
     state: [],
+    language: ['uiLanguage'],
     complete: ['profileId', 'profileRevision', 'messages'],
     activate: ['expectedRevision', 'id'],
     delete: ['expectedRevision', 'id'],

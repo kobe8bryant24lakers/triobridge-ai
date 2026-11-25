@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { ReportContent, ReportSection } from '../core/types';
 
 export function ReportEditor({
@@ -20,7 +21,7 @@ export function ReportEditor({
   return (
     <div className="report-editor">
       <label>
-        文档标题
+        {t('文档标题', 'Document title')}
         <input
           disabled={disabled}
           value={report.title}
@@ -29,16 +30,16 @@ export function ReportEditor({
       </label>
       {report.sections.map((section, i) => (
         <fieldset className="slide-editor" key={i} disabled={disabled}>
-          <legend>第 {i + 1} 节</legend>
+          <legend>{t(`第 ${i + 1} 节`, `Section ${i + 1}`)}</legend>
           <label>
-            第 {i + 1} 节标题
+            {t(`第 ${i + 1} 节标题`, `Section ${i + 1} heading`)}
             <input
               value={section.heading}
               onChange={(e) => update(i, { heading: e.target.value })}
             />
           </label>
           <label>
-            第 {i + 1} 节正文
+            {t(`第 ${i + 1} 节正文`, `Section ${i + 1} text`)}
             <textarea
               rows={5}
               value={section.paragraphs.join('\n\n')}
@@ -47,9 +48,11 @@ export function ReportEditor({
               }
             />
           </label>
-          <p className="field-help">用空行分隔段落。</p>
+          <p className="field-help">
+            {t('用空行分隔段落。', 'Separate paragraphs with a blank line.')}
+          </p>
           <label>
-            第 {i + 1} 节要点
+            {t(`第 ${i + 1} 节要点`, `Section ${i + 1} bullets`)}
             <textarea
               rows={3}
               value={section.bullets.join('\n')}
@@ -63,7 +66,7 @@ export function ReportEditor({
               className="table-scroll"
               tabIndex={0}
               role="region"
-              aria-label={`编辑第 ${i + 1} 节表格`}
+              aria-label={t(`编辑第 ${i + 1} 节表格`, `Edit table in section ${i + 1}`)}
             >
               <table>
                 <thead>
@@ -71,7 +74,10 @@ export function ReportEditor({
                     {section.table.headers.map((header, c) => (
                       <th scope="col" key={c}>
                         <input
-                          aria-label={`第 ${i + 1} 节第 ${c + 1} 列名称`}
+                          aria-label={t(
+                            `第 ${i + 1} 节第 ${c + 1} 列名称`,
+                            `Section ${i + 1}, column ${c + 1} name`,
+                          )}
                           value={header}
                           onChange={(e) =>
                             update(i, {
@@ -95,7 +101,10 @@ export function ReportEditor({
                         <td key={c}>
                           <textarea
                             rows={2}
-                            aria-label={`第 ${i + 1} 节表格第 ${r + 1} 行第 ${c + 1} 列`}
+                            aria-label={t(
+                              `第 ${i + 1} 节表格第 ${r + 1} 行第 ${c + 1} 列`,
+                              `Section ${i + 1} table, row ${r + 1}, column ${c + 1}`,
+                            )}
                             value={cell}
                             onChange={(e) =>
                               update(i, {
@@ -127,7 +136,7 @@ export function ReportEditor({
               onChange({ ...report, sections: report.sections.filter((_, index) => index !== i) })
             }
           >
-            删除第 {i + 1} 节
+            {t(`删除第 ${i + 1} 节`, `Delete section ${i + 1}`)}
           </button>
         </fieldset>
       ))}
@@ -139,12 +148,19 @@ export function ReportEditor({
             ...report,
             sections: [
               ...report.sections,
-              { heading: '新章节', paragraphs: ['待补充内容'], bullets: [] },
+              {
+                heading: t('新章节', 'New section'),
+                paragraphs: [t('待补充内容', 'Content to add')],
+                bullets: [],
+              },
             ],
           })
         }
       >
-        添加章节（{report.sections.length} / 12）
+        {t(
+          `添加章节（${report.sections.length} / 12）`,
+          `Add section (${report.sections.length} / 12)`,
+        )}
       </button>
     </div>
   );

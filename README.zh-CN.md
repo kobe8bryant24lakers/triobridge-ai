@@ -6,14 +6,16 @@
 
 从连接模型到确认写入，按图操作 Word、Excel 和 PowerPoint。[下载中文图解使用指南（PowerPoint，40 页）](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-zh-CN.pptx)
 
+工作台默认使用简体中文。在独立窗口或 Office 侧边栏中，点三桥 AI 标志旁的语言菜单，选择 **English** 或 **简体中文**。安装版的 Word、Excel 和 PowerPoint 共用此偏好。
+
 ## 下载与安装
 
 | 系统和芯片 | 安装包 |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** 保存文档，完全退出三款 Office，解压 ZIP，再双击 **Install.cmd**。安装后用同一 Windows 账户以普通权限打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。Intel / AMD 电脑选 x64，ARM 电脑选 ARM64。
 

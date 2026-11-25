@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n-errors';
+import { t } from '../i18n';
 import { MAX_SOURCE_LENGTH } from '../core/tasks';
 import { parseFormula, parseOutline } from '../core/output';
 import { slideFontSize } from '../core/slide-layout';
@@ -118,12 +120,13 @@ async function readWord(): Promise<SelectionSnapshot> {
     await context.sync();
     const text = requireText(range.text);
     const warning = wordSelectionWarning(ooxml.value);
-    if (warning) return { text, label: 'Word · 已读取的文字选区', warning };
+    if (warning)
+      return { text, label: t('Word · 已读取的文字选区', 'Word · Selected text'), warning };
     context.trackedObjects.add(range);
     await context.sync();
     return {
       text,
-      label: 'Word · 已读取的文字选区',
+      label: t('Word · 已读取的文字选区', 'Word · Selected text'),
       replace: async (value: string) =>
         Word.run(range, async (ctx) => {
           const formatted = wordMarkdownFormat(value);
@@ -157,12 +160,21 @@ async function prepareWordInsertion(structured = false, markdownBlock = false): 
     await context.sync();
     return {
       label: structured
-        ? '在已确认光标或选区后新起段落插入报告（保留原文）'
+        ? t(
+            '在已确认光标或选区后新起段落插入报告（保留原文）',
+            'Insert the report in a new paragraph after the cursor or selection and keep the original',
+          )
         : markdownBlock
-          ? '在已确认光标或选区后新起段落插入排版内容（保留原文）'
+          ? t(
+              '在已确认光标或选区后新起段落插入排版内容（保留原文）',
+              'Insert formatted content in a new paragraph after the cursor or selection and keep the original',
+            )
           : before
-            ? '在已确认选区末尾插入（保留原文）'
-            : '在已确认光标处插入',
+            ? t(
+                '在已确认选区末尾插入（保留原文）',
+                'Insert after the confirmed selection and keep the original',
+              )
+            : t('在已确认光标处插入', 'Insert at the confirmed cursor position'),
       before,
       commit: async (text: string) =>
         Word.run(range, async (ctx) => {
@@ -210,9 +222,18 @@ async function prepareExcelTable(raw: string): Promise<WritePlan> {
     return name;
   });
   return {
-    label: `新建工作表「${sheetName}」 · ${address}`,
-    before: `新工作表，${table.rows.length + 1} 行 × ${table.headers.length} 列（含表头）。现有工作表不会被覆盖。`,
-    warning: '公式将在 Excel 中计算。创建失败时可能留下新工作表，请按错误提示检查后再试。',
+    label: t(
+      `新建工作表「${sheetName}」 · ${address}`,
+      `Create worksheet “${sheetName}” · ${address}`,
+    ),
+    before: t(
+      `新工作表，${table.rows.length + 1} 行 × ${table.headers.length} 列（含表头）。现有工作表不会被覆盖。`,
+      `New worksheet, ${table.rows.length + 1} rows × ${table.headers.length} columns including headers. Existing sheets will be kept.`,
+    ),
+    warning: t(
+      '公式将在 Excel 中计算。创建失败时可能留下新工作表，请按错误提示检查后再试。',
+      'Excel will calculate the formulas. If creation fails, check for a partially created worksheet before trying again.',
+    ),
     commit: async (value) => {
       if (JSON.stringify(parseTable(value)) !== signature)
         throw new Error('数据表与确认时的内容不同，请返回检查后重新确认。');
@@ -256,11 +277,17 @@ async function prepareExcelTable(raw: string): Promise<WritePlan> {
           if (table.rows.some((row) => row.some((cell) => cell && typeof cell === 'object'))) {
             if (application.calculationMode === 'Manual')
               return {
-                warning: `工作表「${sheetName}」已创建。Excel 当前为手动计算模式，公式结果尚未验证；请使用 Excel 的“立即计算”后检查结果。`,
+                warning: t(
+                  `工作表「${sheetName}」已创建。Excel 当前为手动计算模式，公式结果尚未验证；请使用 Excel 的“立即计算”后检查结果。`,
+                  `Worksheet “${sheetName}” was created. Excel is in manual calculation mode. Use Calculate Now in Excel, then check the formulas.`,
+                ),
               };
             if (canReadCalculationState && application.calculationState !== 'Done')
               return {
-                warning: `工作表「${sheetName}」已创建，Excel 仍有待完成的计算；请等待计算结束后检查公式结果。`,
+                warning: t(
+                  `工作表「${sheetName}」已创建，Excel 仍有待完成的计算；请等待计算结束后检查公式结果。`,
+                  `Worksheet “${sheetName}” was created. Wait for Excel to finish calculating, then check the formulas.`,
+                ),
               };
           }
           const errors: string[] = [];
@@ -278,14 +305,20 @@ async function prepareExcelTable(raw: string): Promise<WritePlan> {
           );
           return errors.length
             ? {
-                warning: `工作表「${sheetName}」已创建，但发现 ${errors.length} 个公式错误：${errors.slice(0, 8).join('、')}。请在 Excel 中检查引用和输入数据。`,
+                warning: t(
+                  `工作表「${sheetName}」已创建，但发现 ${errors.length} 个公式错误：${errors.slice(0, 8).join('、')}。请在 Excel 中检查引用和输入数据。`,
+                  `Worksheet “${sheetName}” was created with ${errors.length} formula errors: ${errors.slice(0, 8).join(', ')}. Check the references and inputs in Excel.`,
+                ),
               }
             : undefined;
         });
       } catch (error) {
         if (creationStarted)
           throw new Error(
-            `工作表「${sheetName}」${created ? '已创建，但写入或检查未完成' : '可能已创建，但未能确认结果'}。请检查该表，删除未完成的表后再试。${officeError(error)}`,
+            t(
+              `工作表「${sheetName}」${created ? '已创建，但写入或检查未完成' : '可能已创建，但未能确认结果'}。请检查该表，删除未完成的表后再试。${officeError(error)}`,
+              `Worksheet “${sheetName}” ${created ? 'was created, but writing or verification did not finish' : 'may have been created, but the result could not be confirmed'}. Inspect it and remove the incomplete copy before retrying. ${uiMessage(officeError(error))}`,
+            ),
           );
         throw error;
       }
@@ -320,7 +353,10 @@ async function readExcel(): Promise<SelectionSnapshot> {
     });
     return {
       text: requireText(text),
-      label: `${range.address} · ${range.rowCount} 行 × ${range.columnCount} 列`,
+      label: t(
+        `${range.address} · ${range.rowCount} 行 × ${range.columnCount} 列`,
+        `${range.address} · ${range.rowCount} rows × ${range.columnCount} columns`,
+      ),
     };
   });
 }
@@ -340,8 +376,8 @@ async function prepareExcelFormula(): Promise<WritePlan> {
     const cellAddress = address.slice(address.lastIndexOf('!') + 1);
     const signature = JSON.stringify([range.formulas, range.values]);
     return {
-      label: `写入 ${address}`,
-      before: String(range.formulas[0][0] ?? range.text[0][0]) || '（空单元格）',
+      label: t(`写入 ${address}`, `Write to ${address}`),
+      before: String(range.formulas[0][0] ?? range.text[0][0]) || t('（空单元格）', '(Empty cell)'),
       commit: async (raw: string) => {
         const formula = parseFormula(raw);
         await Excel.run(async (ctx) => {
@@ -474,10 +510,16 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
       if (revision !== selectionRevision) throw new Error(CHANGED);
       return {
         text,
-        label: `${host === 'powerpoint' ? 'PowerPoint' : 'Office'} · 文本选区`,
+        label: t(
+          `${host === 'powerpoint' ? 'PowerPoint' : 'Office'} · 文本选区`,
+          `${host === 'powerpoint' ? 'PowerPoint' : 'Office'} · Selected text`,
+        ),
         ...(host === 'word'
           ? {
-              warning: '当前 Word 版本不支持自动写入排版结果，请更新 Office，或复制结果手动粘贴。',
+              warning: t(
+                '当前 Word 版本不支持自动写入排版结果，请更新 Office，或复制结果手动粘贴。',
+                'This version of Word cannot write formatted results. Update Office, or copy the result and paste it manually.',
+              ),
             }
           : {}),
         ...(canReplace
@@ -495,13 +537,19 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
     prepareWrite: async (kind, source, output) => {
       if (kind === 'replace' && source?.replace && canReplace)
         return {
-          label: `替换 ${source.label}`,
+          label: t(`替换 ${source.label}`, `Replace ${source.label}`),
           before: source.text,
           ...(nativeWord
             ? {
                 warning: wordMarkdownFormat(output || '')
-                  ? '将按 Markdown 排版替换选区，原选区的字体和段落样式可能改变。'
-                  : '将以纯文本替换，选区内部的字体、加粗和段落样式可能改变。需要保留排版时，请返回并选择插入。',
+                  ? t(
+                      '将按 Markdown 排版替换选区，原选区的字体和段落样式可能改变。',
+                      'Replacing with formatted Markdown can change the fonts and paragraph styles inside the selection.',
+                    )
+                  : t(
+                      '将以纯文本替换，选区内部的字体、加粗和段落样式可能改变。需要保留排版时，请返回并选择插入。',
+                      'Replacing with plain text can change fonts, emphasis, and paragraph styles inside the selection. Insert the result to keep the original formatting.',
+                    ),
               }
             : {}),
           commit: source.replace,
@@ -516,8 +564,8 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
       if (kind === 'formula' && nativeExcel) return prepareExcelFormula();
       if (kind === 'slides' && host === 'powerpoint' && supports('PowerPointApi', '1.4'))
         return {
-          label: '在演示文稿末尾添加幻灯片',
-          before: '保留所有现有幻灯片',
+          label: t('在演示文稿末尾添加幻灯片', 'Append slides to the presentation'),
+          before: t('保留所有现有幻灯片', 'Keep all existing slides'),
           commit: addSlides,
         };
       throw new Error('此版本 Office 不支持该写入操作。请复制结果并手动粘贴。');
@@ -535,7 +583,12 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
 
 export function officeError(error: unknown): string {
   if (error instanceof Error && error.name === 'RichApi.Error')
-    return 'Office 操作失败，可能是目标已改变或文档只读。请重新选择内容后重试；结果仍可复制。';
-  return error instanceof Error ? error.message : '操作未完成，请重试。';
+    return t(
+      'Office 操作失败，可能是目标已改变或文档只读。请重新选择内容后重试；结果仍可复制。',
+      'The Office operation failed. The target may have changed or the document may be read-only. Reselect the content and try again, or copy the result.',
+    );
+  return error instanceof Error
+    ? error.message
+    : t('操作未完成，请重试。', 'The operation did not complete. Try again.');
 }
 import { createPresentationAccess } from './presentation';

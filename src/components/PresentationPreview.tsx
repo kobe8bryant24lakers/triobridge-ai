@@ -1,6 +1,8 @@
+import { englishCount } from './presentation-runtime';
+import { t, getUiLanguage } from '../i18n';
 import type { ChartData, ChartKind, DeckSlide, MaterialContext } from '../presentation/types';
 import { allTables, LAYOUT_LABELS } from '../presentation/content';
-import { chartData } from '../presentation/charts';
+import { CHART_LABELS, chartData } from '../presentation/charts';
 
 const palette = ['#28604A', '#6F94A8', '#C59B53', '#937A9B', '#9AAB75', '#C88176'];
 export function ChartPreview({
@@ -23,7 +25,10 @@ export function ChartPreview({
   const label = (v: number) =>
     unit === '%'
       ? `${(v * 100).toFixed(1)}%`
-      : new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2, notation: 'compact' }).format(v);
+      : new Intl.NumberFormat(getUiLanguage(), {
+          maximumFractionDigits: 2,
+          notation: 'compact',
+        }).format(v);
   let angle = -Math.PI / 2;
   const pie = kind === 'pie' || kind === 'doughnut';
   return (
@@ -31,7 +36,10 @@ export function ChartPreview({
       <svg
         viewBox="0 0 560 290"
         role="img"
-        aria-label={`${data.categories.length} 个分类、${data.series.length} 个系列的${kind === 'line' ? '折线' : pie ? '占比' : '条形'}图预览`}
+        aria-label={t(
+          `${data.categories.length} 个分类、${data.series.length} 个系列的${kind === 'line' ? '折线' : pie ? '占比' : '条形'}图预览`,
+          `${CHART_LABELS[kind]} chart preview with ${englishCount(data.categories.length, 'category', 'categories')} and ${data.series.length} series`,
+        )}
       >
         {pie ? (
           data.series[0].values.map((value, i) => {
@@ -51,7 +59,9 @@ export function ChartPreview({
                 fill={palette[i % palette.length]}
               >
                 <title>
-                  {data.categories[i]}：{label(value || 0)}
+                  {data.categories[i]}
+                  {t('：', ': ')}
+                  {label(value || 0)}
                 </title>
               </path>
             );
@@ -104,7 +114,9 @@ export function ChartPreview({
                       fill={palette[j]}
                     >
                       <title>
-                        {category} · {series.name}：{label(v)}
+                        {category} · {series.name}
+                        {t('：', ': ')}
+                        {label(v)}
                       </title>
                     </rect>
                   );
@@ -156,7 +168,9 @@ export function ChartPreview({
                       v !== null ? (
                         <circle key={i} cx={x(i)} cy={y(v)} r="3.5" fill={palette[s]}>
                           <title>
-                            {data.categories[i]} · {series.name}：{label(v)}
+                            {data.categories[i]} · {series.name}
+                            {t('：', ': ')}
+                            {label(v)}
                           </title>
                         </circle>
                       ) : null,
@@ -174,7 +188,9 @@ export function ChartPreview({
                         fill={palette[s]}
                       >
                         <title>
-                          {data.categories[i]} · {series.name}：{label(v)}
+                          {data.categories[i]} · {series.name}
+                          {t('：', ': ')}
+                          {label(v)}
                         </title>
                       </rect>
                     ),

@@ -761,3 +761,23 @@ test('upstream timeout aborts the request and distinguishes cancellation from ti
   );
   assert.equal(wasAborted, true);
 });
+
+test('Office hosts share language without changing model revisions or credentials', async (t) => {
+  const { store, directory, vault, fetcher, operations } = await fixture(t);
+  const original = await add(store);
+  const reopened = createSharedModelStore({ directory, vault, fetcher });
+  const before = operations.length;
+  assert.equal(original.uiLanguage, undefined);
+  const english = await store.language({ uiLanguage: 'en' });
+  assert.deepEqual(english, { ...original, uiLanguage: 'en', languageRevision: 1 });
+  assert.deepEqual(await reopened.state(), english);
+  assert.deepEqual(await reopened.language({ uiLanguage: 'en' }), english);
+  await assert.rejects(() => store.language({ uiLanguage: 'unsupported' }), { code: 'request' });
+  await store.language({ uiLanguage: 'zh-CN' });
+  await reopened.activate({ expectedRevision: original.revision, id: 'first' });
+  const current = await reopened.state();
+  assert.equal(current.uiLanguage, 'zh-CN');
+  assert.equal(current.languageRevision, 2);
+  assert.deepEqual(current.profiles, original.profiles);
+  assert.equal(operations.length, before);
+});

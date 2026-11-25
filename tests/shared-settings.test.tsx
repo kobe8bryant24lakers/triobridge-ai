@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { setUiLanguage } from '../src/i18n';
 import { ModelSettings } from '../src/components/ModelSettings';
 import type { SharedModelActions, SharedProfileState } from '../src/core/profile-store';
 
@@ -60,6 +61,27 @@ function setup(state = sharedState(), overrides: Partial<SharedModelActions> = {
 }
 
 describe('shared model settings', () => {
+  it('localizes shared settings and migration while preserving the stored profile names', async () => {
+    setUiLanguage('en');
+    try {
+      const { user, props, rerender } = setup(sharedState({ legacyAvailable: true }));
+      expect(screen.getByLabelText('Service name')).toHaveValue('团队 OpenAI');
+      expect(
+        (screen.getByLabelText('Shared models') as HTMLSelectElement).selectedOptions[0]
+          .textContent,
+      ).toContain('团队 OpenAI');
+      await user.click(screen.getByRole('button', { name: 'Migrate this app’s settings' }));
+      expect(await screen.findByText('原 OpenAI')).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Choose models to migrate' })).toBeInTheDocument();
+      setUiLanguage('zh-CN');
+      rerender(<ModelSettings {...props} />);
+      expect(screen.getByRole('group', { name: '选择要迁移的模型' })).toBeInTheDocument();
+      expect(screen.getByLabelText('服务名称')).toHaveValue('团队 OpenAI');
+    } finally {
+      setUiLanguage('zh-CN');
+    }
+  });
+
   it('distinguishes profiles with the same service and model by their saved format', async () => {
     const local = {
       ...sharedState().profiles[0],

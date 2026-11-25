@@ -1,3 +1,4 @@
+import { uiMessage } from '../i18n-errors';
 import type { HostBridge, SelectionSnapshot, WriteKind } from '../core/types';
 import { parseFormula, parseOutline } from '../core/output';
 import { parseReport, parseTable, tableMatrix, NUMBER_FORMATS } from '../core/structured-output';
@@ -81,7 +82,7 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
       const target = await call<Target>('target', { kind });
       return {
         label: target.label,
-        before: target.text,
+        before: kind === 'table' || kind === 'slides' ? uiMessage(target.text) : target.text,
         warning: target.warning,
         dispose: () => release(target.token),
         commit: async (text) => {

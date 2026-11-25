@@ -30,7 +30,7 @@ export const modelTransport: typeof fetch = async (url, options) => {
   if (!native) return fetch(url, options);
   const action =
     typeof url === 'string' &&
-    /^\/local-models\/(state|upsert|import|delete|activate|complete)$/.exec(url)?.[1];
+    /^\/local-models\/(state|language|upsert|import|delete|activate|complete)$/.exec(url)?.[1];
   if (!action || options?.method !== 'POST' || typeof options.body !== 'string')
     throw new Error('本地工作台无法识别这项模型操作。');
   const id = crypto.randomUUID();

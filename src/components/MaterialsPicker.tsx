@@ -1,3 +1,5 @@
+import { englishCount } from './presentation-runtime';
+import { t } from '../i18n';
 import { useRef, useState } from 'react';
 import { FolderOpen, FilePlus2, X } from 'lucide-react';
 import { readMaterials } from '../presentation/materials';
@@ -7,7 +9,11 @@ interface Props {
   context: MaterialContext;
   onChange: (value: MaterialContext) => void;
   busy: boolean;
-  run: (label: string, work: (signal: AbortSignal) => Promise<void>) => Promise<void>;
+  run: (
+    label: string,
+    work: (signal: AbortSignal) => Promise<void>,
+    cancellable?: boolean,
+  ) => Promise<void>;
 }
 export function MaterialsPicker({ context, onChange, busy, run }: Props) {
   const [materials, setMaterials] = useState<Material[]>([]),
@@ -19,23 +25,27 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
   async function choose(list: FileList | null) {
     if (!list?.length) return;
     const chosen = Array.from(list);
-    await run('读取本地素材', async (signal) => {
-      try {
-        const result = await readMaterials(chosen, signal, (name, i, total) =>
-          setProgress(`${i} / ${total} · ${name}`),
-        );
-        setMaterials(result.materials);
-        setIssues(result.issues);
-        onChange({ materials: result.materials, includeImages: false });
-        setOpen(true);
-      } finally {
-        setProgress('');
-      }
-    });
+    await run(
+      t('读取本地素材', 'Reading local files'),
+      async (signal) => {
+        try {
+          const result = await readMaterials(chosen, signal, (name, i, total) =>
+            setProgress(`${i} / ${total} · ${name}`),
+          );
+          setMaterials(result.materials);
+          setIssues(result.issues);
+          onChange({ materials: result.materials, includeImages: false });
+          setOpen(true);
+        } finally {
+          setProgress('');
+        }
+      },
+      true,
+    );
   }
   const selected = new Set(context.materials.map((m) => m.id));
   return (
-    <section className="ppt-materials" aria-label="素材上下文">
+    <section className="ppt-materials" aria-label={t('素材上下文', 'Source files')}>
       <div className="section-heading">
         <button
           type="button"
@@ -44,13 +54,15 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
           onClick={() => setOpen(!open)}
         >
           <FolderOpen size={17} />
-          素材上下文 · {context.materials.length} 份已选
+          {t('素材上下文 · ', 'Source files · ')}
+          {context.materials.length}
+          {t(' 份已选', ' selected')}
         </button>
         {materials.length > 0 && (
           <button
             type="button"
             className="icon-button"
-            aria-label="清空素材"
+            aria-label={t('清空素材', 'Clear sources')}
             disabled={busy}
             onClick={() => {
               setMaterials([]);
@@ -65,7 +77,10 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
       {open && (
         <>
           <p className="field-help">
-            选择本地目录，或挑选文件。先在本机解析，点击生成时才将勾选内容发送给当前模型。再次选择会替换本次素材。
+            {t(
+              '选择本地目录，或挑选文件。先在本机解析，点击生成时才将勾选内容发送给当前模型。再次选择会替换本次素材。',
+              'Choose a folder or files. Files are read locally. Generate sends checked files to the model. Choosing again replaces this selection.',
+            )}
           </p>
           <div className="button-row">
             <button
@@ -75,7 +90,7 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
               onClick={() => folder.current?.click()}
             >
               <FolderOpen size={16} />
-              选择素材目录
+              {t('选择素材目录', 'Choose folder')}
             </button>
             <button
               type="button"
@@ -84,7 +99,7 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
               onClick={() => files.current?.click()}
             >
               <FilePlus2 size={16} />
-              选择文件
+              {t('选择文件', 'Choose files')}
             </button>
           </div>
           <input
@@ -92,7 +107,7 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
             className="sr-only"
             type="file"
             multiple
-            aria-label="选择素材目录文件"
+            aria-label={t('选择素材目录文件', 'Files in source folder')}
             tabIndex={-1}
             {...{ webkitdirectory: '', directory: '' }}
             onChange={(e) => {
@@ -106,7 +121,7 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
             type="file"
             multiple
             accept=".txt,.md,.csv,.tsv,.json,.docx,.xlsx,.pptx,.pdf,.png,.jpg,.jpeg,.webp"
-            aria-label="选择素材文件"
+            aria-label={t('选择素材文件', 'Select source files')}
             tabIndex={-1}
             onChange={(e) => {
               void choose(e.target.files);
@@ -114,8 +129,10 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
             }}
           />
           <p className="field-help">
-            Word、Excel、PPT、PDF、文本与图片。最多 40 个文件 / 80 MB，单文件 20
-            MB。不自动读取目录外的文件。
+            {t(
+              'Word、Excel、PPT、PDF、文本与图片。最多 40 个文件 / 80 MB，单文件 20 MB。不自动读取目录外的文件。',
+              'Word, Excel, PowerPoint, PDF, text and images. Up to 40 files, 20 MB each and 80 MB total. Only selected files are read.',
+            )}
           </p>
           {progress && (
             <p role="status" className="field-help">
@@ -143,20 +160,33 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
                     <span>
                       {m.name}
                       <small>
-                        {m.image ? '图片' : `${m.text.length.toLocaleString()} 字符`}
-                        {m.tables.length > 0 ? ` · ${m.tables.length} 个表格` : ''}
+                        {m.image
+                          ? t('图片', 'Image')
+                          : t(
+                              `${m.text.length.toLocaleString()} 字符`,
+                              `${m.text.length.toLocaleString()} characters`,
+                            )}
+                        {m.tables.length > 0
+                          ? t(
+                              ` · ${m.tables.length} 个表格`,
+                              ` · ${englishCount(m.tables.length, 'table')}`,
+                            )
+                          : ''}
                       </small>
                     </span>
                   </label>
                   <details>
-                    <summary>查看内容</summary>
+                    <summary>{t('查看内容', 'View content')}</summary>
                     {m.image ? (
                       <img className="material-image" src={m.image.modelData} alt={m.name} />
                     ) : (
                       <pre className="material-text">
                         {m.text.slice(0, 2400)}
                         {m.text.length > 2400
-                          ? '\n… 预览仅显示前 2,400 字符，发送时包含完整已提取内容。'
+                          ? t(
+                              '\n… 预览仅显示前 2,400 字符，发送时包含完整已提取内容。',
+                              '\n… The preview shows the first 2,400 characters. The full extracted content will be sent.',
+                            )
                           : ''}
                       </pre>
                     )}
@@ -174,21 +204,31 @@ export function MaterialsPicker({ context, onChange, busy, run }: Props) {
                 disabled={busy}
                 onChange={(e) => onChange({ ...context, includeImages: e.target.checked })}
               />
-              将图片预览也发给模型理解（最多 4 张，需视觉模型）
+              {t(
+                '将图片预览也发给模型理解（最多 4 张，需视觉模型）',
+                'Send image previews to the model (up to 4, requires a vision model)',
+              )}
             </label>
           )}
           {materials.some((m) => m.image) && !context.includeImages && (
             <p className="field-help">
-              图片只按名称供模型选用，原图经本机压缩后嵌入 PPT；不会读取图片中的事实。
+              {t(
+                '图片只按名称供模型选用，原图经本机压缩后嵌入 PPT；不会读取图片中的事实。',
+                'Images are identified by filename for layout and compressed locally for the deck. Their content is not analyzed.',
+              )}
             </p>
           )}
           {issues.length > 0 && (
             <details className="material-issues" open={!materials.length}>
-              <summary>{issues.length} 项资料读取提示</summary>
+              <summary>
+                {t(`${issues.length} 项资料读取提示`, englishCount(issues.length, 'file notice'))}
+              </summary>
               <ul>
                 {issues.map((issue, i) => (
                   <li key={i}>
-                    <strong>{issue.name}</strong>：{issue.message}
+                    <strong>{issue.name}</strong>
+                    {t('：', ': ')}
+                    {issue.message}
                   </li>
                 ))}
               </ul>

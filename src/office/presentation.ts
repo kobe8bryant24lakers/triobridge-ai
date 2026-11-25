@@ -1,3 +1,5 @@
+import { uiMessage } from '../i18n-errors';
+import { t } from '../i18n';
 import type {
   EditProposal,
   PresentationAccess,
@@ -36,6 +38,7 @@ async function loadInsertTarget(ctx: PowerPoint.RequestContext): Promise<Present
 async function readPresentation(
   scope: 'selected' | 'all',
   fixedIds?: string[],
+  prior?: PresentationSnapshot,
 ): Promise<PresentationSnapshot> {
   if (!supports('1.4'))
     throw new Error(
@@ -128,7 +131,9 @@ async function readPresentation(
           title:
             shapes.find((s) => s.role === 'title')?.text ||
             shapes.find((s) => s.text)?.text?.slice(0, 80) ||
-            `第 ${slideIds.indexOf(slide.id) + 1} 页`,
+            // Keep a synthetic title stable across interface-language changes during verification.
+            prior?.slides.find((previous) => previous.id === slide.id)?.title ||
+            t(`第 ${slideIds.indexOf(slide.id) + 1} 页`, `Slide ${slideIds.indexOf(slide.id) + 1}`),
           shapes,
         };
       }),
@@ -144,7 +149,7 @@ async function applyEdits(snapshot: PresentationSnapshot, input: EditProposal) {
   if (proposal.slideOrder && !supports('1.8'))
     throw new Error('当前 PowerPoint 不支持页面重排，请更新 Office。');
   // Re-read every scoped object before any writes, including style/geometry and page order.
-  assertSnapshotUnchanged(snapshot, await readPresentation(snapshot.scope));
+  assertSnapshotUnchanged(snapshot, await readPresentation(snapshot.scope, undefined, snapshot));
   let started = false;
   try {
     await PowerPoint.run(async (ctx) => {
@@ -210,14 +215,20 @@ async function applyEdits(snapshot: PresentationSnapshot, input: EditProposal) {
             : actual !== expected
         )
           throw new Error(
-            `部分改动的回读结果与方案不一致（${shape.name} · ${PATCH_LABELS[key] || key}）。`,
+            t(
+              `部分改动的回读结果与方案不一致（${shape.name} · ${PATCH_LABELS[key] || key}）。`,
+              `The value read back differs from the proposed change (${shape.name} · ${PATCH_LABELS[key] || key}).`,
+            ),
           );
       }
     }
   } catch (error) {
     if (started)
       throw new Error(
-        `Office 可能已应用部分改动，尚未确认全部成功。请检查页面，使用 Office 撤销或打开原稿备份；重新读取后再操作。${error instanceof Error && error.name !== 'RichApi.Error' ? ` ${error.message}` : ''}`,
+        t(
+          `Office 可能已应用部分改动，尚未确认全部成功。请检查页面，使用 Office 撤销或打开原稿备份；重新读取后再操作。${error instanceof Error && error.name !== 'RichApi.Error' ? ` ${error.message}` : ''}`,
+          `Some changes may have been applied. Check the slides, use Undo or restore a backup, and read the presentation again before retrying.${error instanceof Error && error.name !== 'RichApi.Error' ? ` ${uiMessage(error.message)}` : ''}`,
+        ),
       );
     throw error;
   }
