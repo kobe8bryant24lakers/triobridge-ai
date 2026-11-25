@@ -148,6 +148,7 @@ describe('multi-host shared profile state', () => {
       id: 'legacy',
       name: 'Cloud',
       model: 'cloud',
+      apiFormat: 'anthropic' as const,
       apiKey: 'cloud-private',
     };
     const fixture = {
@@ -163,6 +164,7 @@ describe('multi-host shared profile state', () => {
       id: legacy.id,
       name: legacy.name,
       baseUrl: legacy.baseUrl,
+      apiFormat: legacy.apiFormat,
       model: legacy.model,
       timeoutSeconds: 60,
       hasKey: true,
@@ -176,6 +178,7 @@ describe('multi-host shared profile state', () => {
     await store.actions.refresh();
     const list = await store.actions.listLegacyProfiles();
     expect(list).toHaveLength(2);
+    expect(list.find((profile) => profile.id === legacy.id)?.apiFormat).toBe('anthropic');
     expect(JSON.stringify(list)).not.toContain('private');
     await store.actions.migrateLocal(0, [legacy.id]);
     expect(loadProfiles().profiles.map((x) => x.id)).toEqual(['fixture']);
@@ -185,6 +188,7 @@ describe('multi-host shared profile state', () => {
     expect(body.profiles).toHaveLength(1);
     expect(body.profiles[0].profile).not.toHaveProperty('apiKey');
     expect(body.profiles[0].credential).toEqual({ action: 'replace', value: 'cloud-private' });
+    expect(body.profiles[0].profile.apiFormat).toBe('anthropic');
   });
   it('preserves all local sources when atomic import fails', async () => {
     const legacy = { ...emptyProfile(), name: 'Legacy', model: 'old', apiKey: 'keep-private' };

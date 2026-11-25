@@ -34,6 +34,7 @@ await mkdir(join(stage, 'shared'));
 await mkdir(join(stage, 'native'));
 for (const f of [
   'shared-model-store',
+  'model-protocol',
   'shared-model-vault',
   'local-capability',
   'private-local-permissions',

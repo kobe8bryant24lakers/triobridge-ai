@@ -172,9 +172,9 @@ export default function App({ officeBridge }: Props) {
                 <li>
                   <h2>连接模型</h2>
                   <p>
-                    在模型设置中填写服务地址和模型 ID。服务要求验证时填入 API
-                    Key，点击“连接并保存”。 本机 API 可使用 http://127.0.0.1:8001/v1 等兼容 Chat
-                    Completions 的地址。
+                    在模型设置中填写服务地址和模型 ID。使用本机 API 时，按推理服务选择 OpenAI（Chat
+                    Completions）或 Claude（Anthropic Messages）。例如，基础地址可以填
+                    http://127.0.0.1:8001/v1。按需填写 API Key，然后点击“连接并保存”。
                   </p>
                 </li>
                 <li>

@@ -25,6 +25,7 @@ const runtimeScripts = [
   'server-utils.mjs',
   'shared-model-runtime.mjs',
   'shared-model-store.mjs',
+  'model-protocol.mjs',
   'shared-model-http.mjs',
   'shared-model-vault.mjs',
   'local-request-guard.mjs',

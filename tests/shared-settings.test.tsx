@@ -60,6 +60,24 @@ function setup(state = sharedState(), overrides: Partial<SharedModelActions> = {
 }
 
 describe('shared model settings', () => {
+  it('distinguishes profiles with the same service and model by their saved format', async () => {
+    const local = {
+      ...sharedState().profiles[0],
+      name: '本机模型',
+      baseUrl: 'http://127.0.0.1:8001/v1',
+    };
+    const { user } = setup(
+      sharedState({ profiles: [local, { ...local, id: 'second', apiFormat: 'anthropic' }] }),
+    );
+    expect(
+      screen.getByRole('option', { name: /^本机模型 · OpenAI 格式 · 当前使用$/ }),
+    ).toBeInTheDocument();
+    await user.selectOptions(
+      screen.getByLabelText('本机共享模型'),
+      screen.getByRole('option', { name: /^本机模型 · Claude 格式$/ }),
+    );
+    expect(screen.getByRole('combobox', { name: '接口格式' })).toHaveValue('anthropic');
+  });
   it('shows saved-key status without reading secrets and preserves the key on save', async () => {
     const { user, actions, onSave } = setup();
     expect(screen.getByText('本机共享')).toBeInTheDocument();
@@ -76,6 +94,7 @@ describe('shared model settings', () => {
           id: 'shared-openai',
           name: '团队 OpenAI',
           baseUrl: 'https://api.openai.com/v1',
+          apiFormat: 'openai',
           model: 'configured-model',
           timeoutSeconds: 60,
         },
@@ -86,6 +105,31 @@ describe('shared model settings', () => {
       expect.any(AbortSignal),
     );
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('selects a local wire format, previews the real route and never reuses a saved key on a different endpoint', async () => {
+    const { user, actions } = setup(
+      sharedState({
+        profiles: [{ ...sharedState().profiles[0], baseUrl: 'http://127.0.0.1:8001/v1' }],
+      }),
+    );
+    const format = screen.getByRole('combobox', { name: '接口格式' });
+    expect(format).toHaveValue('openai');
+    expect(format).toHaveAccessibleDescription(/8001\/v1\/chat\/completions/);
+    await user.selectOptions(format, 'anthropic');
+    expect(format).toHaveAccessibleDescription(/8001\/v1\/messages/);
+    expect(screen.queryByRole('option', { name: '保留已保存的密钥' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('密钥操作')).toHaveValue('replace');
+    await user.selectOptions(screen.getByLabelText('密钥操作'), 'remove');
+    await user.click(screen.getByRole('button', { name: '连接并保存' }));
+    expect(actions.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profile: expect.objectContaining({ apiFormat: 'anthropic' }),
+        credential: { action: 'remove' },
+        testConnection: true,
+      }),
+      expect.any(AbortSignal),
+    );
   });
 
   it('requires an explicit replacement or deletion and never exposes the previous key', async () => {

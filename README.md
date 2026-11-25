@@ -25,6 +25,8 @@ The Mac package uses an ad hoc signature. The Windows package has no Authenticod
 
 Add a profile in model settings or select an existing provider. Enter your existing OpenAI-compatible API base URL (for example `http://127.0.0.1:8001/v1`), actual model ID, and a key if required. Connect and save sends a real request. The three Office apps share profiles and the active selection. Keys are held in macOS Keychain or Windows Credential Manager.
 
+In builds from this branch, **Local API** and **Custom** profiles also have an **API format** selector. For the base URL above, OpenAI Chat Completions sends requests to `/v1/chat/completions` and Claude (Anthropic Messages) uses `/v1/messages`. Choose the format your inference server exposes, even when both profiles use the same model ID. Existing profiles default to OpenAI. The v0.6.0 download supports the OpenAI format.
+
 Cloud inference requires a connection to your provider. Local inference uses your existing model API. The installer contains the workbench and Office integration. Model weights are supplied by your inference runtime.
 
 ## Working with documents

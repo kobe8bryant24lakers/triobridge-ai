@@ -172,7 +172,10 @@ export function startModelAudit(
     response(response: Response) {
       record.httpStatus = response.status;
       // CORS may hide this header; null means unavailable, not absent at the provider.
-      record.providerRequestId = text(response.headers.get('x-request-id'), 300);
+      record.providerRequestId = text(
+        response.headers.get('request-id') || response.headers.get('x-request-id'),
+        300,
+      );
     },
     payload(value: unknown) {
       const data = object(value);

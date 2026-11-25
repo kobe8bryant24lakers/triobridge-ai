@@ -1,4 +1,4 @@
-import type { ModelProfile } from './types';
+import type { ProfileDetails } from './types';
 
 // Defaults verified against the providers' API documentation on 2026-11-21.
 // These are editable starting points; access and browser CORS still depend on the provider.
@@ -26,11 +26,17 @@ export const MODEL_PRESETS = [
   },
 ] as const;
 
-export function presetFor(profile: ModelProfile): string {
+export function presetFor(profile: ProfileDetails): string {
   if (!profile.name && !profile.model) return '';
+  if (profile.apiFormat === 'anthropic') return 'custom';
   return (
     MODEL_PRESETS.find(
       (preset) => preset.baseUrl === profile.baseUrl && preset.model === profile.model,
     )?.id || 'custom'
   );
+}
+
+export function customFormatSuffix(profile: ProfileDetails): string {
+  if (presetFor(profile) !== 'custom') return '';
+  return profile.apiFormat === 'anthropic' ? ' · Claude 格式' : ' · OpenAI 格式';
 }

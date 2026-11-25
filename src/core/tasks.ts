@@ -15,7 +15,8 @@ export const TASKS: Record<HostKind, TaskSpec[]> = {
       id: 'rewrite',
       label: '改写润色',
       description: '让表达更清晰，保留你的原意。',
-      instruction: '改写给定文字，保留事实、数字与原意，使表达清晰自然。只输出改写后的正文。',
+      instruction:
+        '改写给定文字，使表达清晰自然。保留原文中的名称、事实、原意、数量、单位和日期精度。原文只写月日就只写月日。只输出改写后的正文。',
       needsSource: true,
       output: 'text',
     },

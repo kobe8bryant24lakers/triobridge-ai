@@ -23,6 +23,8 @@ test('local model proxy enforces fixed target, source, path and body boundaries'
     lastRequest = {
       url: req.url,
       authorization: req.headers.authorization,
+      key: req.headers['x-api-key'],
+      version: req.headers['anthropic-version'],
       body: JSON.parse(Buffer.concat(parts)),
     };
     if (req.url === '/redirect/chat/completions') {
@@ -78,6 +80,24 @@ test('local model proxy enforces fixed target, source, path and body boundaries'
       ])
         assert.equal((await request(undefined, { headers })).status, 403);
     });
+    await t.test(
+      'forwards the Messages credential only to the configured Messages endpoint',
+      async () => {
+        const res = await request('/model-proxy/v1/messages', {
+          headers: {
+            Origin: origin,
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer unrelated',
+            'x-api-key': 'synthetic-messages-key',
+          },
+        });
+        assert.equal(res.status, 200);
+        assert.equal(lastRequest.url, '/v1/messages');
+        assert.equal(lastRequest.key, 'synthetic-messages-key');
+        assert.equal(lastRequest.version, '2023-06-01');
+        assert.equal(lastRequest.authorization, undefined);
+      },
+    );
     await t.test('rejects unsupported paths, body and content types', async () => {
       assert.equal((await request('/model-proxy/admin')).status, 400);
       assert.equal(

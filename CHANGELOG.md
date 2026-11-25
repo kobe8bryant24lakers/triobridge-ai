@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Custom and local model profiles can use OpenAI Chat Completions or Claude (Anthropic Messages). Word, Excel and PowerPoint share the selected format. Existing profiles default to OpenAI.
+
 ## 0.6.0
 
 - Ship a single desktop workbench for Word, Excel and PowerPoint. Windows uses an Office ribbon button and Mac uses an application Services menu.

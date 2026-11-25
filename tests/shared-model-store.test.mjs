@@ -135,6 +135,62 @@ test('stale catalog writes fail with latest public state and cannot overwrite an
   assert.equal((await store.state()).profiles[0].name, 'Changed elsewhere');
 });
 
+test('catalogs without a format retain their bound OpenAI endpoint and require explicit credentials when switching', async (t) => {
+  const { store, directory, vault, fetcher, calls } = await fixture(t);
+  await add(store);
+  const file = join(directory, 'profiles.json');
+  const old = JSON.parse(await readFile(file, 'utf8'));
+  delete old.profiles[0].apiFormat;
+  const original = JSON.stringify(old);
+  await writeFile(file, original);
+  const reopened = createSharedModelStore({ directory, vault, fetcher });
+  assert.equal((await reopened.state()).profiles[0].apiFormat, 'openai');
+  await reopened.complete({
+    profileId: 'first',
+    profileRevision: 1,
+    messages: [{ role: 'user', content: 'existing profile' }],
+  });
+  assert.equal(calls[0][0], 'https://example.test/v1/chat/completions');
+  const update = {
+    expectedRevision: 1,
+    profile: profile('first', { apiFormat: 'anthropic' }),
+    credential: { action: 'keep' },
+    testConnection: true,
+  };
+  await assert.rejects(reopened.upsert(update), { code: 'credential' });
+  assert.equal(calls.length, 1);
+  await assert.rejects(reopened.upsert({ ...update, credential: { action: 'remove' } }), {
+    code: 'response',
+  });
+  assert.equal(calls[1][0], 'https://example.test/v1/messages');
+  assert.equal(calls[1][1].headers['x-api-key'], undefined);
+  assert.equal(await readFile(file, 'utf8'), original);
+  await assert.rejects(
+    reopened.upsert({ ...update, profile: profile('first', { apiFormat: 'invalid' }) }),
+    { code: 'config' },
+  );
+  assert.equal(calls.length, 2);
+});
+
+test('Claude bases, complete routes and fixed proxies resolve once, including prefixed gateways', () => {
+  for (const [base, expected] of [
+    ['http://127.0.0.1:8001', 'http://127.0.0.1:8001/v1/messages'],
+    ['http://[::1]:8001/v1/', 'http://[::1]:8001/v1/messages'],
+    ['https://example.test/gateway', 'https://example.test/gateway/v1/messages'],
+    ['https://example.test/gateway/v1/messages/', 'https://example.test/gateway/v1/messages'],
+    ['/model-proxy/v1', 'https://example.test/v1/messages'],
+  ])
+    assert.equal(sharedCompletionUrl(base, 'https://example.test', 'anthropic'), expected);
+  assert.throws(
+    () => sharedCompletionUrl('https://example.test/v1/chat/completions', undefined, 'anthropic'),
+    /OpenAI/,
+  );
+  assert.throws(
+    () => sharedCompletionUrl('http://remote.example/v1', undefined, 'anthropic'),
+    /HTTPS/,
+  );
+});
+
 test('switching the global default preserves each profile revision and deleting removes credentials', async (t) => {
   const { store, keys } = await fixture(t);
   await add(store);

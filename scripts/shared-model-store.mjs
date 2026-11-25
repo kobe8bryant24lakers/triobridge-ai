@@ -6,6 +6,12 @@ import { createNativeModelVault } from './shared-model-vault.mjs';
 import { ensurePrivateModelDirectory } from './local-capability.mjs';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
 import { modelConnectionError } from './model-connection-error.mjs';
+import {
+  modelEndpoint,
+  modelRequest,
+  normalizeModelResponse,
+  ModelProtocolError,
+} from './model-protocol.mjs';
 import { storageDetailMessage, storageFailureDetail } from './model-storage-diagnostic.mjs';
 
 export class SharedModelError extends Error {
@@ -47,48 +53,29 @@ export function sharedModelsDirectory(platform = process.platform) {
   throw new Error('Shared models require a supported per-user application data directory.');
 }
 
-function validateBaseUrl(baseUrl, allowProxy = true) {
-  if (typeof baseUrl !== 'string' || baseUrl.length > 2048) fail('config', '模型服务地址无效。');
-  if (allowProxy && /^\/model-proxy(?:\/[\w-]+)*$/.test(baseUrl.trim())) return;
-  let url;
+function checkedEndpoint(baseUrl, apiFormat) {
   try {
-    url = new URL(baseUrl.trim());
-  } catch {
-    fail('config', '共享模型需要完整服务地址或已配置的本机代理路径。');
+    return modelEndpoint(baseUrl, apiFormat);
+  } catch (error) {
+    fail('config', error.message);
   }
-  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (
-    !['http:', 'https:'].includes(url.protocol) ||
-    (url.protocol === 'http:' && !loopback) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  )
-    fail('config', '远程模型需要 HTTPS，HTTP 仅限本机回环地址；服务地址不能含凭据、参数或片段。');
 }
 
-export function sharedCompletionUrl(baseUrl, proxyTarget) {
-  validateBaseUrl(baseUrl);
-  const base = baseUrl
-    .trim()
-    .replace(/\/+$/, '')
-    .replace(/\/chat\/completions$/, '');
-  if (base.startsWith('/model-proxy')) {
-    if (!proxyTarget) fail('config', '本机代理尚未配置 MODEL_PROXY_TARGET。', 503);
-    validateBaseUrl(proxyTarget, false);
-    const target = new URL(proxyTarget);
-    if (target.pathname !== '/') fail('config', '本机代理目标必须是服务根地址。');
-    return new URL(`${base.slice('/model-proxy'.length)}/chat/completions`, target).href;
-  }
-  return `${base}/chat/completions`;
+export function sharedCompletionUrl(baseUrl, proxyTarget, apiFormat) {
+  const endpoint = checkedEndpoint(baseUrl, apiFormat);
+  if (!endpoint.startsWith('/model-proxy/')) return endpoint;
+  if (!proxyTarget) fail('config', '本机代理尚未配置 MODEL_PROXY_TARGET。', 503);
+  checkedEndpoint(proxyTarget, apiFormat);
+  if (!URL.canParse(proxyTarget) || new URL(proxyTarget).pathname !== '/')
+    fail('config', '本机代理目标必须是服务根地址。');
+  return new URL(endpoint.slice('/model-proxy'.length), proxyTarget).href;
 }
 
 function profileFields(value) {
   if (
     !isObject(value) ||
     Object.keys(value).some(
-      (key) => !['id', 'name', 'baseUrl', 'model', 'timeoutSeconds'].includes(key),
+      (key) => !['id', 'name', 'baseUrl', 'apiFormat', 'model', 'timeoutSeconds'].includes(key),
     )
   )
     fail('config', '模型配置包含不支持的字段。');
@@ -106,11 +93,12 @@ function profileFields(value) {
     value.timeoutSeconds > 300
   )
     fail('config', '请检查模型名称、ID 和 5–300 秒的超时设置。');
-  validateBaseUrl(value.baseUrl);
+  checkedEndpoint(value.baseUrl, value.apiFormat);
   return {
     id: value.id,
     name: value.name.trim(),
     baseUrl: value.baseUrl.trim().replace(/\/+$/, ''),
+    apiFormat: value.apiFormat ?? 'openai',
     model: value.model.trim(),
     timeoutSeconds: value.timeoutSeconds,
   };
@@ -251,27 +239,30 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
     timeout = true;
     controller.abort();
   }, profile.timeoutSeconds * 1000);
-  const endpoint = profile.endpoint || sharedCompletionUrl(profile.baseUrl);
+  const endpoint = profile.endpoint;
   try {
+    const { headers, body: payload } = modelRequest(
+      profile.apiFormat,
+      profile.model,
+      messages,
+      secret,
+    );
     const response = await fetcher(endpoint, {
       method: 'POST',
       redirect: 'error',
       credentials: 'omit',
       cache: 'no-store',
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
-      },
-      body: JSON.stringify({ model: profile.model, messages, stream: false }),
+      headers,
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       await response.body?.cancel();
       const errors = {
-        400: '模型服务拒绝了请求，请检查模型 ID。',
+        400: '模型服务拒绝了请求，请检查接口格式和模型 ID。',
         401: 'API Key 无效或已过期。',
         403: 'API Key 没有此模型的访问权限。',
-        404: '找不到模型接口或模型。',
+        404: '找不到模型接口或模型，请检查地址、接口格式和模型 ID。',
         429: '请求过于频繁或额度不足，请稍后重试。',
       };
       fail(
@@ -280,14 +271,14 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
         response.status >= 400 ? response.status : 502,
       );
     }
-    const data = await readResponse(response);
+    const data = normalizeModelResponse(profile.apiFormat, await readResponse(response));
     const choice = isObject(data) && Array.isArray(data.choices) ? data.choices[0] : undefined;
     if (
       !isObject(choice) ||
       !isObject(choice.message) ||
       (typeof choice.message.content !== 'string' && typeof choice.message.refusal !== 'string')
     )
-      fail('response', '模型服务未返回兼容的文本响应。', 502);
+      fail('response', '模型服务未返回兼容的文本响应，请检查接口格式。', 502);
     if (typeof choice.message.content === 'string' && choice.message.content.length > 100_000)
       fail('response', '模型输出超过 100,000 字符。', 502);
     const body = {
@@ -318,13 +309,20 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
     };
     return {
       body: redact(body, secret),
-      requestId: redact(response.headers.get('x-request-id')?.slice(0, 300) || null, secret),
+      requestId: redact(
+        (response.headers.get('request-id') || response.headers.get('x-request-id'))?.slice(
+          0,
+          300,
+        ) || null,
+        secret,
+      ),
     };
   } catch (error) {
     if (timeout)
       fail('timeout', `请求超过 ${profile.timeoutSeconds} 秒，请重试或增加超时时间。`, 504);
     if (signal?.aborted) fail('cancelled', '已取消生成。', 499);
     if (error instanceof SharedModelError) throw error;
+    if (error instanceof ModelProtocolError) fail('response', error.message, 502);
     fail('network', redact(modelConnectionError(error, endpoint), secret), 502);
   } finally {
     clearTimeout(timer);
@@ -399,8 +397,8 @@ export function createSharedModelStore({
             (typeof credentialRef !== 'string' || !refPattern.test(credentialRef)))
         )
           throw new Error();
-        validateBaseUrl(endpoint, false);
-        if (sharedCompletionUrl(endpoint) !== endpoint) throw new Error();
+        if (!URL.canParse(endpoint) || checkedEndpoint(endpoint, fields.apiFormat) !== endpoint)
+          throw new Error();
         return { ...profileFields(fields), revision, credentialRef, endpoint };
       });
       if (
@@ -546,9 +544,9 @@ export function createSharedModelStore({
     }
   }
   function candidate(profile, credential, old) {
-    const endpoint = sharedCompletionUrl(profile.baseUrl, proxyTarget);
-    if (credential.action === 'keep' && old && endpoint !== old.endpoint)
-      fail('credential', '更换服务地址后需要重新填写或明确移除密钥，不能沿用旧服务的密钥。');
+    const endpoint = sharedCompletionUrl(profile.baseUrl, proxyTarget, profile.apiFormat);
+    if (credential.action === 'keep' && old?.credentialRef && endpoint !== old.endpoint)
+      fail('credential', '更换服务地址或接口格式后，请重新填写密钥或选择不使用密钥。');
     return {
       ...profile,
       endpoint,

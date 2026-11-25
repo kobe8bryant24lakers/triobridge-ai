@@ -1,5 +1,11 @@
 import { modelTransport, nativeWorkbench } from '../offline/transport';
-import type { ChatMessage, RuntimeModelProfile, SharedModelProfile } from './types';
+import {
+  modelEndpoint,
+  modelRequest,
+  normalizeModelResponse,
+  ModelProtocolError,
+} from '../../scripts/model-protocol.mjs';
+import type { ChatMessage, ModelApiFormat, RuntimeModelProfile, SharedModelProfile } from './types';
 import { MAX_RESULT_LENGTH } from './tasks';
 import { startModelAudit } from './model-audit';
 import {
@@ -23,28 +29,12 @@ export class ModelError extends Error {
   }
 }
 
-export function completionUrl(baseUrl: string): string {
-  const base = baseUrl.trim().replace(/\/+$/, '');
-  if (/^\/model-proxy(?:\/[\w-]+)*$/.test(base))
-    return `${base.replace(/\/chat\/completions$/, '')}/chat/completions`;
-  let url: URL;
+export function completionUrl(baseUrl: string, apiFormat?: ModelApiFormat): string {
   try {
-    url = new URL(base);
-  } catch {
-    throw new ModelError('请填写完整的 API Base URL，例如 https://api.example.com/v1。', 'config');
+    return modelEndpoint(baseUrl, apiFormat);
+  } catch (error) {
+    throw new ModelError((error as Error).message, 'config');
   }
-  if (
-    !['http:', 'https:'].includes(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  )
-    throw new ModelError('服务地址只支持 HTTP(S)，不能包含账号、密码、查询参数或片段。', 'config');
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (url.protocol === 'http:' && !local)
-    throw new ModelError('远程模型服务需要 HTTPS；本地 HTTP 服务请使用本机代理。', 'config');
-  return `${base.replace(/\/chat\/completions$/, '')}/chat/completions`;
 }
 
 export function validateProfile(profile: RuntimeModelProfile): void {
@@ -56,7 +46,7 @@ export function validateProfile(profile: RuntimeModelProfile): void {
     (!isSharedProfile(profile) && profile.apiKey.length > 4096)
   )
     throw new ModelError('模型配置字段过长，请检查输入。', 'config');
-  completionUrl(profile.baseUrl);
+  completionUrl(profile.baseUrl, profile.apiFormat);
   if (isSharedProfile(profile) && (!Number.isSafeInteger(profile.revision) || profile.revision < 0))
     throw new ModelError('共享模型版本无效，请刷新配置后重试。', 'config');
   if (
@@ -71,7 +61,7 @@ const HTTP_ERRORS: Record<number, string> = {
   400: '服务拒绝了请求，请检查模型 ID 和接口参数。',
   401: 'API Key 无效或已过期，请在模型设置中更新。',
   403: '当前 API Key 没有访问权限，请检查模型权限。',
-  404: '找不到接口或模型，请检查 Base URL（通常包含 /v1）和模型 ID。',
+  404: '找不到接口或模型，请检查 Base URL、接口格式和模型 ID。',
   429: '请求过于频繁或额度不足，请稍后重试并检查服务额度。',
 };
 
@@ -83,7 +73,7 @@ export async function complete(
 ): Promise<string> {
   validateProfile(profile);
   if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
-  const endpoint = completionUrl(profile.baseUrl);
+  const endpoint = completionUrl(profile.baseUrl, profile.apiFormat);
   const secret = isSharedProfile(profile) ? '' : profile.apiKey.trim();
   const audit = startModelAudit(endpoint, profile.model.trim(), messages, secret);
   let auditOutcome = 'network';
@@ -97,31 +87,20 @@ export async function complete(
   }, profile.timeoutSeconds * 1000);
   try {
     const shared = isSharedProfile(profile);
+    const request = shared
+      ? {
+          headers: localModelHeaders(),
+          body: { profileId: profile.id, profileRevision: profile.revision, messages },
+        }
+      : modelRequest(profile.apiFormat, profile.model.trim(), messages, secret);
     const response = await fetcher(shared ? '/local-models/complete' : endpoint, {
       method: 'POST',
       signal: controller.signal,
       redirect: 'error',
       credentials: 'omit',
       cache: 'no-store',
-      headers: shared
-        ? localModelHeaders()
-        : {
-            'Content-Type': 'application/json',
-            ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
-          },
-      body: JSON.stringify(
-        shared
-          ? {
-              profileId: profile.id,
-              profileRevision: profile.revision,
-              messages,
-            }
-          : {
-              model: profile.model.trim(),
-              messages,
-              stream: false,
-            },
-      ),
+      headers: request.headers,
+      body: JSON.stringify(request.body),
     });
     audit?.response(response);
     if (!response.ok && shared) {
@@ -152,7 +131,8 @@ export async function complete(
             ? 'rate'
             : 'response',
       );
-    const data = (await response.json()) as {
+    const raw = await response.json();
+    const data = (shared ? raw : normalizeModelResponse(profile.apiFormat, raw)) as {
       choices?: {
         message?: { content?: unknown; refusal?: unknown };
         finish_reason?: string;
@@ -160,7 +140,7 @@ export async function complete(
     };
     audit?.payload(data);
     if (!data || typeof data !== 'object')
-      throw new ModelError('服务返回的数据格式无效，请确认兼容 Chat Completions。', 'response');
+      throw new ModelError('服务返回的数据格式无效，请检查所选接口格式。', 'response');
     const choice = data.choices?.[0];
     if (choice?.finish_reason === 'length')
       throw new ModelError(
@@ -171,7 +151,7 @@ export async function complete(
       throw new ModelError('模型未完成此请求，请调整输入后重试。', 'response');
     const content = choice?.message?.content;
     if (typeof content !== 'string' || !content.trim())
-      throw new ModelError('服务未返回可用文本，请确认接口兼容 Chat Completions。', 'response');
+      throw new ModelError('服务未返回可用文本，请检查所选接口格式。', 'response');
     if (content.length > MAX_RESULT_LENGTH)
       throw new ModelError('模型返回内容过长，请缩小任务范围。', 'response');
     auditOutcome = 'success';
@@ -183,7 +163,7 @@ export async function complete(
         ? 'cancelled'
         : error instanceof ModelError
           ? error.code
-          : error instanceof SyntaxError
+          : error instanceof SyntaxError || error instanceof ModelProtocolError
             ? 'response'
             : 'network';
     if (timedOut)
@@ -193,6 +173,7 @@ export async function complete(
       );
     if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
     if (error instanceof ModelError) throw error;
+    if (error instanceof ModelProtocolError) throw new ModelError(error.message, 'response');
     if (error instanceof SharedModelClientError)
       throw new ModelError(error.message, error.code === 'capability' ? 'config' : 'response');
     if (error instanceof SyntaxError)
