@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { unzipSync } from 'fflate';
+import { windowsPowerShellEnvironment } from '../../scripts/private-local-permissions.mjs';
 
 const version = '1.0.4370.26';
 const sdkSha256 = '1c0dacac84b70109b3fd42f90c53a0ba942abc3a87590d7a4e0ccd86e4a06cf4';
@@ -97,6 +98,6 @@ export async function addWindowsTaskPane({ root, payload, dest, arch }) {
         'if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.GetNameInfo("SimpleName", $false) -ne "Microsoft Corporation") { throw "Invalid WebView2 installer signature." }',
       ].join('\n'),
     ],
-    { env: { ...process.env, TRIO_WEBVIEW_INSTALLER: installer }, stdio: 'inherit' },
+    { env: { ...windowsPowerShellEnvironment(), TRIO_WEBVIEW_INSTALLER: installer }, stdio: 'inherit' },
   );
 }
