@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { strFromU8, unzipSync } from 'fflate';
 
 for (const [path, lang] of [
   ['', 'en'],
@@ -19,9 +21,21 @@ for (const [path, lang] of [
       0,
     );
     await expect(page.locator('#guide')).toContainText('127.0.0.1:8001/v1');
-    await expect(
-      page.locator('#guide a[href="./assets/TrioBridge-AI-User-Guide-zh-CN.pptx"]'),
-    ).toBeVisible();
+  });
+  test(`${lang} downloads the guide in the page language`, async ({ page }) => {
+    await page.goto(path);
+    const filename = `TrioBridge-AI-User-Guide-${lang}.pptx`;
+    const link = page.locator('#guide a[download]');
+    await expect(link).toHaveAttribute('href', `./assets/${filename}`);
+    const pendingDownload = page.waitForEvent('download');
+    await link.click();
+    const download = await pendingDownload;
+    expect(download.suggestedFilename()).toBe(filename);
+    const file = await download.path();
+    if (!file) throw new Error('The guide download did not complete.');
+    const cover = 'ppt/slides/slide1.xml';
+    const archive = unzipSync(await readFile(file), { filter: (entry) => entry.name === cover });
+    expect(strFromU8(archive[cover])).toMatch(lang === 'en' ? /user guide/i : /使用指南/);
   });
   test(`${lang} keeps downloads and language links usable at phone and desktop widths`, async ({
     page,
@@ -40,12 +54,9 @@ for (const [path, lang] of [
     }
   });
 }
-test('publishes only the guide, with no hosted application, manifest, installer or private docs', async ({
+test('publishes only the public site, with no hosted application, manifest, installer or private docs', async ({
   request,
 }) => {
-  const guide = await request.get('assets/TrioBridge-AI-User-Guide-zh-CN.pptx');
-  expect(guide.status()).toBe(200);
-  expect((await guide.body()).subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
   for (const path of ['', 'zh-CN.html', 'site.css', 'assets/icon.svg', 'assets/workbench.png'])
     expect((await request.get(path)).status()).toBe(200);
   for (const path of [
