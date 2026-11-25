@@ -22,6 +22,7 @@ import {
 } from './local-service-readiness.mjs';
 import { platformDriver, certificateIdentity } from './local-install-platform.mjs';
 import { getOrCreateLocalCapability } from './local-capability.mjs';
+import { storageDetailMessage } from './model-storage-diagnostic.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
 import { renderLocalManifest, writePrivateLocalManifest } from './local-manifest.mjs';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
@@ -110,13 +111,28 @@ async function startAndVerify(root, driver, state, version, activate) {
     const code = error instanceof ReadinessError ? error.code : startupPhases[phase][1];
     let task;
     if (driver.taskStatus) task = await driver.taskStatus().catch(() => undefined);
-    await saveStartupResult(root, { phase, code, task, hresult: error.taskHresult });
-    const detail =
-      error instanceof ReadinessError ? error.message : startupPhases[phase][0] + '时出错。';
+    await saveStartupResult(root, {
+      phase,
+      code,
+      task,
+      hresult: error.taskHresult,
+      storageDetail: error.storageDetail,
+    });
+    let detail = startupPhases[phase][0] + '时出错。';
+    if (error instanceof ReadinessError) detail = error.message;
+    else if (storageDetailMessage(error.storageDetail))
+      detail += ` [${error.storageDetail}] ${storageDetailMessage(error.storageDetail)}`;
+    const taskMessage =
+      task?.state === 'Running' && task.result === '0x00041301'
+        ? ' Windows 登录任务正在运行（0x00041301）。'
+        : task
+          ? ` Windows 登录任务 ${task.state}，结果 ${task.result ?? '未知'}。`
+          : '';
     throw new Error(
-      `本机服务未能启动。[${phase}/${code}] ${detail}` +
+      (phase === 'models' ? '本机共享配置检查未通过。' : '本机服务未能启动。') +
+        `[${phase}/${code}] ${detail}` +
         (error.taskHresult ? ` Windows 错误码 ${error.taskHresult}。` : '') +
-        (task ? ` Windows 登录任务 ${task.state}，结果 ${task.result ?? '未知'}。` : '') +
+        taskMessage +
         (process.platform === 'win32' ? ' 可双击包内 Diagnose.cmd 查看本次启动诊断。' : ''),
     );
   } finally {

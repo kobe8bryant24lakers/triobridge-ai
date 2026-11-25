@@ -129,6 +129,11 @@ function Get-TrioBridgeLastStartup {
                 'PORT_BUSY', 'PORT_DENIED', 'NO_LISTENER', 'TIMEOUT', 'CONNECTION_RESET', 'TLS_CERTIFICATE', 'SERVICE_IDENTITY',
                 'LOCAL_AUTH', 'MODEL_STORAGE', 'INVALID_RESPONSE', 'TRANSPORT')) { return }
         $safe = [ordered]@{ phase = [string]$record.phase; code = [string]$record.code }
+        if ($record.PSObject.Properties['storageDetail'] -and $record.storageDetail -is [string] -and $record.storageDetail -cin @(
+            'CATALOG_BUSY', 'DIRECTORY_ACCESS', 'CAPABILITY_ACCESS', 'ACL_INSPECT', 'ACL_OWNER', 'ACL_APPLY', 'ACL_VERIFY',
+            'CATALOG_ACCESS', 'CATALOG_UNSAFE', 'CATALOG_TOO_LARGE', 'CATALOG_JSON', 'CATALOG_SCHEMA', 'STORE_INIT')) {
+            $safe.storageDetail = [string]$record.storageDetail
+        }
         if ($record.PSObject.Properties['hresult'] -and $record.hresult -is [string] -and $record.hresult -cmatch '^0x[0-9A-F]{8}\z') {
             $safe.hresult = [string]$record.hresult
         }
@@ -138,6 +143,40 @@ function Get-TrioBridgeLastStartup {
         }
         return [PSCustomObject]$safe
     } catch { return }
+}
+
+function Get-TrioBridgeStorageEntry([string]$Path) {
+    $report = [ordered]@{ status = 'unavailable'; ownerMatches = $null; aclProtected = $null }
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            $report.status = 'link'
+        } else {
+            $report.status = if ($item.PSIsContainer) { 'directory' } else { 'file' }
+            $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+            $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier])
+            $report.ownerMatches = $owner.Value -eq [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+            $report.aclProtected = $acl.AreAccessRulesProtected
+        }
+    } catch {
+        if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { $report.status = 'missing' }
+    }
+    return [PSCustomObject]$report
+}
+
+function Get-TrioBridgeStorageReport {
+    $base = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'TrioBridgeAI'
+    $parent = Get-TrioBridgeStorageEntry $base
+    $result = [ordered]@{ directory = $null; catalog = $null; capability = $null }
+    if ($parent.status -eq 'directory') {
+        $directory = Join-Path $base 'models'
+        $result.directory = Get-TrioBridgeStorageEntry $directory
+        if ($result.directory.status -eq 'directory') {
+            $result.catalog = Get-TrioBridgeStorageEntry (Join-Path $directory 'profiles.json')
+            $result.capability = Get-TrioBridgeStorageEntry (Join-Path $directory 'local-capability')
+        }
+    }
+    return [PSCustomObject]$result
 }
 
 function Get-TrioBridgeLocalServiceReport {
@@ -153,6 +192,7 @@ function Get-TrioBridgeLocalServiceReport {
         tcp3000 = $listening
         task = Get-TrioBridgeTaskStatus
         lastStartup = Get-TrioBridgeLastStartup
+        storage = Get-TrioBridgeStorageReport
     }
 }
 

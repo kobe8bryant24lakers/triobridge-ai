@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer as createProxyCanary } from 'node:http';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,10 @@ import { after, before, test } from 'node:test';
 import { promisify } from 'node:util';
 import devCerts from 'office-addin-dev-certs';
 import { checkLoopbackPort, waitForLocalEndpoint } from '../scripts/local-service-readiness.mjs';
+import { storageDetailHeader } from '../scripts/model-storage-diagnostic.mjs';
+import { getOrCreateLocalCapability } from '../scripts/local-capability.mjs';
+import { enforcePrivatePath } from '../scripts/private-local-permissions.mjs';
+import { createSharedModelRuntime } from '../scripts/shared-model-runtime.mjs';
 
 let directory, ca, cert, key;
 const version = '1.2.3';
@@ -58,6 +62,61 @@ test('the read-only state probe retries a dropped connection', async (t) => {
   await waitForLocalEndpoint({ ca, port, token, timeout: 3000 });
   assert.equal(attempts, 2);
 });
+
+test('a known catalog lock is retried, while unrecognized error details never reach diagnostics', async (t) => {
+  let requests = 0;
+  const port = await service(t, (_req, res) => {
+    requests++;
+    if (requests === 2) return res.end(JSON.stringify(state));
+    res.writeHead(503, {
+      [storageDetailHeader]: requests === 1 ? 'CATALOG_BUSY' : 'private-test-value',
+    });
+    res.end('private-test-body');
+  });
+  await waitForLocalEndpoint({ ca, port, token, timeout: 3000 });
+  await assert.rejects(waitForLocalEndpoint({ ca, port, token }), (error) => {
+    assert.equal(error.code, 'MODEL_STORAGE');
+    assert.equal(error.storageDetail, undefined);
+    assert.doesNotMatch(error.message, /private-test/);
+    return true;
+  });
+  assert.equal(requests, 3);
+});
+
+test(
+  'the same installed middleware recovers after a bad first catalog read without replacing user data',
+  { skip: !['darwin', 'win32'].includes(process.platform) },
+  async (t) => {
+    const temporary = await mkdtemp(join(tmpdir(), 'triobridge-runtime-models-'));
+    t.after(() => rm(temporary, { recursive: true, force: true }));
+    const models = join(temporary, 'models');
+    const capability = await getOrCreateLocalCapability(models);
+    const path = join(models, 'profiles.json');
+    const invalid = 'synthetic unreadable catalog';
+    await writeFile(path, invalid);
+    await enforcePrivatePath(path, 'file', { created: true });
+    let runtime;
+    const port = await service(t, async (req, res) => (await runtime)(req, res, () => res.end()));
+    runtime = createSharedModelRuntime('https://localhost:' + port, {}, { directory: models });
+    await assert.rejects(waitForLocalEndpoint({ ca, port, token: capability }), {
+      code: 'MODEL_STORAGE',
+      storageDetail: 'CATALOG_JSON',
+    });
+    assert.equal(await readFile(path, 'utf8'), invalid);
+    const restored =
+      '\uFEFF' +
+      JSON.stringify({
+        version: 2,
+        revision: 4,
+        profiles: [],
+        activeId: '',
+        retiredCredentials: [],
+      });
+    await writeFile(path, restored);
+    await waitForLocalEndpoint({ ca, port, token: capability });
+    assert.equal(await readFile(path, 'utf8'), restored);
+  },
+);
 
 test('TLS and service identity failures are terminal and never send a capability', async (t) => {
   const tokens = [];

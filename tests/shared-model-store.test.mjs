@@ -429,6 +429,24 @@ test('corrupt and linked metadata are not overwritten, and an abandoned lock can
   );
 });
 
+test('catalog reads preserve BOM-encoded data and report JSON and schema failures separately', async (t) => {
+  const { store, directory } = await fixture(t);
+  const path = join(directory, 'profiles.json');
+  await add(store);
+  const original = await readFile(path, 'utf8');
+  await writeFile(path, '\uFEFF' + original);
+  assert.equal((await store.state()).profiles.length, 1);
+  assert.equal(await readFile(path, 'utf8'), '\uFEFF' + original);
+  for (const [input, detail] of [
+    ['invalid private data', 'CATALOG_JSON'],
+    ['{}', 'CATALOG_SCHEMA'],
+  ]) {
+    await writeFile(path, input);
+    await assert.rejects(store.state(), { code: 'storage', storageDetail: detail });
+    assert.equal(await readFile(path, 'utf8'), input);
+  }
+});
+
 test('shared endpoints accept only loopback plaintext and a locally fixed proxy target', () => {
   for (const url of [
     'http://example.test',

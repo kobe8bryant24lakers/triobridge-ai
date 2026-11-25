@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 — 2026-11-24
+
+Windows shared setup verifies existing private permissions before changing them. A temporary file lock can clear during startup. After an unreadable first catalog is corrected, the same service can read it again. UTF-8 BOM catalogs retain their original bytes on read. The installer records a specific storage reason and the standalone diagnostic checks file metadata.
+
+Windows 本机共享版改进了第 3 步的模型配置读取。安装窗口和只读诊断能区分文件占用、访问权限、JSON 解析和配置结构错误。安装器保留原文件和系统凭据。
+
 ## 0.5.1 — 2026-11-23
 
 Windows local setup reports the active startup check and elapsed time. The installer connects directly to loopback with the installation certificate, waits for a cold shared configuration read, and checks both endpoints on restart. The read-only diagnostic includes the last startup phase and scheduler status even after a failed upgrade rolls back.

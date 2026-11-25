@@ -17,6 +17,20 @@ export function windowsPowerShellEnvironment(environment = process.env) {
 export const WINDOWS_PRIVATE_ACL_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+function Test-PrivateAcl($security, $userSid, $allowed, $inheritance) {
+  if (-not $security.AreAccessRulesProtected -or $security.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $userSid) { return $false }
+  $rules = @($security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+  if ($rules.Count -ne $allowed.Count) { return $false }
+  $seen = @{}
+  foreach ($rule in $rules) {
+    $sid = $rule.IdentityReference.Value
+    if ($sid -notin $allowed -or $seen.ContainsKey($sid) -or $rule.IsInherited -or
+        $rule.AccessControlType -ne 'Allow' -or $rule.FileSystemRights -ne 'FullControl' -or
+        $rule.InheritanceFlags -ne $inheritance -or $rule.PropagationFlags -ne 'None') { return $false }
+    $seen[$sid] = $true
+  }
+  return $true
+}
 $stage = 'INSPECT'
 try {
 $path = [Environment]::GetEnvironmentVariable('TRIOBRIDGE_PRIVATE_PATH', 'Process')
@@ -41,12 +55,15 @@ if ($owner -ne $identity.User.Value) {
     throw 'TBACL_OWNER: Private path belongs to another OS account.'
   }
 }
+$allowed = @($identity.User.Value, 'S-1-5-18', 'S-1-5-32-544') | Select-Object -Unique
+$inheritance = [Security.AccessControl.InheritanceFlags]::None
+if ($kind -eq 'directory') { $inheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit' }
+if (Test-PrivateAcl $current $identity.User.Value $allowed $inheritance) { exit 0 }
 $stage = 'BUILD'
 if ($kind -eq 'directory') { $acl = New-Object Security.AccessControl.DirectorySecurity }
 else { $acl = New-Object Security.AccessControl.FileSecurity }
-$acl.SetOwner($identity.User)
+if ($owner -ne $identity.User.Value) { $acl.SetOwner($identity.User) }
 $acl.SetAccessRuleProtection($true, $false)
-$allowed = @($identity.User.Value, 'S-1-5-18', 'S-1-5-32-544') | Select-Object -Unique
 foreach ($sid in $allowed) {
   $principal = New-Object Security.Principal.SecurityIdentifier($sid)
   if ($kind -eq 'directory') {
@@ -57,14 +74,15 @@ foreach ($sid in $allowed) {
   [void]$acl.AddAccessRule($rule)
 }
 $stage = 'APPLY'
-Set-Acl -LiteralPath $path -AclObject $acl
+if ($kind -eq 'directory') { [IO.Directory]::SetAccessControl($path, $acl) }
+else { [IO.File]::SetAccessControl($path, $acl) }
 $stage = 'VERIFY'
 $verified = Get-Acl -LiteralPath $path
-if (-not $verified.AreAccessRulesProtected -or $verified.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.User.Value) { throw 'Private ACL verification failed.' }
-foreach ($rule in $verified.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
-  if ($rule.IdentityReference.Value -notin $allowed -or $rule.AccessControlType -ne 'Allow' -or $rule.IsInherited) { throw 'Private ACL contains an unexpected rule.' }
-}
+if (-not (Test-PrivateAcl $verified $identity.User.Value $allowed $inheritance)) { throw 'Private ACL verification failed.' }
 } catch {
+  for ($cause = $_.Exception; $cause; $cause = $cause.InnerException) {
+    if (($cause.HResult -band 65535) -in @(32, 33)) { [Console]::Error.WriteLine('TBACL_BUSY'); break }
+  }
   [Console]::Error.WriteLine('TBACL_' + $stage)
   exit 1
 }
@@ -112,10 +130,14 @@ export async function protectWindowsPath(
     const stage = String(error.stderr || '').match(
       /TBACL_(INSPECT|GET_ITEM|TYPE|IDENTITY|GET_ACL|READ_OWNER|OWNER|BUILD|APPLY|VERIFY)\b/,
     )?.[1];
-    throw new Error(
+    const failure = new Error(
       'Could not enforce private permissions for the current Windows account.' +
         (stage ? ` (ACL_${stage})` : ''),
     );
+    failure.storageDetail = /\bTBACL_BUSY\b/.test(String(error.stderr || ''))
+      ? 'CATALOG_BUSY'
+      : { OWNER: 'ACL_OWNER', APPLY: 'ACL_APPLY', VERIFY: 'ACL_VERIFY' }[stage] || 'ACL_INSPECT';
+    throw failure;
   }
 }
 

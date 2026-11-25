@@ -14,6 +14,8 @@ import { localInstallerName, packageFiles } from './build-local-installers.mjs';
 import { sharedModelsDirectory } from './shared-model-store.mjs';
 import { createNativeModelVault } from './shared-model-vault.mjs';
 import { windowsPowerShellEnvironment } from './private-local-permissions.mjs';
+import { waitForLocalEndpoint } from './local-service-readiness.mjs';
+import { storageDetailHeader } from './model-storage-diagnostic.mjs';
 
 const execute = promisify(execFile);
 const archive = resolve(process.argv[2]);
@@ -158,7 +160,7 @@ await runInstaller(process.argv[2], { driver });
     });
     fixtureApi.listen(0, '127.0.0.1');
     await once(fixtureApi, 'listening');
-    const call = async (action, body) => {
+    const call = async (action, body, expectedStatus = 200) => {
       const ca = await readFile(join(root, 'certificates/server.crt'));
       const token = await readFile(join(models, 'local-capability'), 'utf8');
       return new Promise((done, reject) => {
@@ -183,8 +185,12 @@ await runInstaller(process.argv[2], { driver });
             res.on('error', reject);
             res.on('end', () => {
               try {
-                assert.equal(res.statusCode, 200);
-                done(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+                assert.equal(res.statusCode, expectedStatus);
+                done(
+                  expectedStatus === 200
+                    ? JSON.parse(Buffer.concat(chunks).toString('utf8'))
+                    : res.headers[storageDetailHeader],
+                );
               } catch (error) {
                 reject(error);
               }
@@ -310,6 +316,17 @@ await runInstaller(process.argv[2], { driver });
     assert.equal(report.localService.tcp3000, true);
     assert.equal(report.localService.task.state, 'Running');
     assert.deepEqual(report.localService.lastStartup, { phase: 'ready', code: 'OK' });
+    for (const [entry, type] of [
+      ['directory', 'directory'],
+      ['catalog', 'file'],
+      ['capability', 'file'],
+    ]) {
+      assert.deepEqual(report.localService.storage[entry], {
+        status: type,
+        ownerMatches: true,
+        aclProtected: true,
+      });
+    }
     assert.deepEqual(
       report.catalogs.find((catalog) => catalog.edition === 'local'),
       {
@@ -325,6 +342,68 @@ await runInstaller(process.argv[2], { driver });
     assert.ok(!diagnosis.stdout.includes(root));
     assert.ok(!diagnosis.stdout.includes(models));
     checks.push('read-only discovery confirms the reachable catalog and all three manifest hosts');
+    const catalogPath = join(models, 'profiles.json');
+    const originalCatalog = await readFile(catalogPath);
+    const held = spawn(
+      join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        "$ErrorActionPreference='Stop'; $file=[IO.File]::Open($env:TRIOBRIDGE_TEST_CATALOG,'Open','Read','None'); try { [Console]::WriteLine('LOCKED'); [void][Console]::ReadLine() } finally { $file.Dispose() }",
+      ],
+      {
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...windowsPowerShellEnvironment(), TRIOBRIDGE_TEST_CATALOG: catalogPath },
+      },
+    );
+    const released = once(held, 'exit');
+    const lockDeadline = setTimeout(() => held.kill(), 45_000);
+    try {
+      const output = await Promise.race([
+        once(held.stdout, 'data'),
+        released.then(() => {
+          throw new Error('Catalog lock fixture exited.');
+        }),
+      ]);
+      assert.equal(output[0].toString().trim(), 'LOCKED');
+      assert.equal(await call('state', {}, 503), 'CATALOG_BUSY');
+      const unlock = setTimeout(() => held.stdin.end('\n'), 1500);
+      try {
+        await waitForLocalEndpoint({
+          ca: await readFile(join(root, 'certificates/server.crt')),
+          token: await readFile(join(models, 'local-capability'), 'utf8'),
+          timeout: 30_000,
+        });
+      } finally {
+        clearTimeout(unlock);
+      }
+    } finally {
+      if (held.stdin.writable && !held.stdin.writableEnded) held.stdin.end('\n');
+      await released;
+      clearTimeout(lockDeadline);
+    }
+    assert.deepEqual(await readFile(catalogPath), originalCatalog);
+    checks.push(
+      'installed state reports a real Windows file-sharing violation and recovers after unlock',
+    );
+    const damaged = 'synthetic malformed catalog';
+    const restoredBytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), originalCatalog]);
+    try {
+      await writeFile(catalogPath, damaged);
+      await assert.rejects(run('restart'), /\[models\/MODEL_STORAGE\].*\[CATALOG_JSON\]/);
+      const failedCheck = JSON.parse((await diagnose()).stdout.trim()).localService.lastStartup;
+      assert.equal(failedCheck.storageDetail, 'CATALOG_JSON');
+      assert.equal(await readFile(catalogPath, 'utf8'), damaged);
+    } finally {
+      await writeFile(catalogPath, restoredBytes);
+    }
+    assert.equal((await call('state', {})).profiles[0].id, id);
+    assert.deepEqual(await readFile(catalogPath), restoredBytes);
+    checks.push(
+      'a corrected first-read catalog recovers in the same service process with the original credential',
+    );
     await run('install');
     assert.equal((await readInstallation(root)).active, first.active);
     assert.equal((await call('state', {})).profiles[0].id, id);

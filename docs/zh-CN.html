@@ -121,10 +121,10 @@
       </section>
 
       <section class="section wrap" id="install" aria-labelledby="install-title">
-        <div class="section-heading"><p class="eyebrow">本机共享版 · v0.5.1</p><h2 id="install-title">安装一次，三款 Office 共用模型</h2><p>安装包自带运行环境，自动配置本机服务、证书和加载项入口。无需安装 Node.js 或输入命令，支持云端模型及本地 HTTP API。</p></div>
+        <div class="section-heading"><p class="eyebrow">本机共享版 · v0.5.2</p><h2 id="install-title">安装一次，三款 Office 共用模型</h2><p>安装包自带运行环境，自动配置本机服务、证书和加载项入口。无需安装 Node.js 或输入命令，支持云端模型及本地 HTTP API。</p></div>
         <div class="local-downloads">
-          <div class="download-block"><div><h3>Windows 本机共享版</h3><p>普通 Intel / AMD 电脑选择 x64；搭载 Snapdragon 等 ARM 处理器的电脑选择 ARM64。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-x64.zip">下载 Windows x64</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Windows-arm64.zip">下载 Windows ARM64</a></div></div>
-          <div class="download-block"><div><h3>Mac 本机共享版</h3><p>搭载 Apple M 系列芯片选择 Apple 芯片版；较早的 Intel Mac 选择 Intel 版。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-arm64.zip">下载 Mac Apple 芯片版</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-Mac-x64.zip">下载 Mac Intel 版</a></div></div>
+          <div class="download-block"><div><h3>Windows 本机共享版</h3><p>普通 Intel / AMD 电脑选择 x64；搭载 Snapdragon 等 ARM 处理器的电脑选择 ARM64。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.2/TrioBridge-AI-Local-Windows-x64.zip">下载 Windows x64</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.2/TrioBridge-AI-Local-Windows-arm64.zip">下载 Windows ARM64</a></div></div>
+          <div class="download-block"><div><h3>Mac 本机共享版</h3><p>搭载 Apple M 系列芯片选择 Apple 芯片版；较早的 Intel Mac 选择 Intel 版。</p></div><div class="download-actions"><a class="button primary" href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.2/TrioBridge-AI-Local-Mac-arm64.zip">下载 Mac Apple 芯片版</a><a href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.2/TrioBridge-AI-Local-Mac-x64.zip">下载 Mac Intel 版</a></div></div>
         </div>
         <p class="install-prerequisite">安装包尚未签名。首次运行可能需要系统确认；证书信任由系统提示，Windows 创建当前账号专用共享目录时会请求管理员授权。需要已安装 Office，且组织策略允许加载项。Mac 首次使用或升级后可能请求钥匙串访问，请在系统窗口确认后重试。Windows 原生 Office 验收仍待完成。</p>
         <ol class="instruction-list quick-install-steps">
@@ -241,7 +241,7 @@
         <div class="faq-list">
           <details><summary>浏览器演示会调用真实 AI 吗？</summary><div><p>选择“演示模型”时使用固定样例，不会调用模型，也不会修改 Office 文件。演示页面同样支持你配置真实模型，这时会把可见输入实际发送给所选服务，但文档仍是浏览器中的模拟文档。</p></div></details>
           <details><summary>下载清单后，为什么还看不到加载项？</summary><div><p>下载不会自动完成安装。请按<a href="#install">对应系统的安装步骤</a>将 XML 放入正确目录，然后完全退出并重新打开 Office。Windows 还需添加受信任的共享目录并勾选“在菜单中显示”。组织策略禁用加载项时，需要联系管理员。</p></div></details>
-          <details><summary>Windows 安装停在第 3 步，应该看哪里？</summary><div><p>第 3 步会启动登录任务、验证 localhost 的 3000 端口并读取共享配置。窗口会显示当前检查项和等待时间。如果安装回退，双击 <code>Diagnose.cmd</code>，查看 <code>localService.lastStartup</code> 中的阶段和错误码。<a href="install/TrioBridge-Diagnose-Windows.zip">下载 Windows 只读诊断工具</a></p></div></details>
+          <details><summary>Windows 安装停在第 3 步，应该看哪里？</summary><div><p>第 3 步会启动登录任务、验证 localhost 的 3000 端口并读取共享配置。窗口会显示当前检查项和等待时间。若显示 MODEL_STORAGE，双击 <code>Diagnose.cmd</code>，查看 <code>localService.lastStartup.storageDetail</code> 中的具体原因。报告还会检查文件所有权和权限。<a href="install/TrioBridge-Diagnose-Windows.zip">下载 Windows 只读诊断工具</a></p></div></details>
           <details><summary>Windows 只有一个应用能看到加载项？</summary><div><p>三个应用需各自在“主页 → 加载项 → 高级 / 更多加载项 → 共享文件夹”中添加入口。重开后仍没有“共享文件夹”时，核对该应用的“受信任的加载项目录”与可用应用是否一致。运行包内 <code>Diagnose.cmd</code> 可只读检查版本、目录可达性和三应用声明，不读取模型密钥或文档。<a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/LOCAL-MODELS.md#windows-只有部分应用显示加载项">查看具体排查步骤</a></p></div></details>
           <details><summary>模型生成成功，为什么没有自动写入？</summary><div><p>生成只产生预览。你需要选择写回操作并再次确认。如果当前宿主、选区或任务不支持自动写回，工作台会提供复制方式。Excel 的分析和解释本来就是供复制使用的文字结果。</p></div></details>
           <details><summary>插件更新后，需要重新安装吗？</summary><div><p>本机共享版下载新版安装包并再次运行 Install，配置与密钥会保留。在线工作台更新后，重新打开加载项即可加载新版本。如果 Release 说明要求更新清单，请下载新的 XML，替换原目录中的清单并重启 Office。组织分发的版本请遵循管理员安排。</p></div></details>
