@@ -33,7 +33,14 @@
 | `PORT_BUSY` / `PORT_DENIED` | 前者请检查当前使用 3000 端口的程序。后者请让管理员检查回环端口保留范围和本机策略。 |
 | `TASK_START` / `NO_LISTENER` | 查看记录中的任务状态、返回值或 HRESULT，确认当前账号可启动该登录任务。 |
 | `TLS_CERTIFICATE` / `SERVICE_IDENTITY` | 核对端口上的程序与本次安装的证书，再用同一账号运行 Install 修复。 |
-| `LOCAL_AUTH` / `MODEL_STORAGE` / `CAPABILITY_ACCESS` | 检查当前账号对共享模型配置目录的访问权限。保留已有配置，使用同一账号运行 Install 修复。 |
+| `LOCAL_AUTH` / `CAPABILITY_ACCESS` | 核对安装和打开 Office 使用的系统账号。保留原凭据，使用同一账号运行 Install 修复。 |
+| `MODEL_STORAGE` | 本机 HTTPS 已通过验证，读取共享配置时收到 503。v0.5.2 会显示第二个原因码，回退后可在 `localService.lastStartup.storageDetail` 查看。 |
+| `CATALOG_BUSY` | 安装器会重试临时占用。如果最终仍被占用，关闭正在独占访问该配置的程序，再运行 Install。 |
+| `ACL_OWNER` / `ACL_APPLY` / `ACL_VERIFY` / `ACL_INSPECT` | 在诊断报告的 `localService.storage` 查看目录和文件的状态、所有者是否匹配及是否设置了专用权限。需要协助时可提供这些字段。 |
+| `CATALOG_JSON` / `CATALOG_SCHEMA` | 已有配置的 JSON 或结构未通过校验。保留原文件，核对可信备份。 |
+| `CATALOG_ACCESS` / `DIRECTORY_ACCESS` | 检查当前系统账号是否可读取对应文件或目录。首次安装时 `profiles.json` 可以尚未创建。 |
+
+`Running / 0x00041301` 表示登录任务正在运行。遇到 `models/MODEL_STORAGE` 时应先查看配置存储原因码。v0.5.1 只记录总类，请使用新版安装包复测。独立诊断仅检查文件类型、所有者匹配和访问权限标志，报告不会包含模型配置值、用户名或密钥。[微软任务计划程序状态码](https://learn.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-error-and-success-constants)
 
 ## Windows 只有部分应用显示加载项
 

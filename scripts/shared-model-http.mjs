@@ -1,6 +1,7 @@
 import { acceptsLocalOrigin } from './local-request-guard.mjs';
 import { SharedModelError } from './shared-model-store.mjs';
 import { matchesLocalCapability } from './local-capability.mjs';
+import { storageDetailHeader, storageDetailMessage } from './model-storage-diagnostic.mjs';
 
 const fields = {
   state: [],
@@ -71,6 +72,8 @@ export function createSharedModelMiddleware({ store, allowedOrigin, authToken })
       if (action === 'complete') send(200, result.body, result.requestId);
       else send(200, result);
     } catch (failure) {
+      if (action === 'state' && storageDetailMessage(failure?.storageDetail))
+        res.setHeader(storageDetailHeader, failure.storageDetail);
       if (failure instanceof SharedModelError)
         send(failure.status, {
           error: { code: failure.code, message: failure.message },

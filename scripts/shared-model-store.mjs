@@ -6,6 +6,7 @@ import { createNativeModelVault } from './shared-model-vault.mjs';
 import { ensurePrivateModelDirectory } from './local-capability.mjs';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
 import { modelConnectionError } from './model-connection-error.mjs';
+import { storageDetailMessage, storageFailureDetail } from './model-storage-diagnostic.mjs';
 
 export class SharedModelError extends Error {
   constructor(code, message, status = 400, state) {
@@ -20,6 +21,12 @@ export class SharedModelError extends Error {
 const fail = (code, message, status = 400) => {
   throw new SharedModelError(code, message, status);
 };
+function failStorage(detail, cause) {
+  const storageDetail = storageFailureDetail(cause, detail);
+  const error = new SharedModelError('storage', storageDetailMessage(storageDetail), 503);
+  error.storageDetail = storageDetail;
+  throw error;
+}
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const idPattern = /^[a-zA-Z0-9_-]{1,100}$/;
 const refPattern = /^[a-zA-Z0-9_-]{1,100}\.[a-f0-9-]{36}$/;
@@ -338,28 +345,38 @@ export function createSharedModelStore({
   async function ensureDirectory() {
     try {
       await ensurePrivateModelDirectory(directory);
-    } catch {
-      fail('storage', '共享配置目录不安全，请检查目录权限。', 503);
+    } catch (error) {
+      failStorage('DIRECTORY_ACCESS', error);
     }
   }
   async function load() {
     await ensureDirectory();
-    let value;
+    let info;
     try {
-      const info = await lstat(file);
-      if (
-        !info.isFile() ||
-        info.isSymbolicLink() ||
-        (process.getuid && info.uid !== process.getuid())
-      )
-        fail('storage', '共享配置文件不安全，原始文件未修改。', 503);
-      if (info.size > 200_000) fail('storage', '共享配置文件过大，原始文件未修改。', 503);
-      await enforcePrivatePath(file, 'file');
-      value = JSON.parse(await readFile(file, 'utf8'));
+      info = await lstat(file);
     } catch (error) {
       if (error.code === 'ENOENT') return empty();
-      if (error instanceof SharedModelError) throw error;
-      fail('storage', '共享配置无法读取，原始文件未被覆盖。', 503);
+      failStorage('CATALOG_ACCESS', error);
+    }
+    if (
+      !info.isFile() ||
+      info.isSymbolicLink() ||
+      (process.getuid && info.uid !== process.getuid())
+    )
+      failStorage('CATALOG_UNSAFE');
+    if (info.size > 200_000) failStorage('CATALOG_TOO_LARGE');
+    let text;
+    try {
+      await enforcePrivatePath(file, 'file');
+      text = await readFile(file, 'utf8');
+    } catch (error) {
+      failStorage('CATALOG_ACCESS', error);
+    }
+    let value;
+    try {
+      value = JSON.parse(text.replace(/^\uFEFF/, ''));
+    } catch {
+      failStorage('CATALOG_JSON');
     }
     try {
       if (
@@ -400,7 +417,7 @@ export function createSharedModelStore({
         retiredCredentials: value.retiredCredentials,
       };
     } catch {
-      fail('storage', '共享配置格式损坏，原始文件未被覆盖。', 503);
+      failStorage('CATALOG_SCHEMA');
     }
   }
   function publicState(state) {
@@ -729,6 +746,8 @@ export function createSharedModelStore({
       return requestCompletion(profile, await secret(profile, signal), messages, signal, fetcher);
     },
     async cleanup() {
+      const snapshot = await load();
+      if (!snapshot.retiredCredentials.length) return publicState(snapshot);
       return locked(async () => publicState(await cleanup(await load())));
     },
   };

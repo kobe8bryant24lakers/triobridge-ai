@@ -180,7 +180,7 @@ test('both languages offer four distinct local packages before the hosted editio
       await expect(links.nth(index)).toBeVisible();
       await expect(links.nth(index)).toHaveAttribute(
         'href',
-        `https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.1/TrioBridge-AI-Local-${asset}.zip`,
+        `https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.5.2/TrioBridge-AI-Local-${asset}.zip`,
       );
     }
     await expect(page.locator('.hosted-edition')).not.toHaveAttribute('open');

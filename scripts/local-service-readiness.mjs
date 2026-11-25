@@ -1,6 +1,7 @@
 import { request } from 'node:https';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
+import { storageDetailHeader, storageDetailMessage } from './model-storage-diagnostic.mjs';
 
 const messages = {
   PORT_BUSY: '3000 端口仍被占用。请检查占用程序，释放端口后再双击 Install。',
@@ -11,15 +12,17 @@ const messages = {
   TLS_CERTIFICATE: '本机 HTTPS 证书校验失败。请重新运行 Install 检查证书及端口归属。',
   SERVICE_IDENTITY: '端口上的服务与本次安装的标识或版本不匹配。',
   LOCAL_AUTH: '共享配置接口拒绝了本次安装的凭据。请使用同一 Windows 或 Mac 账号运行安装。',
-  MODEL_STORAGE: '本机服务已启动，但无法读取共享模型配置。请检查当前账号对配置目录的访问权限。',
+  MODEL_STORAGE: '本机服务已启动，但共享配置读取失败。',
   INVALID_RESPONSE: '本机服务返回了无法识别的响应。',
   TRANSPORT: '无法通过本机回环地址建立 HTTPS 连接。',
 };
 
 export class ReadinessError extends Error {
-  constructor(code) {
-    super(messages[code]);
+  constructor(code, detail) {
+    const message = code === 'MODEL_STORAGE' && storageDetailMessage(detail);
+    super(message ? messages[code] + ' [' + detail + '] ' + message : messages[code]);
     this.code = code;
+    if (message) this.storageDetail = detail;
   }
 }
 
@@ -75,7 +78,7 @@ function probe({ ca, port, token }, timeout) {
           let code = 'INVALID_RESPONSE';
           if (token && [401, 403].includes(res.statusCode)) code = 'LOCAL_AUTH';
           if (token && res.statusCode === 503) code = 'MODEL_STORAGE';
-          reject(new ReadinessError(code));
+          reject(new ReadinessError(code, res.headers[storageDetailHeader]));
           res.destroy();
           return;
         }
@@ -134,8 +137,10 @@ export async function waitForLocalEndpoint({
     } catch (failure) {
       const error = transportError(failure);
       const remaining = deadline - Date.now();
-      if (!['NO_LISTENER', 'CONNECTION_RESET', 'TIMEOUT'].includes(error.code) || remaining <= 0)
-        throw error;
+      const retry =
+        ['NO_LISTENER', 'CONNECTION_RESET', 'TIMEOUT'].includes(error.code) ||
+        error.storageDetail === 'CATALOG_BUSY';
+      if (!retry || remaining <= 0) throw error;
       await delay(Math.min(retryDelay, remaining));
       if (Date.now() >= deadline) throw error;
       retryDelay = Math.min(2000, retryDelay * 2);

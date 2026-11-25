@@ -34,6 +34,7 @@ const runtimeScripts = [
   'model-connection-error.mjs',
   'install-local.mjs',
   'local-service-readiness.mjs',
+  'model-storage-diagnostic.mjs',
   'local-install-files.mjs',
   'local-install-platform.mjs',
   'native-local.ps1',
