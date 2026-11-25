@@ -43,7 +43,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 export function parseSharedState(value: unknown): SharedStateSnapshot {
   const invalid = () => {
-    throw new SharedModelClientError('本机共享服务返回了无效配置，请重新加载。', 'response');
+    throw new SharedModelClientError('读取的共享模型配置无效，请重新加载。', 'response');
   };
   if (
     !object(value) ||
@@ -127,7 +127,7 @@ export async function sharedResponseError(response: Response): Promise<SharedMod
     value = await response.json();
   } catch {
     return new SharedModelClientError(
-      '本机共享服务暂时不可用，请检查本机服务后重试。',
+      '暂时无法读取共享配置，请重新打开模型设置后重试。',
       'unavailable',
       response.status,
     );
@@ -139,7 +139,7 @@ export async function sharedResponseError(response: Response): Promise<SharedMod
     publishSharedState(state);
   }
   return new SharedModelClientError(
-    typeof error?.message === 'string' ? error.message : '本机共享服务未完成操作，请重试。',
+    typeof error?.message === 'string' ? error.message : '共享模型操作未完成，请重试。',
     typeof error?.code === 'string' ? error.code : 'response',
     response.status,
     state,
@@ -203,7 +203,7 @@ export function createSharedModelClient(
       try {
         data = await response.json();
       } catch {
-        throw new SharedModelClientError('此入口没有可用的本机共享服务。', 'unavailable');
+        throw new SharedModelClientError('无法从此入口读取共享配置。', 'unavailable');
       }
       const state = parseSharedState(data);
       if (object(data) && data.connectionTest) audit?.payload(data.connectionTest);
@@ -228,14 +228,16 @@ export function createSharedModelClient(
       if (timedOut)
         throw new SharedModelClientError(
           connection
-            ? '连接等待超时。若系统正在请求密钥访问，请在系统窗口确认后重试；否则检查本机服务。本次修改尚未确认保存，请重新连接后核对配置。'
-            : '本机共享服务响应超时，请检查服务后重试。',
+            ? '连接超时。请查看系统是否在请求密钥访问，并检查模型 API 是否可用。重新连接后可核对配置。'
+            : '读取或保存共享模型配置超时，请重试。',
           'local_timeout',
         );
       if (signal?.aborted) throw new DOMException('已取消操作。', 'AbortError');
       if (error instanceof SharedModelClientError) throw error;
       throw new SharedModelClientError(
-        '无法连接 TrioBridge 本机共享服务。请双击本机共享安装包中的 Restart，重启后重试。本次修改尚未确认保存，请重新连接后核对配置。',
+        nativeWorkbench()
+          ? '工作台未能读取或保存共享配置。请重新打开模型设置，核对后重试。'
+          : '无法连接 TrioBridge 本机共享服务。请双击本机共享安装包中的 Restart，重启后重试。本次修改尚未确认保存，请重新连接后核对配置。',
         'local_network',
       );
     } finally {

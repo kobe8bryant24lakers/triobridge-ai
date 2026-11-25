@@ -290,7 +290,7 @@ export function createProfileController(options: ControllerOptions = {}) {
   ): Promise<SharedProfileState> {
     if (mutating) throw new Error('正在保存模型配置，请等待当前操作完成。');
     if (state.mode !== 'shared' || state.connection !== 'ready')
-      throw new Error('请先恢复本机共享服务连接后再修改配置。');
+      throw new Error('请重新读取共享配置后再修改。');
     mutating = true;
     try {
       return apply(await operation());

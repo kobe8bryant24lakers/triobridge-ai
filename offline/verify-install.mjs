@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { stat, readFile, readdir } from 'node:fs/promises';
+import { mkdir, rm, stat, readFile, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 const mac = process.platform === 'darwin';
-const bundle = resolve('build', 'native-' + process.platform + '-' + process.arch, 'bundle');
+const work = resolve('build', 'native-' + process.platform + '-' + process.arch);
+const extracted = join(work, 'verified-archive');
+const bundle = mac ? join(extracted, 'bundle') : extracted;
+const archive = resolve(
+  'dist-install',
+  'TrioBridge-AI-' + (mac ? 'Mac' : 'Windows') + '-' + process.arch + '.zip',
+);
+await rm(extracted, { recursive: true, force: true });
+await mkdir(extracted, { recursive: true });
+if (mac) execFileSync('/usr/bin/ditto', ['-x', '-k', archive, extracted]);
+else execFileSync('tar.exe', ['-xf', archive, '-C', extracted]);
 const app = join(bundle, mac ? 'TrioBridge AI.app' : 'Workbench');
 const resources = mac ? join(app, 'Contents/Resources/app') : join(app, 'resources/app');
 assert.equal(JSON.parse(await readFile(join(resources, 'package.json'))).main, 'main.mjs');
@@ -14,6 +24,8 @@ for (const path of page.matchAll(/(?:src|href)="([^"]+)"/g)) {
 }
 assert.ok(!page.includes('office.js'));
 assert.ok(!(await readdir(resources)).includes('.env'));
+await stat(join(resources, 'LICENSE'));
+await stat(join(resources, 'ui/THIRD-PARTY-NOTICES.md'));
 if (mac) {
   execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
   execFileSync('/usr/bin/codesign', [
@@ -40,7 +52,7 @@ if (mac) {
         assert.match(val, /0x3/);
       }
     for (const arch of ['x86', 'x64'])
-      run(join(bundle, '..', 'ribbon-' + arch, 'Release', 'RibbonCheck.exe'), []);
+      run(join(work, 'ribbon-' + arch, 'Release', 'RibbonCheck.exe'), []);
     const result = JSON.parse(
       execFileSync(join(resources, 'native/Office.exe'), {
         input: JSON.stringify({ host: 'word', op: 'selection' }),

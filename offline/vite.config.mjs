@@ -4,5 +4,10 @@ export default defineConfig({
   base: './',
   publicDir: false,
   plugins: [react()],
-  build: { outDir: 'build/native-ui', target: 'es2022', rollupOptions: { input: 'offline.html' } },
+  build: {
+    outDir: 'build/native-ui',
+    target: 'es2022',
+    license: { fileName: 'THIRD-PARTY-NOTICES.md' },
+    rollupOptions: { input: 'offline.html' },
+  },
 });

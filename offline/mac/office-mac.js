@@ -74,8 +74,9 @@ function word(a, q) {
     if (!target.writable) fail('这段选区包含特殊对象，请使用插入。');
     sel.content = String(q.value);
   } else if (q.kind === 'document' || q.kind === 'insert') {
-    const range = sel.textObject;
-    a.collapseRange(range, { direction: 'collapse end' });
+    const range = a.collapseRange(sel.textObject, { direction: 'collapse end' });
+    if (range.startOfContent() !== target.guard.end || range.endOfContent() !== target.guard.end)
+      fail('未能确认选区末尾的插入位置，请重新选择。');
     if (q.kind === 'document')
       a.insertFile({ at: range, fileName: q.file, confirmConversions: false, link: false });
     else range.content = String(q.value);

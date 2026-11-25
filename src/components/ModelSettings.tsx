@@ -747,7 +747,7 @@ function SharedModelSettings({
             next.profiles.find((profile) => profile.id === draft.id),
             next,
           );
-        setStatus({ text: '共享服务已恢复连接。未保存的修改仍保留。' });
+        setStatus({ text: '已重新读取共享配置。草稿仍可编辑。' });
       },
     );
   }
@@ -820,7 +820,7 @@ function SharedModelSettings({
       </p>
       {offline && (
         <div className="notice error" role="alert">
-          共享服务暂时无法连接。配置与草稿仍保留，恢复连接后再保存。
+          暂时无法读取共享配置。草稿已保留，可重新连接后保存。
           <button
             type="button"
             className="text-button"

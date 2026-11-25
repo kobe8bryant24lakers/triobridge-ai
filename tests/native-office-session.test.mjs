@@ -1,7 +1,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { createOfficeSession } from '../offline/app/office-session.mjs';
 import { reportRtf } from '../offline/app/report.mjs';
+
+test('Mac Word inserts into the new collapsed range and never into the original selection', () => {
+  const script = readFileSync(new URL('../offline/mac/office-mac.js', import.meta.url), 'utf8');
+  const word = runInNewContext(script + '\nword', { ObjC: { import() {} } });
+  const originalRange = { content: '原有段落' };
+  const collapsed = { startOfContent: () => 12, endOfContent: () => 12, content: '' };
+  const doc = { name: () => '合成文档', fullName: () => '合成文档.docx' };
+  const selection = {
+    textObject: originalRange,
+    content: () => originalRange.content,
+    selectionStart: () => 8,
+    selectionEnd: () => 12,
+    storyType: () => 'main story',
+  };
+  const app = {
+    activeDocument: doc,
+    selection,
+    collapseRange: (range) => {
+      assert.equal(range, originalRange);
+      return collapsed;
+    },
+  };
+  const { guard } = word(app, { op: 'target', kind: 'insert' });
+  word(app, { op: 'write', kind: 'insert', guard, value: '插入内容' });
+  assert.equal(collapsed.content, '插入内容');
+  assert.equal(originalRange.content, '原有段落');
+  collapsed.startOfContent = () => 8;
+  assert.throws(
+    () => word(app, { op: 'write', kind: 'insert', guard, value: '错误目标' }),
+    /插入位置/,
+  );
+  assert.equal(collapsed.content, '插入内容');
+});
 
 test('native writes are host-bound, single-use, and use the original target guard', async () => {
   const calls = [];

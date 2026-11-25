@@ -19,6 +19,8 @@ Use your own models in Word, Excel, and PowerPoint. The workbench opens compiled
 
 Close the workbench and Office before installing an upgrade. Run the included Uninstall to remove the workbench. Both operations preserve saved model profiles and keys. Use the previous installer’s Uninstall to remove a legacy sign-in HTTPS service.
 
+The Mac package uses an ad hoc signature. The Windows package has no Authenticode signature. Your system may show an unverified-publisher prompt. Managed machines follow your organization's installation policy.
+
 ## Model settings
 
 Add a profile in model settings or select an existing provider. Enter your existing OpenAI-compatible API base URL (for example `http://127.0.0.1:8001/v1`), actual model ID, and a key if required. Connect and save sends a real request. The three Office apps share profiles and the active selection. Keys are held in macOS Keychain or Windows Credential Manager.

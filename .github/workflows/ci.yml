@@ -104,7 +104,7 @@ jobs:
       - run: npm ci --prefix offline/tooling
       - run: npm run build:installer
       - run: npm run verify:installer
-      - run: node offline/verify-ui.mjs
+      - run: node offline/verify-ui.mjs --test-model
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: installer-${{ matrix.platform }}-${{ matrix.arch }}

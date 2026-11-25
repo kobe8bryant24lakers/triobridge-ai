@@ -172,8 +172,9 @@ export default function App({ officeBridge }: Props) {
                 <li>
                   <h2>连接模型</h2>
                   <p>
-                    在模型设置中填写服务地址、模型 ID 和 API Key，测试连接后保存。使用 OpenAI 兼容的
-                    Chat Completions 接口。
+                    在模型设置中填写服务地址和模型 ID。服务要求验证时填入 API
+                    Key，点击“连接并保存”。 本机 API 可使用 http://127.0.0.1:8001/v1 等兼容 Chat
+                    Completions 的地址。
                   </p>
                 </li>
                 <li>
@@ -188,36 +189,31 @@ export default function App({ officeBridge }: Props) {
                   <p>
                     选择任务并生成预览。可以编辑结果，核对目标位置后确认写入。Word
                     报告支持章节和表格；Excel 可写入单个公式，或创建独立的数据工作表。PPT
-                    支持生成可编辑整稿、逐项应用局部改动、插入原生图表；建议先下载原稿备份。
+                    支持生成带图表的可编辑整稿，也能调整已有页面的文字、样式和位置。
                   </p>
                 </li>
               </ol>
-              <h2>不同版本，按能力适配</h2>
+              <h2>从桌面 Office 打开</h2>
               <p>
-                基础文本使用通用 Office API；Word 和 Excel 单公式使用 1.1 基础 API，Excel
-                新建格式化数据表需要 ExcelApi 1.2。PPT 对象编辑需要 PowerPointApi 1.4，选中页需要
-                1.5，重排需要 1.8；插入整页需要 1.2 及可读取页面尺寸的 1.10。不支持时仍可下载
-                PPTX。旧式 IE / EdgeHTML WebView 不在支持范围内。
+                Windows 在“三桥 AI”功能区打开工作台。Mac 在当前应用菜单的“服务”中选择“打开三桥 AI”。
+                首次读写文档时，macOS 可能请求允许工作台控制该应用。
               </p>
               <h2>本地模型与隐私</h2>
               <p>
-                在线版直接连接模型，服务需允许当前来源的
-                CORS。本机共享版由本机服务调用已保存的模型，
-                不要求模型服务允许浏览器跨域访问，密钥保存在系统安全存储中。应用不保存文档或生成历史。
+                工作台从安装包读取页面。模型请求发往你设置的 API，本机推理需要先运行你自己的模型。
+                Word、Excel 和 PowerPoint 共用当前系统账户下的模型列表和选择。
               </p>
-              <p>
-                本机共享版需要运行本机服务并安装本机专用清单。在同一台电脑、同一系统账号下，
-                只需配置一次，Word、Excel、PowerPoint 即可共用多个模型并同步切换。
-                在线安装包和纯静态网页使用各应用独立的配置；导出配置不包含密钥。
-              </p>
-              <a
-                className="doc-link"
-                href="https://github.com/kobe8bryant24lakers/triobridge-ai#readme"
-                target="_blank"
-                rel="noreferrer"
-              >
-                安装说明与兼容性文档 <ChevronRight size={16} />
-              </a>
+              <p>密钥保存在 macOS 钥匙串或 Windows 凭据管理器中。导出配置只包含模型设置。</p>
+              {!nativeWorkbench() && (
+                <a
+                  className="doc-link"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai#readme"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  安装说明与兼容性文档 <ChevronRight size={16} />
+                </a>
+              )}
             </section>
           ) : null}
           <div hidden={page !== 'work'}>
