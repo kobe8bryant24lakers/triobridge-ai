@@ -20,9 +20,10 @@ declare global {
   }
 }
 export function nativeWorkbench() {
-  return typeof window !== 'undefined' && window.location.protocol === 'file:'
-    ? window.trioWorkbench
-    : undefined;
+  if (typeof window === 'undefined' || window.top !== window) return undefined;
+  const { protocol, href } = window.location;
+  if (protocol === 'file:' || href.split('#')[0] === 'https://triobridge.local/offline.html')
+    return window.trioWorkbench;
 }
 export const modelTransport: typeof fetch = async (url, options) => {
   const native = nativeWorkbench();

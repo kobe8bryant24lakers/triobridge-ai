@@ -379,6 +379,128 @@ test('connection test failure and cancellation do not commit configuration or cr
   assert.equal(keys.size, 0);
 });
 
+test('length-limited connection probes save native/shared models with a transient warning', async (t) => {
+  for (const [apiFormat, response] of [
+    ['openai', { choices: [{ finish_reason: 'length', message: { content: 'O' } }] }],
+    [
+      'openai',
+      {
+        choices: [
+          { finish_reason: 'length', message: { content: null, reasoning: 'private reasoning' } },
+        ],
+      },
+    ],
+    ['anthropic', { stop_reason: 'max_tokens', content: [{ type: 'thinking', thinking: 'wait' }] }],
+  ]) {
+    const { store, directory, keys } = await fixture(t, {
+      fetcher: async () => Response.json(response),
+    });
+    const result = await store.upsert({
+      expectedRevision: 0,
+      profile: profile('first', { apiFormat }),
+      credential: replace(),
+      testConnection: true,
+    });
+    assert.equal(result.revision, 1);
+    assert.equal(result.activeId, 'first');
+    assert.match(result.warning, /服务端输出长度上限/);
+    assert.equal(keys.size, 1);
+    assert.equal(result.connectionTest.choices[0].finish_reason, 'length');
+    assert.doesNotMatch(JSON.stringify(result), /private reasoning/);
+    assert.equal((await store.state()).warning, undefined);
+    assert.doesNotMatch(
+      await readFile(join(directory, 'profiles.json'), 'utf8'),
+      /warning|thinking/,
+    );
+  }
+});
+
+test('context-limited Claude probes save with a distinct transient context warning', async (t) => {
+  const { store, directory } = await fixture(t, {
+    fetcher: async () =>
+      Response.json({
+        stop_reason: 'model_context_window_exceeded',
+        content: [{ type: 'thinking', thinking: 'private thinking' }],
+      }),
+  });
+  const result = await store.upsert({
+    expectedRevision: 0,
+    profile: profile('first', { apiFormat: 'anthropic' }),
+    credential: replace(),
+    testConnection: true,
+  });
+  assert.equal(result.revision, 1);
+  assert.match(result.warning, /上下文空间用尽/);
+  assert.doesNotMatch(result.warning, /输出长度上限/);
+  assert.equal(result.connectionTest.choices[0].finish_reason, 'context_length');
+  assert.doesNotMatch(JSON.stringify(result), /private thinking/);
+  assert.doesNotMatch(await readFile(join(directory, 'profiles.json'), 'utf8'), /warning|thinking/);
+});
+
+test('shared completions preserve stop diagnostics with null content instead of reporting a schema error', async (t) => {
+  for (const reason of ['length', 'context_length', 'content_filter']) {
+    const { store } = await fixture(t, {
+      fetcher: async () =>
+        Response.json({
+          choices: [
+            {
+              finish_reason: reason,
+              message: { content: null, reasoning_content: 'private thinking' },
+            },
+          ],
+        }),
+    });
+    await add(store);
+    const result = await store.complete({
+      profileId: 'first',
+      profileRevision: 1,
+      messages: [{ role: 'user', content: 'synthetic input' }],
+    });
+    assert.equal(result.body.choices[0].finish_reason, reason);
+    assert.equal(result.body.choices[0].message.content, null);
+    assert.doesNotMatch(JSON.stringify(result), /private thinking/);
+  }
+});
+
+test('shared completions still reject null content without a diagnostic stop reason', async (t) => {
+  const { store } = await fixture(t, {
+    fetcher: async () =>
+      Response.json({ choices: [{ finish_reason: 'stop', message: { content: null } }] }),
+  });
+  await add(store);
+  await assert.rejects(
+    store.complete({
+      profileId: 'first',
+      profileRevision: 1,
+      messages: [{ role: 'user', content: 'synthetic input' }],
+    }),
+    { code: 'response' },
+  );
+});
+
+test('invalid and refused probe responses never save a native/shared model', async (t) => {
+  for (const response of [
+    { choices: [{ finish_reason: 'length', message: {} }] },
+    { choices: [{ finish_reason: 'length', message: { content: [] } }] },
+    { choices: [{ finish_reason: 'stop', message: { content: null } }] },
+    { choices: [{ finish_reason: 'content_filter', message: { content: 'blocked' } }] },
+    { choices: [{ finish_reason: 'length', message: { content: '', refusal: 'denied' } }] },
+  ]) {
+    const { store, keys } = await fixture(t, { fetcher: async () => Response.json(response) });
+    await assert.rejects(
+      store.upsert({
+        expectedRevision: 0,
+        profile: profile(),
+        credential: replace(),
+        testConnection: true,
+      }),
+      { code: 'response' },
+    );
+    assert.equal((await store.state()).revision, 0);
+    assert.equal(keys.size, 0);
+  }
+});
+
 test('connection test rechecks the revision after another Office changes the catalog', async (t) => {
   let finish;
   let started;

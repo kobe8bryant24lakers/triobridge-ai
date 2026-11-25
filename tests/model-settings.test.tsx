@@ -117,6 +117,33 @@ describe('quick model setup', () => {
     expect(screen.getByLabelText(/API Key 本地/)).toHaveValue('');
   });
 
+  it('saves a connected local model when its probe hits the server output limit and explains the limit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ choices: [{ finish_reason: 'length', message: { content: null } }] }),
+        ),
+    );
+    const save = vi.fn();
+    const user = userEvent.setup();
+    render(<ModelSettings state={{ profiles: [], activeId: '' }} onSave={save} onBack={vi.fn()} />);
+    await user.selectOptions(screen.getByLabelText('模型服务'), 'custom');
+    await user.type(screen.getByLabelText('服务名称'), '本机模型');
+    await user.type(screen.getByLabelText('API Base URL'), 'http://127.0.0.1:8001/v1');
+    await user.type(screen.getByLabelText('模型 ID'), 'local-reasoner');
+    await user.click(screen.getByRole('button', { name: '连接并保存' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('连接成功，配置已保存');
+    expect(screen.getByRole('status')).toHaveTextContent('服务端输出长度上限');
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profiles: [expect.objectContaining({ model: 'local-reasoner' })],
+      }),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('cancels connection without saving and allows retry', async () => {
     vi.stubGlobal(
       'fetch',

@@ -3,6 +3,7 @@ import { parseFormula, parseOutline } from '../core/output';
 import { slideFontSize } from '../core/slide-layout';
 import type { HostBridge, HostKind, SelectionSnapshot, WritePlan } from '../core/types';
 import { wordSelectionWarning } from './word-safety';
+import { wordMarkdownFormat } from '../../offline/app/word-markdown.mjs';
 import {
   columnName,
   NUMBER_FORMATS,
@@ -47,6 +48,68 @@ function setSelectedText(text: string): Promise<void> {
   );
 }
 
+type WordBlockBoundaries = {
+  before: OfficeExtension.ClientResult<Word.LocationRelation> | null;
+  after: OfficeExtension.ClientResult<Word.LocationRelation> | null;
+  paragraphs: Word.ParagraphCollection;
+  inserting: boolean;
+};
+
+function wordBlockBoundaries(range: Word.Range, inserting: boolean): WordBlockBoundaries {
+  const precise = supports('WordApi', '1.3');
+  const target = inserting && precise ? range.getRange('End') : range;
+  const paragraphs = target.paragraphs;
+  // Read only style names, never the neighboring paragraphs' text. Older Word
+  // lacks exact boundary comparison but can still preserve both outside styles.
+  paragraphs.load('items/style');
+  return {
+    before: precise
+      ? target.getRange('Start').compareLocationWith(paragraphs.getFirst().getRange('Start'))
+      : null,
+    after: precise
+      ? target.getRange('End').compareLocationWith(paragraphs.getLast().getRange('End'))
+      : null,
+    paragraphs,
+    inserting,
+  };
+}
+
+function wordBoundaryStyle(name: unknown): string {
+  if (typeof name !== 'string' || !name.trim())
+    throw new Error('无法确认原段落样式，请重新选择写入位置。');
+  // Style names come from the document. Escape the CSS string and HTML raw-text
+  // delimiters so a custom style cannot end this stylesheet or inject markup.
+  return name.replace(
+    /[\\"<>&\u0000-\u001f\u007f]/g,
+    (char) => `\\${char.charCodeAt(0).toString(16)} `,
+  );
+}
+
+function wordInsertionHtml(
+  formatted: ReturnType<typeof wordMarkdownFormat>,
+  boundaries: WordBlockBoundaries | null,
+): string | null {
+  if (!formatted) return null;
+  if (!formatted.block) return formatted.html;
+  if (!boundaries) throw new Error('无法确认段落边界，请重新选择写入位置。');
+  const before = !boundaries.before || ['After', 'AdjacentAfter'].includes(boundaries.before.value);
+  const after = !boundaries.after || ['Before', 'AdjacentBefore'].includes(boundaries.after.value);
+  if (!before && !after) return formatted.html;
+  const items = boundaries.paragraphs.items;
+  const last = items[items.length - 1];
+  const first = boundaries.inserting ? last : items[0];
+  // Word drops empty <p> boundaries. A line break keeps them present, and an
+  // explicit original style prevents the imported boundary restyling neighbors.
+  // Keep both boundaries in the same write; never split or delete text first.
+  const leading = before
+    ? `p.trioWordBefore{mso-style-name:"${wordBoundaryStyle(first?.style)}";}`
+    : '';
+  const trailing = after
+    ? `p.trioWordAfter{mso-style-name:"${wordBoundaryStyle(last?.style)}";}`
+    : '';
+  return `<style>${leading}${trailing}</style>${before ? '<p class="trioWordBefore"><br></p>' : ''}${formatted.html}${after ? '<p class="trioWordAfter"><br></p>' : ''}`;
+}
+
 async function readWord(): Promise<SelectionSnapshot> {
   return Word.run(async (context) => {
     const range = context.document.getSelection();
@@ -63,13 +126,17 @@ async function readWord(): Promise<SelectionSnapshot> {
       label: 'Word · 已读取的文字选区',
       replace: async (value: string) =>
         Word.run(range, async (ctx) => {
+          const formatted = wordMarkdownFormat(value);
+          const boundaries = formatted?.block ? wordBlockBoundaries(range, false) : null;
           range.load('text');
           const currentOoxml = range.getOoxml();
           await ctx.sync();
           if (range.text !== text) throw new Error(CHANGED);
           const structureWarning = wordSelectionWarning(currentOoxml.value);
           if (structureWarning) throw new Error(structureWarning);
-          range.insertText(value, Word.InsertLocation.replace);
+          const html = wordInsertionHtml(formatted, boundaries);
+          if (html) range.insertHtml(html, Word.InsertLocation.replace);
+          else range.insertText(value, Word.InsertLocation.replace);
           await ctx.sync();
         }),
       dispose: async () => {
@@ -80,7 +147,7 @@ async function readWord(): Promise<SelectionSnapshot> {
   });
 }
 
-async function prepareWordInsertion(structured = false): Promise<WritePlan> {
+async function prepareWordInsertion(structured = false, markdownBlock = false): Promise<WritePlan> {
   return Word.run(async (context) => {
     const range = context.document.getSelection();
     range.load('text');
@@ -91,22 +158,30 @@ async function prepareWordInsertion(structured = false): Promise<WritePlan> {
     return {
       label: structured
         ? '在已确认光标或选区后新起段落插入报告（保留原文）'
-        : before
-          ? '在已确认选区末尾插入（保留原文）'
-          : '在已确认光标处插入',
+        : markdownBlock
+          ? '在已确认光标或选区后新起段落插入排版内容（保留原文）'
+          : before
+            ? '在已确认选区末尾插入（保留原文）'
+            : '在已确认光标处插入',
       before,
       commit: async (text: string) =>
         Word.run(range, async (ctx) => {
-          const html = structured ? reportToHtml(parseReport(text)) : undefined;
+          const formatted = structured ? null : wordMarkdownFormat(text);
+          const boundaries = formatted?.block ? wordBlockBoundaries(range, true) : null;
+          const reportHtml = structured ? reportToHtml(parseReport(text)) : null;
           range.load('text');
           await ctx.sync();
           if (range.text !== before) throw new Error(CHANGED);
+          const html = reportHtml || wordInsertionHtml(formatted, boundaries);
           // A heading inserted directly at a paragraph's end can merge into
           // that paragraph and restyle the user's existing text in Word.
-          if (html)
+          if (structured && html)
             range
               .insertParagraph('', Word.InsertLocation.after)
               .insertHtml(html, Word.InsertLocation.replace);
+          // End is the tracked range's exact end, including a cursor in the
+          // middle of a paragraph. Do not move the block after its parent paragraph.
+          else if (html) range.insertHtml(html, Word.InsertLocation.end);
           else range.insertText(text, Word.InsertLocation.end);
           await ctx.sync();
         }),
@@ -400,6 +475,11 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
       return {
         text,
         label: `${host === 'powerpoint' ? 'PowerPoint' : 'Office'} · 文本选区`,
+        ...(host === 'word'
+          ? {
+              warning: '当前 Word 版本不支持自动写入排版结果，请更新 Office，或复制结果手动粘贴。',
+            }
+          : {}),
         ...(canReplace
           ? {
               replace: async (value: string) => {
@@ -419,13 +499,15 @@ export async function createOfficeBridge(host: HostKind): Promise<HostBridge> {
           before: source.text,
           ...(nativeWord
             ? {
-                warning:
-                  '将以纯文本替换，选区内部的字体、加粗和段落样式可能改变。需要保留排版时，请返回并选择插入。',
+                warning: wordMarkdownFormat(output || '')
+                  ? '将按 Markdown 排版替换选区，原选区的字体和段落样式可能改变。'
+                  : '将以纯文本替换，选区内部的字体、加粗和段落样式可能改变。需要保留排版时，请返回并选择插入。',
               }
             : {}),
           commit: source.replace,
         };
-      if (kind === 'insert' && nativeWord) return prepareWordInsertion();
+      if (kind === 'insert' && nativeWord)
+        return prepareWordInsertion(false, Boolean(wordMarkdownFormat(output || '')?.block));
       if (kind === 'document' && nativeWord) {
         parseReport(output || '');
         return prepareWordInsertion(true);

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 — 2026-11-25
+
+- Publish a 40-slide illustrated Chinese user guide with step-by-step instructions for Word, Excel and PowerPoint. [Download the PowerPoint guide](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-zh-CN.pptx)
+
+- Add a dockable Windows workbench to the Word, Excel, and PowerPoint ribbon alongside the standalone window. Each pane is bound to its Office window and uses the existing local model profiles. Windows packages include the offline WebView2 runtime installer.
+- Include an optional Mac Office task pane and its enable, restart, and removal commands in the desktop package. The pane uses local HTTPS and loads Office.js from Microsoft.
+- Fix formula writes to a single cell in Excel for Mac and preserve adjacent paragraph styles when writing Markdown from the Word task pane.
+- Convert Markdown in Word results to editable headings, lists, tables, and emphasis when inserting or replacing text. The workbench previews the same formatting before confirmation.
+- Remove the fixed 4,096-token budget from Claude-compatible requests. Services that require `max_tokens` use the maximum reported by the selected model. Word can preview and write complete long text replies, and reports when the model runs out of context.
+- Save model connections when a valid test response reaches the server's output limit, with a warning to raise that limit before generating content. Incomplete document generation is still rejected.
+- Fix Windows PowerPoint document identification using its supported window caption instead of the Word/Excel window handle property, which could incorrectly report a selection error.
+- Append generated PowerPoint decks and chart pages without reading the current selection or existing shape contents. Insertion still verifies the target document, page order and dimensions.
+
 ## 0.7.1 — 2026-11-25
 
 - Fix Windows ZIP extraction in WinRAR. Both Windows packages now store the installer files and the Workbench directory directly at the archive root.

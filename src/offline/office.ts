@@ -2,7 +2,7 @@ import type { HostBridge, SelectionSnapshot, WriteKind } from '../core/types';
 import { parseFormula, parseOutline } from '../core/output';
 import { parseReport, parseTable, tableMatrix, NUMBER_FORMATS } from '../core/structured-output';
 import { validateEdit } from '../presentation/editing';
-import type { PresentationSnapshot } from '../presentation/types';
+import type { PresentationInsertTarget, PresentationSnapshot } from '../presentation/types';
 import type { NativeWorkbench } from './transport';
 
 interface Target {
@@ -18,6 +18,7 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
     excel = host === 'excel',
     ppt = host === 'powerpoint';
   const slideTokens = new WeakMap<PresentationSnapshot, string>();
+  const insertTokens = new WeakMap<PresentationInsertTarget, string>();
   async function call<T>(action: string, data?: unknown): Promise<T> {
     const result = await native.office(action, data);
     if (!result.ok) throw new Error(result.message || 'Office 未完成操作，请检查当前文档。');
@@ -73,7 +74,7 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
         return {
           label: source.label,
           before: source.text,
-          warning: '将以纯文本替换选区，原有文字格式可能改变。',
+          warning: '替换会改变选区内的文字和格式，请核对预览。',
           commit: source.replace,
         };
       prepareValue(kind, output || '');
@@ -111,8 +112,15 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
             const checked = validateEdit(proposal, snapshot);
             await call('edit', { token: slideTokens.get(snapshot), proposal: checked });
           },
-          async insert(base64, count, snapshot) {
-            await call('append', { token: snapshot && slideTokens.get(snapshot), base64, count });
+          async prepareInsert() {
+            const result = await call<{ token: string; target: PresentationInsertTarget }>(
+              'presentationTarget',
+            );
+            insertTokens.set(result.target, result.token);
+            return result.target;
+          },
+          async insert(base64, count, target) {
+            await call('append', { token: insertTokens.get(target), base64, count });
           },
           async create(base64) {
             await call('create', { base64 });

@@ -98,11 +98,8 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
   async function exportChart(target: 'download' | 'insert') {
     if (!parsed.table || !parsed.data || !title.trim()) return;
     await run(target === 'insert' ? '插入并核对图表页' : '生成可编辑图表文件', async (signal) => {
-      const snapshot =
-        target === 'insert' && access
-          ? await access.read(access.capabilities.selected ? 'selected' : 'all')
-          : undefined;
-      if (target === 'insert' && !snapshot?.size)
+      const insertTarget = target === 'insert' && access ? await access.prepareInsert() : undefined;
+      if (target === 'insert' && !insertTarget?.size)
         throw new Error('无法确认当前页面尺寸，请下载图表页后手动导入。');
       const chartContext: MaterialContext = {
         materials: [
@@ -128,15 +125,20 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
           },
         ],
       };
-      const base64 = await renderDeck(deck, chartContext, DEFAULT_THEME, snapshot?.size || WIDE);
+      const base64 = await renderDeck(
+        deck,
+        chartContext,
+        DEFAULT_THEME,
+        insertTarget?.size || WIDE,
+      );
       if (signal.aborted) return;
       if (target === 'download') {
         downloadPresentation(base64, title);
         notify('已生成图表 PPT；可在 PowerPoint 中右键图表编辑数据。');
-      } else if (access) {
+      } else if (access && insertTarget) {
         setConfirm(false);
         setInserted(fingerprint);
-        await access.insert(base64, 1, snapshot);
+        await access.insert(base64, 1, insertTarget);
         notify('已在末尾插入 1 页原生图表，并核对页数。可右键图表编辑数据。');
       }
     });

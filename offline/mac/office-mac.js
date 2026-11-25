@@ -22,6 +22,38 @@ function limited(text) {
 function documentKey(doc) {
   return [String(doc.name()), String(optional(() => doc.fullName(), ''))];
 }
+function wordDocumentKeys(a) {
+  // Word can return null entries for documents.name() after Save As, even
+  // though the corresponding indexed document exposes both name and fullName.
+  const keys = [];
+  for (let i = 0; i < a.documents.length; i++) keys.push(documentKey(a.documents[i]));
+  return keys;
+}
+function wordDocument(a, key) {
+  const keys = wordDocumentKeys(a);
+  const matches = keys.filter((entry) => entry[1] === key[1]);
+  if (!key[1] || matches.length !== 1)
+    fail('无法唯一定位目标 Word 文档，请关闭重复副本后重新读取。');
+  same(key, matches[0]);
+  // A short byName() key can fail after Save As, and an index moves when Word
+  // opens the import. Word accepts the complete HFS filename as its document key.
+  // Unlike a whose() predicate, that key also works for activation/write commands.
+  let doc;
+  try {
+    doc = a.documents.byName(key[1]);
+    documentKey(doc);
+  } catch (error) {
+    // Word reports /private/var for an import opened through /var; its complete
+    // path lookup can then fail. Only a unique, fully verified short name may
+    // serve as the alternate key. Never use an ambiguous same-name document.
+    if (Number(error.errorNumber) !== -1728) throw error;
+    if (keys.filter((entry) => entry[0] === key[0]).length !== 1)
+      fail('无法唯一定位目标 Word 文档，请关闭同名副本后重新读取。');
+    doc = a.documents.byName(key[0]);
+  }
+  same(key, documentKey(doc));
+  return doc;
+}
 function rangeValue(v) {
   return Array.isArray(v)
     ? v.map((row) => (Array.isArray(row) ? row.join('\t') : String(row))).join('\n')
@@ -37,11 +69,14 @@ function word(a, q) {
   const doc = a.activeDocument,
     sel = a.selection;
   function current() {
-    const text = limited(String(sel.content() || ''));
+    const start = sel.selectionStart(),
+      end = sel.selectionEnd();
+    // Some Word versions return the next character for a collapsed selection.
+    const text = start === end ? '' : limited(String(sel.content() || ''));
     const guard = {
       doc: documentKey(doc),
-      start: sel.selectionStart(),
-      end: sel.selectionEnd(),
+      start,
+      end,
       story: String(sel.storyType()),
       text,
     };
@@ -70,6 +105,141 @@ function word(a, q) {
   if (q.op === 'target')
     return Object.assign(target, { label: 'Word · 在当前选区后插入', writable: true });
   same(q.guard, target.guard);
+  if (optional(() => doc.readOnly(), false)) fail('文档为只读，请打开可编辑副本。');
+  if (q.file && (q.kind === 'replace' || q.kind === 'insert')) {
+    if (q.kind === 'replace' && !target.writable) fail('这段选区包含特殊对象，请使用插入。');
+    // activeDocument and selection are deferred JXA specifiers. Bind the original
+    // by full identity before opening the private HTML file.
+    const original = wordDocument(a, target.guard.doc);
+    same(target.guard.doc, documentKey(original));
+    // A range rooted in selection produces unusable specifiers in current Word.
+    // Keep every main-story range rooted in its named document. Other stories
+    // must be matched to the actual selected story, not just its story type.
+    let story;
+    if (target.guard.story !== 'main text story') {
+      story = a.getStoryRange(original, { storyType: target.guard.story });
+      for (let i = 0; i < 128; i++) {
+        if (a.inStory(story, { textRange: sel.textObject })) break;
+        story = story.nextStoryRange;
+        if (i === 127) fail('无法确认此处的文字范围，请在正文中插入格式化内容。');
+      }
+    }
+    const originalRange = (start, end) => {
+      try {
+        const range = story
+          ? a.setRange(story, { start, end })
+          : a.createRange(original, { start, end });
+        // Word may return an unresolved range after Save As even when document
+        // properties remain readable. Resolve it before any original-text write.
+        range.startOfContent();
+        return range;
+      } catch (error) {
+        if (
+          Number(error.errorNumber) === -1728 ||
+          /(?:^|\D)-1728(?:$|\D)/.test(String(error.message))
+        )
+          fail('Word 无法定位这份文档的文字范围。请保存并重新打开该文档，再重新读取选区。');
+        throw error;
+      }
+    };
+    const selected = originalRange(target.guard.start, target.guard.end);
+    if (
+      selected.startOfContent() !== target.guard.start ||
+      selected.endOfContent() !== target.guard.end ||
+      String(selected.content() || '') !== target.text ||
+      (story && !a.isEquivalent(selected, { textRange: sel.textObject }))
+    )
+      fail('无法确认选区的文字范围，请重新读取并确认写入位置。');
+    const destinationStart = q.kind === 'insert' ? target.guard.end : target.guard.start;
+    let destinationEnd = target.guard.end;
+    let prefixMark;
+    if (q.block) {
+      const paragraph = originalRange(destinationStart, destinationStart).paragraphs[0].textObject;
+      if (destinationStart > paragraph.startOfContent()) {
+        const end = paragraph.endOfContent();
+        prefixMark = originalRange(end - 1, end);
+        if (String(prefixMark.content()) !== '\r') fail('请在普通文字段落中插入格式化内容。');
+      }
+      const ending = originalRange(destinationEnd, destinationEnd).paragraphs[0].textObject;
+      if (
+        !(q.kind === 'replace' && target.text.endsWith('\r')) &&
+        destinationEnd === ending.endOfContent() - 1 &&
+        String(ending.content()).endsWith('\r') &&
+        optional(() => ending.tables.length, 1) === 0 &&
+        String(originalRange(destinationEnd, destinationEnd + 1).content()) === '\r'
+      )
+        destinationEnd++;
+    }
+    same(q.guard, current().guard);
+    const sourceName = String(q.file).split('/').pop();
+    if (wordDocumentKeys(a).some((key) => key[0] === sourceName))
+      fail('格式化临时文档已打开，请重新生成。');
+    let source;
+    try {
+      a.open(Path(q.file), { readOnly: false, addToRecentFiles: false, confirmConversions: false });
+      const sourceKeys = wordDocumentKeys(a).filter((key) => key[0] === sourceName);
+      if (sourceKeys.length !== 1) fail('无法唯一定位格式化临时文档，请重新生成。');
+      source = wordDocument(a, sourceKeys[0]);
+      const openedKey = documentKey(a.activeDocument);
+      if (
+        JSON.stringify(openedKey) !== JSON.stringify(documentKey(source)) &&
+        JSON.stringify(openedKey) !== JSON.stringify(target.guard.doc)
+      )
+        fail('目标文档已改变，请重新读取并确认写入位置。');
+      // Word's range commands can move the active selection even when passed a
+      // document-rooted range. Prepare paragraphs only while the source is active.
+      a.activateObject(source);
+      same(documentKey(source), documentKey(a.activeDocument));
+      if (prefixMark) {
+        const start = source.textObject.startOfContent();
+        a.insertParagraph({ at: a.createRange(source, { start, end: start }) });
+        const leading = a.createRange(source, { start, end: start + 1 });
+        leading.formattedText = prefixMark.formattedText;
+      }
+      const sourceStart = source.textObject.startOfContent();
+      let sourceEnd = source.textObject.endOfContent();
+      const selectedParagraphEnd = q.kind === 'replace' && target.text.endsWith('\r');
+      if (!q.block && !selectedParagraphEnd) {
+        if (!String(source.textObject.content()).endsWith('\r'))
+          fail('无法确认格式化内容的段落边界。');
+        sourceEnd--;
+      }
+      if (sourceEnd <= sourceStart) fail('格式化内容为空，请重新生成。');
+      const content = a.createRange(source, { start: sourceStart, end: sourceEnd });
+      const activeKey = documentKey(a.activeDocument);
+      if (JSON.stringify(activeKey) === JSON.stringify(documentKey(source)))
+        a.activateObject(original);
+      else same(target.guard.doc, activeKey);
+      same(q.guard, current().guard);
+      if (optional(() => original.readOnly(), false)) fail('文档为只读，请打开可编辑副本。');
+      if (q.kind === 'replace' && !current().writable) fail('这段选区包含特殊对象，请使用插入。');
+      const destination = originalRange(destinationStart, destinationEnd);
+      same(q.guard, current().guard);
+      const expected =
+        (q.kind === 'insert' ? '' : target.text) + (destinationEnd > target.guard.end ? '\r' : '');
+      if (
+        String(destination.content() || '') !== expected ||
+        (story && !a.inStory(destination, { textRange: sel.textObject }))
+      )
+        fail('写入位置的段落边界已改变，请重新读取并确认写入位置。');
+      wordDocument(a, target.guard.doc);
+      destination.formattedText = content.formattedText;
+    } finally {
+      if (source) {
+        const activeKey = optional(() => documentKey(a.activeDocument), null);
+        const restore =
+          JSON.stringify(activeKey) === JSON.stringify(target.guard.doc) ||
+          JSON.stringify(activeKey) === JSON.stringify(documentKey(source));
+        a.close(source, { saving: 'no' });
+        if (
+          restore &&
+          JSON.stringify(documentKey(a.activeDocument)) !== JSON.stringify(target.guard.doc)
+        )
+          a.activateObject(original);
+      }
+    }
+    return;
+  }
   if (q.kind === 'replace') {
     if (!target.writable) fail('这段选区包含特殊对象，请使用插入。');
     sel.content = String(q.value);
@@ -132,7 +302,22 @@ function excel(a, q) {
     return;
   }
   const r = q.kind === 'formula' ? a.activeCell : a.selection;
-  if (Number(r.countLarge()) > 2000) fail('请把选区缩小到 2,000 个单元格以内。');
+  // Excel's macOS dictionary declares countLarge as null. Collection counts
+  // work through JXA; check dimensions too because cells.length can overflow.
+  const rows = Number(r.rows.length),
+    columns = Number(r.columns.length),
+    count = Number(r.cells.length);
+  if (rows * columns > 2000 || count > 2000) fail('请把选区缩小到 2,000 个单元格以内。');
+  if (
+    !Number.isSafeInteger(rows) ||
+    !Number.isSafeInteger(columns) ||
+    !Number.isSafeInteger(count) ||
+    rows < 1 ||
+    columns < 1 ||
+    count < 1 ||
+    rows * columns !== count
+  )
+    fail('无法确认选区大小，请选择一块连续的单元格区域。');
   const address = String(a.getAddress(r)),
     values = r.value(),
     formula = r.formula();
@@ -149,7 +334,7 @@ function excel(a, q) {
       writable: q.kind === 'formula',
     };
   same(q.guard, guard);
-  if (q.kind !== 'formula' || r.countLarge() != 1) fail('请选择一个公式目标单元格。');
+  if (q.kind !== 'formula' || count !== 1) fail('请选择一个公式目标单元格。');
   if (optional(() => r.mergeCells(), false) || optional(() => r.hasArray(), false))
     fail('请选择普通单元格，不能覆盖合并区域或数组公式。');
   r.formula = String(q.value);

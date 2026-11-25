@@ -66,6 +66,8 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
       backup: false,
     },
     read,
+    prepareInsert: async () =>
+      structuredClone({ slideIds: snapshot.slideIds, size: snapshot.size }),
     apply: async (before, input) => {
       assertSnapshotUnchanged(before, await read(before.scope));
       const plan = validateEdit(input, before);

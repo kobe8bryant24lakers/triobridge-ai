@@ -1,5 +1,28 @@
 import { test, expect } from '@playwright/test';
 
+test('Word previews the edited Markdown as headings and lists through confirmation', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '读取示例选区' }).click();
+  await page.getByRole('button', { name: '生成演示预览' }).click();
+  await page.getByRole('button', { name: '编辑', exact: true }).click();
+  await page.getByLabel('编辑结果').fill('## 本周进展\n\n- **文档**已完成');
+  await page.getByRole('button', { name: '完成编辑' }).click();
+  for (const name of ['结果内容', '即将写入的结果']) {
+    if (name === '即将写入的结果')
+      await page.getByRole('button', { name: '替换已读取选区' }).click();
+    const preview = page.getByRole('region', { name, exact: true });
+    await expect(preview.getByRole('heading', { name: '本周进展', level: 2 })).toBeVisible();
+    await expect(preview.getByRole('listitem').locator('strong')).toHaveText('文档');
+  }
+  await page.getByRole('button', { name: '确认写入', exact: true }).click();
+  await page.getByText('查看模拟文档 · 已应用的内容').click();
+  await expect(
+    page.locator('.demo-document').getByRole('heading', { name: '本周进展' }),
+  ).toBeVisible();
+});
+
 test('Word: preview, cancel write, then confirm; manual edits invalidate source binding', async ({
   page,
 }) => {

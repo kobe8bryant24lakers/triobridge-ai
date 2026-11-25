@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildMessages, TASKS } from '../src/core/tasks';
-import { completionUrl, complete, ModelError } from '../src/core/model-client';
+import { completionUrl, complete, ModelError, testConnection } from '../src/core/model-client';
 import {
   emptyProfile,
   exportProfiles,
@@ -23,7 +23,10 @@ const profile = (): ModelProfile => ({
 const messages = [{ role: 'user' as const, content: 'hello' }];
 
 describe('OpenAI-compatible model client', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
   it.each([
     ['https://example.com/v1/', 'https://example.com/v1/chat/completions'],
     ['https://example.com/v1/chat/completions', 'https://example.com/v1/chat/completions'],
@@ -112,8 +115,8 @@ describe('OpenAI-compatible model client', () => {
       model: model.model,
       messages,
       stream: false,
-      max_tokens: 4096,
     });
+    expect(JSON.parse(options.body)).not.toHaveProperty('max_tokens');
     const saved = importProfiles(exportProfiles([model]))[0];
     expect(saved).toMatchObject({ apiFormat: 'anthropic', apiKey: '' });
   });
@@ -133,6 +136,250 @@ describe('OpenAI-compatible model client', () => {
       complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
     ).rejects.toThrow(message);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    [400, { error: { type: 'invalid_request_error', message: 'max_tokens: Field required' } }],
+    [400, { error: { message: "Missing required parameter: 'max_tokens'." } }],
+    [422, { detail: [{ type: 'missing', loc: ['body', 'max_tokens'], msg: 'Field required' }] }],
+  ])(
+    'negotiates only the model-reported output limit after an explicit HTTP %s missing-field error',
+    async (status, error) => {
+      const fetcher = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json(error, { status }))
+        .mockResolvedValueOnce(Response.json({ id: 'resolved-model', max_tokens: 11753 }))
+        .mockResolvedValueOnce(
+          Response.json({
+            stop_reason: 'end_turn',
+            content: [{ type: 'text', text: 'full answer' }],
+          }),
+        );
+      const model = {
+        ...profile(),
+        apiFormat: 'anthropic' as const,
+        baseUrl: 'https://example.com/gateway/v1',
+        model: 'vendor/model?tag=1',
+      };
+      expect(await complete(model, messages, undefined, fetcher)).toBe('full answer');
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      const [initial, lookup, final] = fetcher.mock.calls;
+      expect(JSON.parse(initial[1].body)).not.toHaveProperty('max_tokens');
+      expect(lookup[0]).toBe('https://example.com/gateway/v1/models/vendor%2Fmodel%3Ftag%3D1');
+      expect(lookup[1]).toMatchObject({
+        method: 'GET',
+        redirect: 'error',
+        credentials: 'omit',
+        cache: 'no-store',
+        headers: initial[1].headers,
+        signal: initial[1].signal,
+      });
+      expect(lookup[1]).not.toHaveProperty('body');
+      expect(final[0]).toBe(initial[0]);
+      expect(JSON.parse(final[1].body)).toEqual({
+        ...JSON.parse(initial[1].body),
+        max_tokens: 11753,
+      });
+      expect(final[1].signal).toBe(initial[1].signal);
+    },
+  );
+  it('queries the official Claude model before submitting and does not send a guessed quota', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: 'resolved-model', max_tokens: 27123 }))
+      .mockResolvedValueOnce(
+        Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] }),
+      );
+    expect(
+      await complete(
+        { ...profile(), apiFormat: 'anthropic', baseUrl: 'https://api.anthropic.com' },
+        messages,
+        undefined,
+        fetcher,
+      ),
+    ).toBe('OK');
+    expect(fetcher.mock.calls.map(([url, options]) => [url, options.method])).toEqual([
+      ['https://api.anthropic.com/v1/models/model-1', 'GET'],
+      ['https://api.anthropic.com/v1/messages', 'POST'],
+    ]);
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).max_tokens).toBe(27123);
+  });
+  it('uses the fixed proxy POST capability route without a request body', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ error: { message: 'max_tokens is required' } }, { status: 400 }),
+      )
+      .mockResolvedValueOnce(Response.json({ max_tokens: 17301 }))
+      .mockResolvedValueOnce(
+        Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] }),
+      );
+    await complete(
+      { ...profile(), apiFormat: 'anthropic', baseUrl: '/model-proxy/v1' },
+      messages,
+      undefined,
+      fetcher,
+    );
+    expect(fetcher.mock.calls[1][0]).toBe('/model-proxy/v1/models/model-1');
+    expect(fetcher.mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+      redirect: 'error',
+      credentials: 'omit',
+    });
+    expect(fetcher.mock.calls[1][1]).not.toHaveProperty('body');
+    expect(JSON.parse(fetcher.mock.calls[2][1].body).max_tokens).toBe(17301);
+  });
+  it.each([
+    [400, { error: { message: 'max_tokens must be greater than 0' } }],
+    [400, { error: { message: 'max_tokens is required to be at most 4096' } }],
+    [400, { error: { message: 'Missing required parameter: model' } }],
+    [422, { detail: [{ type: 'greater_than', loc: ['body', 'max_tokens'] }] }],
+    [422, { detail: [{ type: 'missing', loc: ['body', 'messages', 0, 'max_tokens'] }] }],
+    [
+      422,
+      {
+        detail: [
+          { type: 'missing', loc: ['body', 'max_tokens'] },
+          { type: 'missing', loc: ['body', 'model'] },
+        ],
+      },
+    ],
+    [401, { error: { message: 'max_tokens is required' } }],
+    [429, { error: { message: 'max_tokens is required' } }],
+    [500, { error: { message: 'max_tokens is required' } }],
+  ])('never retries unrelated HTTP %s failures', async (status, body) => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(body, { status }));
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    {},
+    { max_tokens: 0 },
+    { max_tokens: -1 },
+    { max_tokens: '8192' },
+    { max_tokens: 1.5 },
+    { max_tokens: Number.MAX_SAFE_INTEGER + 1 },
+    { max_input_tokens: 12000 },
+  ])('does not invent a quota when model information is invalid: %j', async (metadata) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ error: { message: 'max_tokens is required' } }, { status: 400 }),
+      )
+      .mockResolvedValueOnce(Response.json(metadata));
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow('模型信息未提供有效的 max_tokens');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('does not replay generated partial output even if it mentions a missing max_tokens parameter', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        stop_reason: 'max_tokens',
+        content: [{ type: 'text', text: 'max_tokens is required' }],
+      }),
+    );
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow('截断');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('does not follow metadata redirects or fall back to an arbitrary token limit', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ error: { message: 'max_tokens is required' } }, { status: 400 }),
+      )
+      .mockRejectedValueOnce(new TypeError('redirect blocked'));
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow('无法读取同一服务');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[1][1].redirect).toBe('error');
+  });
+  it('cancels capability discovery before any second generation request', async () => {
+    const controller = new AbortController();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ error: { message: 'max_tokens is required' } }, { status: 400 }),
+      )
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        return Response.json({ max_tokens: 8192 });
+      });
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, controller.signal, fetcher),
+    ).rejects.toMatchObject({ code: 'cancelled' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('bounds gateway error bodies without retaining a cloned response or probing', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(70_000));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const fetcher = vi.fn().mockResolvedValue(new Response(stream, { status: 400 }));
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toMatchObject({ code: 'response' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(cancelled).toBe(true);
+  });
+  it('rejects oversized model metadata and does not submit a generation request with a guessed quota', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(Response.json({ max_tokens: 11753, padding: 'x'.repeat(70_000) }));
+    await expect(
+      complete(
+        { ...profile(), apiFormat: 'anthropic', baseUrl: 'https://api.anthropic.com' },
+        messages,
+        undefined,
+        fetcher,
+      ),
+    ).rejects.toThrow('数据过大');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1].method).toBe('GET');
+  });
+  it.each([
+    ['openai', { choices: [{ finish_reason: 'length', message: { content: 'O' } }] }],
+    [
+      'openai',
+      {
+        choices: [
+          { finish_reason: 'length', message: { content: null, reasoning_content: 'thinking' } },
+        ],
+      },
+    ],
+    ['anthropic', { stop_reason: 'max_tokens', content: [{ type: 'thinking', thinking: 'wait' }] }],
+  ] as const)(
+    'allows a length-limited %s connection probe without accepting it as generation',
+    async (apiFormat, data) => {
+      const fetcher = vi.fn().mockImplementation(async () => Response.json(data));
+      vi.stubGlobal('fetch', fetcher);
+      const model = { ...profile(), apiFormat };
+      await expect(testConnection(model)).resolves.toEqual({
+        warning: expect.stringContaining('服务端输出长度上限'),
+      });
+      await expect(complete(model, messages, undefined, fetcher)).rejects.toThrow('截断');
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each([
+    {},
+    { choices: [{ finish_reason: 'length', message: {} }] },
+    { choices: [{ finish_reason: 'length', message: { content: [] } }] },
+    { choices: [{ finish_reason: 'stop', message: { content: null } }] },
+    { choices: [{ finish_reason: 'content_filter', message: { content: 'blocked' } }] },
+    { choices: [{ finish_reason: 'length', message: { content: '', refusal: 'denied' } }] },
+  ])('keeps invalid or refused connection probes unsaved', async (data) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
+    await expect(testConnection(profile())).rejects.toMatchObject({ code: 'response' });
   });
   it('rejects malformed Claude text blocks instead of inserting a fragment', async () => {
     const fetcher = vi.fn().mockResolvedValue(

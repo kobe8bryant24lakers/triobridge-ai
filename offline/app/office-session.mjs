@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { constants } from 'node:fs';
 import { reportRtf } from './report.mjs';
+import { wordMarkdownFormat } from './word-markdown.mjs';
 const hosts = {
   word: ['replace', 'insert', 'document'],
   excel: ['formula', 'table'],
@@ -88,13 +89,34 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck, ope
         const { guard, snapshot } = await office(action, { scope: data.scope });
         return { token: remember({ guard, snapshot, kind: 'presentation' }), snapshot };
       }
+      if (action === 'presentationTarget' && host === 'powerpoint') {
+        const { guard, target } = await office(action);
+        return { token: remember({ guard, target, kind: 'presentation-insert' }), target };
+      }
       const entry = targets.get(data.token);
       if (action !== 'create' && !entry) throw Error('写入位置已过期，请重新读取。');
       if (action === 'write' && entry.canWrite) {
-        if (data.value == null || JSON.stringify(data.value).length > 2000000)
+        const wordText = host === 'word' && ['replace', 'insert'].includes(entry.kind);
+        if (
+          data.value == null ||
+          (wordText ? typeof data.value !== 'string' : JSON.stringify(data.value).length > 2000000)
+        )
           throw Error('写入内容无效或过大。');
         const body = { kind: entry.kind, guard: entry.guard, value: data.value };
-        if (entry.kind === 'document') {
+        const formatting = wordText ? wordMarkdownFormat(data.value) : null;
+        if (formatting) {
+          temp = await mkdtemp(join(tmpdir(), 'triobridge-word-'));
+          body.file = join(temp, randomUUID() + '.htm');
+          body.block = formatting.block;
+          await writeFile(
+            body.file,
+            '\uFEFF<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+              formatting.html +
+              '</body></html>',
+            { mode: 0o600 },
+          );
+          delete body.value;
+        } else if (entry.kind === 'document') {
           temp = await mkdtemp(join(tmpdir(), 'triobridge-report-'));
           body.file = join(temp, 'report.rtf');
           await writeFile(body.file, reportRtf(data.value), { mode: 0o600 });
@@ -118,8 +140,10 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck, ope
       }
       if (
         host === 'powerpoint' &&
-        (action === 'create' || (action === 'append' && entry.kind === 'presentation'))
+        (action === 'create' || (action === 'append' && entry.kind === 'presentation-insert'))
       ) {
+        if (action === 'append' && (!Number.isSafeInteger(data.count) || data.count < 1))
+          throw Error('待插入页数无效。');
         if (typeof data.base64 !== 'string' || data.base64.length > 90000000)
           throw Error('演示稿文件过大。');
         const bytes = Buffer.from(data.base64, 'base64');
@@ -149,7 +173,7 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck, ope
         await office('append', {
           file,
           guard: entry.guard,
-          snapshot: entry.snapshot,
+          target: entry.target,
           count: data.count,
         });
         targets.delete(data.token);

@@ -13,7 +13,7 @@ namespace TrioBridge
 internal class Office
 {
     static readonly JavaScriptSerializer Json =
-        new JavaScriptSerializer { MaxJsonLength = 9000000, RecursionLimit = 80 };
+        new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 80 };
     static object[] A(object value)
     {
         return ((IEnumerable)value).Cast<object>().ToArray();
@@ -79,16 +79,107 @@ internal class Office
     {
         return new { name = S(doc.FullName), window = S(window.HWND) };
     }
+    static object WordGuard(dynamic doc, dynamic window, dynamic range)
+    {
+        return new { doc = Guard(doc, window), start = (int)range.Start,
+                     end = (int)range.End, story = (int)range.StoryType,
+                     text = Bound(S(range.Text)) };
+    }
+    static bool PlainWordRange(dynamic range, string text)
+    {
+        return range.Tables.Count == 0 && range.Fields.Count == 0 && range.InlineShapes.Count == 0 &&
+               range.ContentControls.Count == 0 && range.OMaths.Count == 0 &&
+               range.Hyperlinks.Count == 0 && range.Footnotes.Count == 0 &&
+               range.Endnotes.Count == 0 && !text.Contains("\a");
+    }
+    static void WordRichText(dynamic app, dynamic doc, dynamic window, dynamic range,
+                             Dictionary<string, object> q, string kind)
+    {
+        string file = S(q["file"]);
+        Check(File.Exists(file), "格式化内容文件已失效，请重新生成。");
+        dynamic destination = range.Duplicate;
+        if (kind == "insert")
+            destination.Collapse(0);
+        string expectedDestination = kind == "insert" ? "" : S(range.Text);
+        bool block = Get(q, "block") is bool && (bool)q["block"];
+        dynamic prefixMark = null;
+        if (block)
+        {
+            dynamic paragraph = destination.Paragraphs[1].Range;
+            if ((int)destination.Start > (int)paragraph.Start)
+            {
+                prefixMark = paragraph.Duplicate;
+                prefixMark.SetRange((int)prefixMark.End - 1, (int)prefixMark.End);
+                Check(S(prefixMark.Text) == "\r", "请在普通文字段落中插入格式化内容。");
+            }
+            // The imported final paragraph carries the generated paragraph style.
+            // Replace an immediately adjacent ordinary paragraph mark with it,
+            // instead of leaving a second, empty paragraph after the result.
+            dynamic endpoint = destination.Duplicate;
+            endpoint.SetRange((int)destination.End, (int)destination.End);
+            dynamic ending = endpoint.Paragraphs[1].Range;
+            if (!(kind == "replace" && S(range.Text).EndsWith("\r")) &&
+                (int)destination.End == (int)ending.End - 1 &&
+                S(ending.Text).EndsWith("\r") && ending.Tables.Count == 0)
+            {
+                dynamic mark = ending.Duplicate;
+                mark.SetRange((int)destination.End, (int)destination.End + 1);
+                if (S(mark.Text) == "\r")
+                {
+                    destination.SetRange((int)destination.Start, (int)destination.End + 1);
+                    expectedDestination += "\r";
+                }
+            }
+        }
+        dynamic source = null;
+        try
+        {
+            // Parse the generated file before changing the destination. The temporary
+            // document owns all preparatory paragraph changes and is never saved.
+            source = app.Documents.Open(FileName: file, ConfirmConversions: false,
+                                        ReadOnly: false, AddToRecentFiles: false, Visible: false);
+            if (prefixMark != null)
+            {
+                source.Content.InsertBefore("\r");
+                dynamic leading = source.Range(0, 1);
+                leading.FormattedText = prefixMark.FormattedText;
+            }
+            dynamic content = source.Content.Duplicate;
+            bool selectedParagraphEnd = kind == "replace" && S(range.Text).EndsWith("\r");
+            if (!block && !selectedParagraphEnd)
+            {
+                Check(S(content.Text).EndsWith("\r"), "无法确认格式化内容的段落边界。");
+                content.SetRange((int)content.Start, (int)content.End - 1);
+            }
+            Check((int)content.End > (int)content.Start, "格式化内容为空，请重新生成。");
+            string activeName = S(app.ActiveDocument.FullName);
+            Check(activeName == S(doc.FullName) || activeName == S(source.FullName),
+                  "目标文档已改变，请重新读取并确认写入位置。");
+            if (activeName != S(doc.FullName))
+                window.Activate();
+            dynamic current = app.Selection.Range;
+            Same(q["guard"], WordGuard(app.ActiveDocument, app.ActiveWindow, current));
+            Check(!doc.ReadOnly, "文档为只读，请打开可编辑副本。");
+            if (kind == "replace")
+                Check(PlainWordRange(current, S(current.Text)), "请只选择普通文字。");
+            Check(S(destination.Text) == expectedDestination,
+                  "写入位置的段落边界已改变，请重新读取并确认写入位置。");
+            // One formatted assignment replaces/inserts the range. Never clear the
+            // original selection before opening or converting the generated file.
+            destination.FormattedText = content.FormattedText;
+        }
+        finally
+        {
+            if (source != null)
+                source.Close(false);
+        }
+    }
     static object Word(dynamic app, Dictionary<string, object> q, string op, string kind)
     {
-        dynamic doc = app.ActiveDocument, range = app.Selection.Range;
+        dynamic doc = app.ActiveDocument, window = app.ActiveWindow, range = app.Selection.Range;
         string text = Bound(S(range.Text));
-        object guard = new { doc = Guard(doc, app.ActiveWindow), start = (int)range.Start,
-                             end = (int)range.End, story = (int)range.StoryType, text };
-        bool normal = range.Tables.Count == 0 && range.Fields.Count == 0 && range.InlineShapes.Count == 0 &&
-                      range.ContentControls.Count == 0 && range.OMaths.Count == 0 &&
-                      range.Hyperlinks.Count == 0 && range.Footnotes.Count == 0 &&
-                      range.Endnotes.Count == 0 && !text.Contains("\a");
+        object guard = WordGuard(doc, window, range);
+        bool normal = PlainWordRange(range, text);
         if (op == "selection")
         {
             Check(text.Trim().Length > 0, "请在 Word 中先选中文字。");
@@ -102,7 +193,15 @@ internal class Office
         if (kind == "replace")
         {
             Check(normal, "请只选择普通文字。");
-            range.Text = S(q["value"]);
+            if (q.ContainsKey("file"))
+                WordRichText(app, doc, window, range, q, kind);
+            else
+                range.Text = S(q["value"]);
+            return null;
+        }
+        if (kind == "insert" && q.ContainsKey("file"))
+        {
+            WordRichText(app, doc, window, range, q, kind);
             return null;
         }
         range.Collapse(0);
@@ -314,6 +413,15 @@ internal class Office
                                                   new { width = (double)doc.PageSetup.SlideWidth,
                                                         height = (double)doc.PageSetup.SlideHeight } } };
     }
+    static object PresentationTarget(dynamic doc)
+    {
+        var slideIds = new List<string>();
+        foreach (dynamic slide in doc.Slides)
+            slideIds.Add(S(slide.SlideID));
+        Check(slideIds.Count <= 500, "演示稿超过 500 页。");
+        return new { slideIds, size = new { width = (double)doc.PageSetup.SlideWidth,
+                                            height = (double)doc.PageSetup.SlideHeight } };
+    }
     static object PowerPoint(dynamic app, Dictionary<string, object> q, string op, string kind)
     {
         if (op == "openDeck")
@@ -322,7 +430,11 @@ internal class Office
             return null;
         }
         dynamic doc = app.ActivePresentation;
-        object guard = Guard(doc, app.ActiveWindow);
+        // PowerPoint.DocumentWindow has no HWND property (unlike Word/Excel windows).
+        // Use its documented, read-only caption together with the presentation path.
+        object guard = new { name = S(doc.FullName), window = S(app.ActiveWindow.Caption) };
+        if (op == "presentationTarget")
+            return new { guard, target = PresentationTarget(doc) };
         if (op == "presentation")
             return new { guard, snapshot = Snapshot(app, S(q["scope"])) };
         if (op == "selection")
@@ -366,10 +478,11 @@ internal class Office
             return null;
         }
         Same(q["guard"], guard);
-        var snapshot = D(q["snapshot"]);
-        Same(snapshot, Snapshot(app, S(snapshot["scope"])));
         if (op == "append")
         {
+            // Appending does not depend on the current selection or existing shape content.
+            // Keep the original document, page order and dimensions fixed across rendering.
+            Same(q["target"], PresentationTarget(doc));
             int before = doc.Slides.Count;
             try
             {
@@ -385,6 +498,8 @@ internal class Office
             return null;
         }
         Check(op == "edit", "未知 PowerPoint 操作。");
+        var snapshot = D(q["snapshot"]);
+        Same(snapshot, Snapshot(app, S(snapshot["scope"])));
         var proposal = D(q["proposal"]);
         var changes = A(proposal["changes"]);
         var undo = new Stack<Action>();
@@ -512,6 +627,47 @@ internal class Office
         }
         return null;
     }
+    internal static bool SameInstance(object left, object right)
+    {
+        if (ReferenceEquals(left, right))
+            return left != null;
+        if (left == null || right == null || !Marshal.IsComObject(left) || !Marshal.IsComObject(right))
+            return false;
+        IntPtr a = IntPtr.Zero, b = IntPtr.Zero;
+        try
+        {
+            a = Marshal.GetIUnknownForObject(left);
+            b = Marshal.GetIUnknownForObject(right);
+            return a == b;
+        }
+        finally
+        {
+            if (a != IntPtr.Zero) Marshal.Release(a);
+            if (b != IntPtr.Zero) Marshal.Release(b);
+        }
+    }
+    internal static void CheckWindow(object application, object window)
+    {
+        Check(application != null && window != null, "Office 窗口已关闭，请重新打开侧边栏。");
+        dynamic app = application;
+        Check(SameInstance((object)app.ActiveWindow, window),
+              "当前 Office 窗口与此侧边栏不一致，请回到原窗口后重试。");
+    }
+    // The embedded control invokes this on its Office UI thread, using the exact
+    // application/window supplied by the ribbon. The standalone helper keeps its
+    // existing active-application behavior by passing no bound window.
+    internal static object Dispatch(object application, object window, string host,
+                                    Dictionary<string, object> q)
+    {
+        Check(host == "word" || host == "excel" || host == "powerpoint", "未知 Office 应用。");
+        Check(S(Get(q, "host")) == host, "Office 应用与侧边栏不一致。");
+        if (window != null) CheckWindow(application, window);
+        string op = S(Get(q, "op")), kind = S(Get(q, "kind"));
+        dynamic app = application;
+        return host == "word" ? Word(app, q, op, kind)
+               : host == "excel" ? Excel(app, q, op, kind)
+               : PowerPoint(app, q, op, kind);
+    }
     [STAThread]
     static void Main()
     {
@@ -520,16 +676,14 @@ internal class Office
         try
         {
             var q = D(Json.DeserializeObject(Console.In.ReadToEnd()));
-            string h = S(q["host"]), op = S(q["op"]), kind = S(Get(q, "kind"));
+            string h = S(q["host"]);
             string id = h == "word"         ? "Word.Application"
                         : h == "excel"      ? "Excel.Application"
                         : h == "powerpoint" ? "PowerPoint.Application"
                                             : null;
             Check(id != null, "未知 Office 应用。");
             dynamic app = Marshal.GetActiveObject(id);
-            object result = h == "word"    ? Word(app, q, op, kind)
-                            : h == "excel" ? Excel(app, q, op, kind)
-                                           : PowerPoint(app, q, op, kind);
+            object result = Dispatch((object)app, null, h, q);
             Console.Write(Json.Serialize(new { ok = true, value = result }));
         }
         catch (Exception e)

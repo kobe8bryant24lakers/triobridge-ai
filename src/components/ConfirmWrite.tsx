@@ -3,11 +3,13 @@ import { AlertCircle, ArrowRight, LoaderCircle } from 'lucide-react';
 import type { OutputKind, WritePlan } from '../core/types';
 import { outlineToText } from '../core/output';
 import { parseReport, parseTable, reportToText, tableToText } from '../core/structured-output';
+import { WordTextPreview } from './WordTextPreview';
 
 interface Props {
   plan: WritePlan;
   output: string;
   outputKind?: OutputKind;
+  wordText?: boolean;
   returnFocus?: HTMLElement | null;
   busy: boolean;
   error: string;
@@ -18,6 +20,7 @@ export function ConfirmWrite({
   plan,
   output,
   outputKind,
+  wordText,
   returnFocus,
   busy,
   error,
@@ -79,15 +82,24 @@ export function ConfirmWrite({
         <ArrowRight size={18} />
         <div>
           <h3 id="confirm-after-heading">即将写入的结果</h3>
-          <pre tabIndex={0} role="region" aria-labelledby="confirm-after-heading">
-            {outputKind === 'outline'
-              ? outlineToText(output)
-              : outputKind === 'document'
-                ? reportToText(parseReport(output))
-                : outputKind === 'table'
-                  ? tableToText(parseTable(output))
-                  : output}
-          </pre>
+          {wordText ? (
+            <WordTextPreview
+              text={output}
+              tabIndex={0}
+              role="region"
+              aria-labelledby="confirm-after-heading"
+            />
+          ) : (
+            <pre tabIndex={0} role="region" aria-labelledby="confirm-after-heading">
+              {outputKind === 'outline'
+                ? outlineToText(output)
+                : outputKind === 'document'
+                  ? reportToText(parseReport(output))
+                  : outputKind === 'table'
+                    ? tableToText(parseTable(output))
+                    : output}
+            </pre>
+          )}
         </div>
       </div>
       {plan.warning && <p className="write-warning">{plan.warning}</p>}

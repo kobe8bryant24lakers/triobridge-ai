@@ -105,7 +105,7 @@
               <li><strong>起草内容</strong><span>根据具体要求写出第一稿</span></li>
               <li><strong>结构化报告</strong><span>编辑章节、要点和表格后插入</span></li>
             </ul>
-            <p class="writeback"><strong>检查后写回</strong>替换已读取的选区，或插入到光标处。</p>
+            <p class="writeback"><strong>检查后写回</strong>核对排版后替换选区或插入到光标处。Markdown 标题、列表和表格可在 Word 中继续编辑。</p>
           </article>
           <article class="feature">
             <div class="feature-heading">
@@ -154,25 +154,24 @@
       <section class="section wrap" id="install" aria-labelledby="install-title">
         <div class="section-heading">
           <h2 id="install-title">下载与安装</h2>
-          <p>按电脑的系统和芯片下载。工作台直接打开安装包内的页面，使用时可以保持联网。</p>
+          <p>按电脑的系统和芯片选择安装包，可在独立窗口或 Office 侧边栏中使用工作台。</p>
         </div>
         <div class="download-block">
           <div>
             <h3>Windows</h3>
-            <p>在“设置 → 系统 → 系统信息”查看系统类型；常见 Intel 和 AMD 电脑选择 x64。</p>
+            <p>在“设置 → 系统 → 系统信息”查看系统类型。常见 Intel 和 AMD 电脑选择 x64。</p>
             <p>
-              保存文档，退出三款 Office，完整解压 ZIP，双击 Install.cmd。重新打开文档，选择“三桥 AI
-              → 打开工作台”。
+              保存文档，退出三款 Office，完整解压 ZIP，双击 Install.cmd。用同一 Windows 账户以普通权限打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。
             </p>
           </div>
           <div class="download-actions">
             <a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-x64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-x64.zip"
               >Windows x64</a
             ><a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-arm64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-arm64.zip"
               >Windows ARM64</a
             >
           </div>
@@ -183,17 +182,17 @@
             <p>在苹果菜单的“关于本机”查看芯片。M 系列芯片选 Apple 芯片，Intel 芯片选 Intel。</p>
             <p>
               解压 ZIP，双击 Install.command。在 Word、Excel 或 PowerPoint 的应用菜单中选择“服务 →
-              打开三桥 AI”。首次读取或写入时，macOS 可能请求允许控制对应应用。
+              打开三桥 AI”。首次读写时，macOS 可能请求允许控制对应应用。要启用内嵌侧栏，退出 Office，运行 Enable-Embedded-Taskpane.command 并按提示信任本机证书。重开 Office，从“我的加载项”选择名称含“三桥 AI”和“本机共享”的加载项。
             </p>
           </div>
           <div class="download-actions">
             <a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-arm64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip"
               >Mac · Apple 芯片</a
             ><a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-x64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip"
               >Mac · Intel</a
             >
           </div>
@@ -233,15 +232,13 @@
           <div>
             <dt>桌面 Office</dt>
             <dd>
-              在 Windows 桌面 Office 使用功能区，在 Mac 桌面 Office
-              使用应用的“服务”菜单。打开的工作台与当前应用关联。
+              Windows 的两个入口都在“三桥 AI”功能区。Mac 可从“服务”菜单打开独立窗口，或从“我的加载项”打开已启用的内嵌侧栏。
             </dd>
           </div>
           <div>
             <dt>安装与权限</dt>
             <dd>
-              页面、字体样式和运行环境随包安装。插件无需启动 localhost 服务，也无需安装 localhost
-              证书。首次启动可能显示系统的开发者确认。
+              独立窗口和 Windows 侧栏从安装包加载界面。若 Windows 缺少 WebView2，可运行 ZIP 内的离线安装程序。Mac 内嵌侧栏使用本机 HTTPS 服务，需联网从微软加载 Office.js。
             </dd>
           </div>
           <div>

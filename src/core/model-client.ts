@@ -1,12 +1,12 @@
 import { modelTransport, nativeWorkbench } from '../offline/transport';
 import {
   modelEndpoint,
-  modelRequest,
+  sendModelRequest,
   normalizeModelResponse,
   ModelProtocolError,
+  connectionTestWarning,
 } from '../../scripts/model-protocol.mjs';
 import type { ChatMessage, ModelApiFormat, RuntimeModelProfile, SharedModelProfile } from './types';
-import { MAX_RESULT_LENGTH } from './tasks';
 import { startModelAudit } from './model-audit';
 import {
   localModelHeaders,
@@ -65,12 +65,13 @@ const HTTP_ERRORS: Record<number, string> = {
   429: '请求过于频繁或额度不足，请稍后重试并检查服务额度。',
 };
 
-export async function complete(
+async function requestModel(
   profile: RuntimeModelProfile,
   messages: ChatMessage[],
   signal?: AbortSignal,
   fetcher: typeof fetch = modelTransport,
-): Promise<string> {
+  connectionTest = false,
+): Promise<{ content: string; warning?: string }> {
   validateProfile(profile);
   if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
   const endpoint = completionUrl(profile.baseUrl, profile.apiFormat);
@@ -87,21 +88,29 @@ export async function complete(
   }, profile.timeoutSeconds * 1000);
   try {
     const shared = isSharedProfile(profile);
-    const request = shared
-      ? {
+    const response = shared
+      ? await fetcher('/local-models/complete', {
+          method: 'POST',
+          signal: controller.signal,
+          redirect: 'error',
+          credentials: 'omit',
+          cache: 'no-store',
           headers: localModelHeaders(),
-          body: { profileId: profile.id, profileRevision: profile.revision, messages },
-        }
-      : modelRequest(profile.apiFormat, profile.model.trim(), messages, secret);
-    const response = await fetcher(shared ? '/local-models/complete' : endpoint, {
-      method: 'POST',
-      signal: controller.signal,
-      redirect: 'error',
-      credentials: 'omit',
-      cache: 'no-store',
-      headers: request.headers,
-      body: JSON.stringify(request.body),
-    });
+          body: JSON.stringify({
+            profileId: profile.id,
+            profileRevision: profile.revision,
+            messages,
+          }),
+        })
+      : await sendModelRequest(
+          fetcher,
+          endpoint,
+          profile.apiFormat,
+          profile.model.trim(),
+          messages,
+          secret,
+          controller.signal,
+        );
     audit?.response(response);
     if (!response.ok && shared) {
       const error = await sharedResponseError(response);
@@ -141,10 +150,20 @@ export async function complete(
     audit?.payload(data);
     if (!data || typeof data !== 'object')
       throw new ModelError('服务返回的数据格式无效，请检查所选接口格式。', 'response');
+    if (connectionTest) {
+      const warning = connectionTestWarning(data);
+      auditOutcome = 'success';
+      return { content: '', ...(warning ? { warning } : {}) };
+    }
     const choice = data.choices?.[0];
     if (choice?.finish_reason === 'length')
       throw new ModelError(
         '模型输出被长度限制截断，请缩短任务或调整服务端输出上限后重试。',
+        'response',
+      );
+    if (choice?.finish_reason === 'context_length')
+      throw new ModelError(
+        '模型上下文空间已用尽，输出被截断。请减少输入内容，或在服务端增大上下文窗口后重试。',
         'response',
       );
     if (choice?.message?.refusal || choice?.finish_reason === 'content_filter')
@@ -152,10 +171,8 @@ export async function complete(
     const content = choice?.message?.content;
     if (typeof content !== 'string' || !content.trim())
       throw new ModelError('服务未返回可用文本，请检查所选接口格式。', 'response');
-    if (content.length > MAX_RESULT_LENGTH)
-      throw new ModelError('模型返回内容过长，请缩小任务范围。', 'response');
     auditOutcome = 'success';
-    return content.trim();
+    return { content: content.trim() };
   } catch (error) {
     auditOutcome = timedOut
       ? 'timeout'
@@ -201,9 +218,25 @@ export async function complete(
   }
 }
 
+export async function complete(
+  profile: RuntimeModelProfile,
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+  fetcher: typeof fetch = modelTransport,
+): Promise<string> {
+  return (await requestModel(profile, messages, signal, fetcher)).content;
+}
+
 export async function testConnection(
   profile: RuntimeModelProfile,
   signal?: AbortSignal,
-): Promise<void> {
-  await complete(profile, [{ role: 'user', content: 'Reply with OK.' }], signal);
+): Promise<{ warning?: string }> {
+  const { warning } = await requestModel(
+    profile,
+    [{ role: 'user', content: 'Reply with OK.' }],
+    signal,
+    modelTransport,
+    true,
+  );
+  return warning ? { warning } : {};
 }

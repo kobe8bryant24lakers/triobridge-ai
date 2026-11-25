@@ -97,6 +97,7 @@ export async function buildLocalInstaller(
   platform = process.platform,
   arch = process.arch,
   output = resolve(root, 'dist-local'),
+  { webRoot = resolve(root, 'dist'), unpackedDirectory } = {},
 ) {
   if (!['darwin', 'win32'].includes(platform) || !['arm64', 'x64'].includes(arch))
     throw new Error('Supported local packages: macOS or Windows, arm64 or x64.');
@@ -110,7 +111,7 @@ export async function buildLocalInstaller(
   try {
     await mkdir(join(directory, 'app/scripts'), { recursive: true });
     await mkdir(join(directory, 'runtime'), { recursive: true });
-    await cp(join(root, 'dist'), join(directory, 'app/dist'), { recursive: true });
+    await cp(webRoot, join(directory, 'app/dist'), { recursive: true });
     for (const script of runtimeScripts) {
       const target = join(directory, 'app/scripts', script);
       if (script.endsWith('.ps1')) {
@@ -218,6 +219,19 @@ export async function buildLocalInstaller(
         2,
       ) + '\n',
     );
+    // Desktop installers may include this independently enabled component in their ZIP.
+    // Its verified payload, runtime and lifecycle stay identical to the standalone package.
+    if (unpackedDirectory) {
+      await mkdir(dirname(unpackedDirectory), { recursive: true });
+      await mkdir(unpackedDirectory);
+      try {
+        await cp(directory, unpackedDirectory, { recursive: true });
+        return unpackedDirectory;
+      } catch (error) {
+        await rm(unpackedDirectory, { recursive: true, force: true });
+        throw error;
+      }
+    }
     await mkdir(output, { recursive: true });
     const zip = join(output, `${name}.zip`);
     await rm(zip, { force: true });

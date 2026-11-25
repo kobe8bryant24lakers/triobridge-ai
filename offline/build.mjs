@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packager } from './tooling/node_modules/@electron/packager/dist/index.js';
+import { addMacEmbeddedTaskpane } from './mac/embedded-taskpane.mjs';
+import { addWindowsTaskPane } from './windows/build-taskpane.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
   platform = process.platform,
   arch = process.arch;
@@ -48,6 +50,12 @@ for (const pkg of ['keyring', binding])
   await copy(
     join(root, 'node_modules', '@napi-rs', pkg),
     join(stage, 'node_modules', '@napi-rs', pkg),
+  );
+// The browser export is also a self-contained ES module for the native workbench.
+for (const file of ['package.json', 'LICENSE', 'dist/browser/markdown-it.esm.min.mjs'])
+  await copy(
+    join(root, 'node_modules/markdown-it', file),
+    join(stage, 'node_modules/markdown-it', file),
   );
 const info = JSON.parse(await readFile(join(stage, 'package.json'), 'utf8'));
 const name = 'TrioBridge AI';
@@ -116,6 +124,7 @@ const [packed] = await packager({
 if (platform === 'win32') {
   const dest = join(payload, 'Workbench');
   await cp(packed, dest, { recursive: true });
+  await addWindowsTaskPane({ root, payload, dest, arch });
   // Desktop Office uses its own bitness, independent of the installed Electron architecture.
   for (const [target, archName] of [
     ['Win32', 'x86'],
@@ -185,6 +194,7 @@ if (platform === 'win32') {
     await copy(join(root, 'offline/mac', f), join(payload, f));
     await chmod(join(payload, f), 0o755);
   }
+  await addMacEmbeddedTaskpane({ root, payload, arch });
 }
 const dist = join(root, 'dist-install');
 await mkdir(dist, { recursive: true });

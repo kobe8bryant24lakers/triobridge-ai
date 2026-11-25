@@ -225,7 +225,7 @@ test('connect-and-save and generation reach a real loopback HTTP API without bro
               withKey && claude ? 'synthetic-api-key' : undefined,
             );
             assert.equal(r.headers['anthropic-version'], claude ? '2023-06-01' : undefined);
-            if (claude) assert.ok(r.body.max_tokens > 0);
+            assert.equal(r.body.max_tokens, undefined);
             assert.equal(r.headers['x-triobridge-local-token'], undefined);
             assert.equal(r.headers.origin, undefined);
           }
@@ -257,6 +257,176 @@ test('a refused local API connection explains the port and never saves the propo
   assert.doesNotMatch(data.error.message, /CORS|synthetic-unsaved-key/);
   assert.equal(keys.size, 0);
   assert.equal((await store.state()).revision, 0);
+});
+
+async function strictClaudeFixture(t, options = {}) {
+  const requests = [];
+  const api = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks).toString('utf8');
+    const body = raw ? JSON.parse(raw) : undefined;
+    requests.push({ path: req.url, method: req.method, headers: req.headers, body });
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET') {
+      res.statusCode = options.metadataStatus ?? 200;
+      if (options.redirect) res.setHeader('Location', options.redirect);
+      res.end(JSON.stringify(options.metadata ?? { id: 'resolved-model', max_tokens: 11753 }));
+      return;
+    }
+    if (body.max_tokens === undefined && !options.partial) {
+      res.statusCode = options.initialStatus ?? 400;
+      res.end(
+        JSON.stringify(
+          options.initialError ?? {
+            error: { type: 'invalid_request_error', message: 'max_tokens: Field required' },
+          },
+        ),
+      );
+      return;
+    }
+    if (options.rejectNegotiated) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: { message: 'max_tokens is required' } }));
+      return;
+    }
+    const complete = body.max_tokens === 11753;
+    res.end(
+      JSON.stringify({
+        stop_reason: complete ? 'end_turn' : 'max_tokens',
+        content: [{ type: 'text', text: complete ? '完整正文'.repeat(1500) : 'partial' }],
+        usage: { input_tokens: 5000, output_tokens: complete ? 6000 : 4096 },
+      }),
+    );
+  });
+  api.listen(0, '127.0.0.1');
+  await once(api, 'listening');
+  t.after(async () => {
+    api.closeAllConnections();
+    await new Promise((resolve) => api.close(resolve));
+  });
+  const baseUrl = `http://127.0.0.1:${api.address().port}/gateway/v1`;
+  const { request, store } = await fixture(t, fetch);
+  const state = await store.upsert({
+    expectedRevision: 0,
+    profile: { ...profile, apiFormat: 'anthropic', baseUrl, model: 'vendor/model?v=1' },
+    credential: { action: 'replace', value: 'strict-fixture-secret' },
+  });
+  const generate = () =>
+    request('complete', {
+      profileId: profile.id,
+      profileRevision: state.profiles[0].revision,
+      messages: [{ role: 'user', content: '改写正文，保留全部内容。' }],
+    });
+  return { requests, generate, baseUrl };
+}
+
+test('shared/native Claude generation negotiates the actual model limit with a strict HTTP service', async (t) => {
+  for (const initialStatus of [400, 422]) {
+    await t.test(String(initialStatus), async (t) => {
+      const { requests, generate } = await strictClaudeFixture(t, {
+        initialStatus,
+        ...(initialStatus === 422
+          ? {
+              initialError: {
+                detail: [{ type: 'missing', loc: ['body', 'max_tokens'], msg: 'Field required' }],
+              },
+            }
+          : {}),
+      });
+      const response = await generate();
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.choices[0].finish_reason, 'stop');
+      assert.equal(body.choices[0].message.content, '完整正文'.repeat(1500));
+      assert.deepEqual(
+        requests.map(({ method, path }) => [method, path]),
+        [
+          ['POST', '/gateway/v1/messages'],
+          ['GET', '/gateway/v1/models/vendor%2Fmodel%3Fv%3D1'],
+          ['POST', '/gateway/v1/messages'],
+        ],
+      );
+      assert.equal(requests[0].body.max_tokens, undefined);
+      assert.equal(requests[1].body, undefined);
+      assert.deepEqual(requests[2].body, { ...requests[0].body, max_tokens: 11753 });
+      for (const request of requests) {
+        assert.equal(request.headers['x-api-key'], 'strict-fixture-secret');
+        assert.equal(request.headers['anthropic-version'], '2023-06-01');
+        assert.equal(request.headers['x-triobridge-local-token'], undefined);
+      }
+      assert.doesNotMatch(JSON.stringify(body), /strict-fixture-secret/);
+    });
+  }
+});
+
+test('shared/native capability failures do not submit a guessed quota', async (t) => {
+  for (const options of [
+    { metadata: {} },
+    { metadata: { max_tokens: -1 } },
+    { metadata: { max_tokens: '65536' } },
+    { metadataStatus: 404 },
+  ]) {
+    await t.test(JSON.stringify(options), async (t) => {
+      const { requests, generate } = await strictClaudeFixture(t, options);
+      const response = await generate();
+      assert.equal(response.status, 502);
+      assert.match((await response.json()).error.message, /模型信息/);
+      assert.deepEqual(
+        requests.map(({ method }) => method),
+        ['POST', 'GET'],
+      );
+    });
+  }
+});
+
+test('shared/native lookup does not follow cross-origin redirects or forward the key', async (t) => {
+  let leaked = 0;
+  const other = createServer((_req, res) => {
+    leaked++;
+    res.end(JSON.stringify({ max_tokens: 11753 }));
+  });
+  other.listen(0, '127.0.0.1');
+  await once(other, 'listening');
+  t.after(async () => {
+    other.closeAllConnections();
+    await new Promise((resolve) => other.close(resolve));
+  });
+  const { requests, generate } = await strictClaudeFixture(t, {
+    metadataStatus: 302,
+    redirect: `http://127.0.0.1:${other.address().port}/steal-key`,
+  });
+  const response = await generate();
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).error.message, /无法读取同一服务/);
+  assert.equal(leaked, 0);
+  assert.equal(requests.length, 2);
+});
+
+test('shared/native generation never replays partial or unrelated failed responses', async (t) => {
+  for (const options of [
+    { partial: true },
+    { initialStatus: 429 },
+    { initialStatus: 500 },
+    { initialError: { error: { message: 'max_tokens must be less than 4096' } } },
+    { initialError: { error: { message: 'max_tokens is required to be positive' } } },
+  ]) {
+    await t.test(JSON.stringify(options), async (t) => {
+      const { requests, generate } = await strictClaudeFixture(t, options);
+      const response = await generate();
+      if (options.partial) {
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).choices[0].finish_reason, 'length');
+      } else assert.equal(response.status, options.initialStatus ?? 400);
+      assert.equal(requests.length, 1);
+    });
+  }
+});
+
+test('shared/native generation negotiates at most once when the service rejects its own reported quota', async (t) => {
+  const { requests, generate } = await strictClaudeFixture(t, { rejectNegotiated: true });
+  assert.equal((await generate()).status, 400);
+  assert.equal(requests.length, 3);
 });
 
 test('same-origin shared API returns metadata and completion evidence without credentials', async (t) => {
