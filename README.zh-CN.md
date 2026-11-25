@@ -8,10 +8,10 @@
 
 | 系统和芯片 | 安装包 |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** 保存文档，完全退出三款 Office，解压 ZIP，再双击 **Install.cmd**。重新打开文档，在“三桥 AI”功能区点击“打开工作台”。Intel / AMD 电脑选 x64，ARM 电脑选 ARM64。
 
@@ -23,9 +23,9 @@ Mac 包使用临时签名，Windows 包未签署 Authenticode。系统可能提�
 
 ## 模型设置
 
-选择“模型设置 → 新增”。已有云端配置可以直接切换使用。本机模型可选择“本机 API”，填写已有服务的地址（例如 `http://127.0.0.1:8001/v1`）、实际模型 ID 和密钥。模型服务无需密钥时选择“不使用密钥”。点击“连接并保存”会发起一次真实请求。三个应用共用模型列表和当前选择，密钥保存在 macOS 钥匙串或 Windows 凭据管理器。
+在“模型设置 → 新增”中选择“本机 API”或“自定义 / 本地模型”。填写服务地址（例如 `http://127.0.0.1:8001/v1`）和模型 ID，按推理服务支持的类型选择 **接口格式**。以上述地址为例，OpenAI（Chat Completions）请求 `/v1/chat/completions`，Claude（Anthropic Messages）请求 `/v1/messages`。已有配置默认使用 OpenAI。
 
-当前源码构建的版本在“本机 API”和“自定义 / 本地模型”下提供 **接口格式**。以上述基础地址为例，选择 OpenAI（Chat Completions）会请求 `/v1/chat/completions`，选择 Claude（Anthropic Messages）会请求 `/v1/messages`。请按推理服务提供的接口选择，同一模型 ID 可以分别保存两种格式。已有配置默认使用 OpenAI。v0.6.0 下载包支持 OpenAI 格式。
+按服务要求填写密钥，或选择“不使用密钥”。点击 **连接并保存** 会发起一次真实请求。Word、Excel 和 PowerPoint 共用模型列表和当前选择，密钥保存在 macOS 钥匙串或 Windows 凭据管理器。
 
 云端推理需要联网。本机推理使用你已运行的模型 API，安装包包含工作台与桌面集成，模型权重由你自己的推理程序提供。
 

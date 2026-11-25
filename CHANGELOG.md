@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 — 2026-11-25
 
 - Custom and local model profiles can use OpenAI Chat Completions or Claude (Anthropic Messages). Word, Excel and PowerPoint share the selected format. Existing profiles default to OpenAI.
+- Model settings show the request URL before connecting. Word rewrites now ask the model to preserve the source date precision.
 
 ## 0.6.0
 
