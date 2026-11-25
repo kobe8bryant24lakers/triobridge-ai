@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 — 2026-11-25
+
+- Fix Windows ZIP extraction in WinRAR. Both Windows packages now store the installer files and the Workbench directory directly at the archive root.
+- Check every archived path against the staged installer before running installation tests. Manually dispatched Windows acceptance runs use WinRAR to extract the package.
+
 ## 0.7.0 — 2026-11-25
 
 - Custom and local model profiles can use OpenAI Chat Completions or Claude (Anthropic Messages). Word, Excel and PowerPoint share the selected format. Existing profiles default to OpenAI.

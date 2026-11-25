@@ -8,10 +8,10 @@ Use your own models in Word, Excel, and PowerPoint. The workbench opens compiled
 
 | System and processor | Installer |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Reopen a document and choose **三桥 AI → 打开工作台** in the ribbon.
 

@@ -13,7 +13,26 @@ const archive = resolve(
 await rm(extracted, { recursive: true, force: true });
 await mkdir(extracted, { recursive: true });
 if (mac) execFileSync('/usr/bin/ditto', ['-x', '-k', archive, extracted]);
-else execFileSync('tar.exe', ['-xf', archive, '-C', extracted]);
+else {
+  const listing = execFileSync('tar.exe', ['-tf', archive], { encoding: 'utf8' });
+  const archivePaths = listing
+    .trimEnd()
+    .split(/\r?\n/)
+    .map((entry) => entry.replace(/\/$/, ''));
+  const stagedPaths = await readdir(join(work, 'bundle'), { recursive: true });
+  assert.deepEqual(
+    archivePaths.sort(),
+    stagedPaths.map((entry) => entry.replaceAll('\\', '/')).sort(),
+    'ZIP entries must use the exact relative names of the staged installer files and directories.',
+  );
+  const winrar = process.env.TRIOBRIDGE_TEST_WINRAR;
+  if (winrar) {
+    execFileSync(winrar, ['x', '-inul', '-y', archive, extracted + '\\'], { timeout: 120000 });
+    console.log('WinRAR extracted the Windows installer ZIP.');
+  } else {
+    execFileSync('tar.exe', ['-xf', archive, '-C', extracted]);
+  }
+}
 const app = join(bundle, mac ? 'TrioBridge AI.app' : 'Workbench');
 const resources = mac ? join(app, 'Contents/Resources/app') : join(app, 'resources/app');
 assert.equal(JSON.parse(await readFile(join(resources, 'package.json'))).main, 'main.mjs');
