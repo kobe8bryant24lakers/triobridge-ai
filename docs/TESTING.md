@@ -1,5 +1,11 @@
 # 验证说明
 
+## v0.7.1 Windows ZIP 解压
+
+v0.7.0 的 Windows x64 和 ARM64 发布包都包含一个单独的 `./` 目录，全部 127 个条目均带 `./` 前缀。v0.7.1 直接归档 `Install.cmd`、`Setup.exe`、`Uninstall.cmd` 和 `Workbench/`。Windows 构建会在解压前将包内每个文件和目录的路径与待打包目录逐项比对。
+
+在 GitHub Actions 手动运行 “Check and publish Pages” 时，两个 Windows 作业使用 WinRAR 7.23 解压，然后在解压出来的文件上运行安装、重复安装、Office 注册、卸载和三个工作台的启动验证。
+
 ## v0.7.0 自定义模型接口格式（发布候选实测）
 
 在 Apple 芯片 Mac 上从 ZIP 解包检查签名，分别启动 Word、Excel 和 PowerPoint 工作台。三种工作台都从 `file:` 加载设置页并读取共享模型目录。设置页在 390 和 960 像素宽度下都能完整显示接口格式和实际请求地址。

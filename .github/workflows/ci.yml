@@ -103,6 +103,20 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix offline/tooling
       - run: npm run build:installer
+      - name: Set up WinRAR for manual Windows ZIP acceptance
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'winrar-x64-723.exe'
+          Invoke-WebRequest 'https://www.rarlab.com/rar/winrar-x64-723.exe' -OutFile $setup
+          if ((Get-FileHash $setup -Algorithm SHA256).Hash -ne '8ff0daf3ed564cc743c0e23ff2e253997ffc74460f9673f0b6dd037b2db4ce7b') {
+            throw 'WinRAR installer checksum mismatch.'
+          }
+          $result = Start-Process $setup -ArgumentList '-s1' -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "WinRAR setup exited with code $($result.ExitCode)." }
+          $winrar = Get-Item -LiteralPath (Join-Path $env:ProgramFiles 'WinRAR/WinRAR.exe')
+          Write-Host "Extracting with WinRAR $($winrar.VersionInfo.ProductVersion)"
+          "TRIOBRIDGE_TEST_WINRAR=$($winrar.FullName)" >> $env:GITHUB_ENV
       - run: npm run verify:installer
       - run: node offline/verify-ui.mjs --test-model
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

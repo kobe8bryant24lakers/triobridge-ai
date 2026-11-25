@@ -131,7 +131,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             把选择留在你手里。
           </p>
-          <span>TrioBridge AI · 0.7.0</span>
+          <span>TrioBridge AI · 0.7.1</span>
         </div>
       </aside>
       <div className="main-shell">

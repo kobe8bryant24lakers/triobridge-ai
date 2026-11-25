@@ -197,5 +197,8 @@ if (platform === 'darwin')
   run('/usr/bin/ditto', ['-c', '-k', '--keepParent', '--norsrc', basename(payload), zip], {
     cwd: work,
   });
-else run('tar.exe', ['-a', '-cf', zip, '.'], { cwd: payload });
+else {
+  const entries = (await readdir(payload)).sort();
+  run('tar.exe', ['-a', '-cf', zip, '--', ...entries], { cwd: payload });
+}
 console.log(basename(zip), Math.round((await stat(zip)).size / 1048576) + ' MiB');
