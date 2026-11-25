@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile, copyFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, copyFile, rename, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { constants } from 'node:fs';
 import { reportRtf } from './report.mjs';
 const hosts = {
   word: ['replace', 'insert', 'document'],
@@ -50,7 +51,7 @@ export function runOffice(root, input) {
   });
 }
 
-export function createOfficeSession(host, root, { run = runOffice, saveDeck } = {}) {
+export function createOfficeSession(host, root, { run = runOffice, saveDeck, openDeck } = {}) {
   const targets = new Map();
   let busy = false,
     closed = false;
@@ -130,8 +131,19 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck } = 
         if (action === 'create') {
           const destination = await saveDeck();
           if (!destination) throw Error('已取消保存演示稿。');
-          await copyFile(file, destination);
-          await office('openDeck', { file: destination });
+          const pending = join(dirname(destination), '.triobridge-' + randomUUID() + '.pptx');
+          try {
+            await copyFile(file, pending, constants.COPYFILE_EXCL);
+            await rename(pending, destination);
+          } finally {
+            await unlink(pending).catch(() => {});
+          }
+          try {
+            if (openDeck) await openDeck(destination);
+            else await office('openDeck', { file: destination });
+          } catch {
+            throw Error('演示稿已保存。请在 PowerPoint 中打开刚保存的文件。');
+          }
           return;
         }
         await office('append', {

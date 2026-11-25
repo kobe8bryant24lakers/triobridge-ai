@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { app, BrowserWindow, ipcMain, session, dialog } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -51,6 +53,10 @@ function openHost(host) {
   windows.set(host, window);
   const requests = new Map();
   const office = createOfficeSession(host, root, {
+    openDeck:
+      process.platform === 'darwin'
+        ? (file) => promisify(execFile)('/usr/bin/open', ['-b', 'com.microsoft.Powerpoint', file])
+        : undefined,
     saveDeck: async () => {
       const { filePath, canceled } = await dialog.showSaveDialog(window, {
         title: '保存并在 PowerPoint 中打开',
@@ -96,8 +102,17 @@ else {
       { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
       (_details, done) => done({ cancel: true }),
     );
-    session.defaultSession.setPermissionRequestHandler((_c, _p, done) => done(false));
-    session.defaultSession.setPermissionCheckHandler(() => false);
+    const allowCopy = (contents, permission) =>
+      permission === 'clipboard-sanitized-write' &&
+      contents &&
+      contexts.has(contents.id) &&
+      contents.getURL().split('#')[0] === pathToFileURL(page).href;
+    session.defaultSession.setPermissionRequestHandler((contents, permission, done) =>
+      done(Boolean(allowCopy(contents, permission))),
+    );
+    session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+      Boolean(allowCopy(contents, permission)),
+    );
     ipcMain.handle('trio:model', async (event, id, action, payload) => {
       const { requests } = context(event);
       if (
