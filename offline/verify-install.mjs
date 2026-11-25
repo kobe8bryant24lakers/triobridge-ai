@@ -124,7 +124,7 @@ if (mac) {
         { stdio: 'inherit' },
       );
       execFileSync(smoke, [], { stdio: 'inherit' });
-      execFileSync(smoke, ['--registered', ...(bitness === 'x64' ? ['--webview'] : [])], {
+      execFileSync(smoke, ['--registered', bitness, ...(bitness === 'x64' ? ['--webview'] : [])], {
         stdio: 'inherit',
         timeout: 90000,
       });

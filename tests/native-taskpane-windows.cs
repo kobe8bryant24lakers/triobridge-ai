@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -75,8 +76,11 @@ internal static class TaskPaneTests
         }
         finally { Marshal.Release(unknown); }
     }
-    static void RegisteredSmoke(bool webView)
+    static void RegisteredSmoke(string hostArchitecture, bool webView)
     {
+        string loader = TaskPane.ProcessArchitecture();
+        Check(loader == hostArchitecture, "Selected " + loader + " WebView2 loader for the " + hostArchitecture + " COM client.");
+        Console.WriteLine("Selected the " + loader + " WebView2 loader for the Office client process.");
         // Use the same merged registry view as the actual x86/x64 COM client.
         const string paneServer = @"CLSID\{640D4723-A40B-46E5-A862-30C4254606D4}\InprocServer32";
         using (var server = Registry.ClassesRoot.OpenSubKey(paneServer))
@@ -130,8 +134,11 @@ internal static class TaskPaneTests
                         while (DateTime.UtcNow < deadline)
                         {
                             await Task.Delay(200);
-                            WebView2 browser = null;
-                            foreach (Control child in control.Controls) if (child is WebView2) browser = (WebView2)child;
+                            var children = control.Controls.Cast<Control>();
+                            if (children.OfType<Button>().Any())
+                                throw new Exception("The installed task pane failed to initialize: " +
+                                    string.Join(" ", children.OfType<Label>().Select(item => item.Text)));
+                            var browser = children.OfType<WebView2>().FirstOrDefault();
                             if (browser == null || browser.CoreWebView2 == null) continue;
                             if (!requested)
                             {
@@ -182,7 +189,7 @@ internal static class TaskPaneTests
     {
         try
         {
-            if (args.Length > 0 && args[0] == "--registered") RegisteredSmoke(args.Length > 1 && args[1] == "--webview");
+            if (args.Length > 0 && args[0] == "--registered") RegisteredSmoke(args[1], args.Length > 2 && args[2] == "--webview");
             else if (args.Length > 0 && args[0] == "--script") Console.Write(TaskPane.BridgeScript("word"));
             else Policies();
             return 0;

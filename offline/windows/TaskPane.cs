@@ -141,23 +141,30 @@ public sealed class TaskPane : UserControl, ITaskPane
     {
         return value != null && value.StartsWith("blob:https://triobridge.local/", StringComparison.Ordinal);
     }
-    [DllImport("kernel32.dll", SetLastError = true)]
-    static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
-    static string ProcessArchitecture()
+    [StructLayout(LayoutKind.Sequential)]
+    struct SystemInfo
     {
-        try
+        public ushort ProcessorArchitecture, Reserved;
+        public uint PageSize;
+        public IntPtr MinimumApplicationAddress, MaximumApplicationAddress, ActiveProcessorMask;
+        public uint NumberOfProcessors, ProcessorType, AllocationGranularity;
+        public ushort ProcessorLevel, ProcessorRevision;
+    }
+    [DllImport("kernel32.dll")]
+    static extern void GetSystemInfo(out SystemInfo info);
+    internal static string ProcessArchitecture()
+    {
+        // Match the WebView2 SDK's process architecture detection. An x64 client
+        // running on Windows on Arm requires the x64 loader, including ARM64EC Office.
+        SystemInfo info;
+        GetSystemInfo(out info);
+        switch (info.ProcessorArchitecture)
         {
-            ushort processMachine, nativeMachine;
-            if (IsWow64Process2(new IntPtr(-1), out processMachine, out nativeMachine))
-            {
-                ushort machine = processMachine == 0 ? nativeMachine : processMachine;
-                if (machine == 0xaa64) return "arm64";
-                if (machine == 0x8664) return "x64";
-                if (machine == 0x014c) return "x86";
-            }
+            case 0: return "x86";
+            case 9: return "x64";
+            case 12: return "arm64";
+            default: throw new InvalidOperationException("不支持当前 Office 进程架构。");
         }
-        catch (EntryPointNotFoundException) { }
-        return IntPtr.Size == 8 ? "x64" : "x86";
     }
     [MethodImpl(MethodImplOptions.NoInlining)]
     async void Initialize(int session)
