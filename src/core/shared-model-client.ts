@@ -2,6 +2,7 @@ import { nativeWorkbench } from '../offline/transport';
 import type { ProfileDetails, SharedModelProfile } from './types';
 import { getLocalCapability } from './local-capability';
 import { startModelAudit } from './model-audit';
+import { isModelApiFormat, modelEndpoint } from '../../scripts/model-protocol.mjs';
 
 export type SharedCredential = { action: 'keep' | 'remove' } | { action: 'replace'; value: string };
 export interface SharedUpsertRequest {
@@ -68,6 +69,7 @@ export function parseSharedState(value: unknown): SharedStateSnapshot {
       profile.name.length > 100 ||
       typeof profile.baseUrl !== 'string' ||
       profile.baseUrl.length > 2048 ||
+      (profile.apiFormat !== undefined && !isModelApiFormat(profile.apiFormat)) ||
       typeof profile.model !== 'string' ||
       !profile.model.trim() ||
       profile.model.length > 200 ||
@@ -85,6 +87,7 @@ export function parseSharedState(value: unknown): SharedStateSnapshot {
       id: profile.id,
       name: profile.name,
       baseUrl: profile.baseUrl,
+      apiFormat: profile.apiFormat ?? 'openai',
       model: profile.model,
       timeoutSeconds: profile.timeoutSeconds as number,
       hasKey: profile.hasKey,
@@ -163,7 +166,7 @@ export function createSharedModelClient(
         : undefined;
     const audit = connection
       ? startModelAudit(
-          `${connection.profile.baseUrl.replace(/\/+$/, '').replace(/\/chat\/completions$/, '')}/chat/completions`,
+          modelEndpoint(connection.profile.baseUrl, connection.profile.apiFormat),
           connection.profile.model,
           [{ role: 'user', content: 'Reply with OK.' }],
           connection.credential.action === 'replace' ? connection.credential.value : '',

@@ -28,6 +28,10 @@ describe('OpenAI-compatible model client', () => {
     ['https://example.com/v1/', 'https://example.com/v1/chat/completions'],
     ['https://example.com/v1/chat/completions', 'https://example.com/v1/chat/completions'],
     ['http://127.0.0.1:11434/v1', 'http://127.0.0.1:11434/v1/chat/completions'],
+    [
+      'https://example.com/gateway/v1/messages',
+      'https://example.com/gateway/v1/messages/chat/completions',
+    ],
     ['/model-proxy/v1', '/model-proxy/v1/chat/completions'],
   ])('normalizes %s without appending /v1 implicitly', (base, url) => {
     expect(completionUrl(base)).toBe(url);
@@ -72,6 +76,74 @@ describe('OpenAI-compatible model client', () => {
       );
     await complete({ ...profile(), apiKey: '' }, messages, undefined, fetcher);
     expect(fetcher.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+  });
+  it('uses Claude Messages for a custom model regardless of its name and preserves structured text', async () => {
+    const model = {
+      ...profile(),
+      baseUrl: 'http://localhost:8001/v1/messages/',
+      apiFormat: 'anthropic' as const,
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        stop_reason: 'end_turn',
+        content: [
+          { type: 'text', text: '{"name":"q' },
+          { type: 'text', text: 'wen"}' },
+        ],
+      }),
+    );
+    const result = await complete(
+      model,
+      [{ role: 'system', content: 'Only JSON.' }, ...messages],
+      undefined,
+      fetcher,
+    );
+    expect(result).toBe('{"name":"qwen"}');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, options] = fetcher.mock.calls[0];
+    expect(url).toBe('http://localhost:8001/v1/messages');
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'x-api-key': model.apiKey,
+    });
+    expect(JSON.parse(options.body)).toMatchObject({
+      system: 'Only JSON.',
+      model: model.model,
+      messages,
+      stream: false,
+      max_tokens: 4096,
+    });
+    const saved = importProfiles(exportProfiles([model]))[0];
+    expect(saved).toMatchObject({ apiFormat: 'anthropic', apiKey: '' });
+  });
+  it.each([
+    ['max_tokens', '截断'],
+    ['model_context_window_exceeded', '截断'],
+    ['refusal', '未完成'],
+    ['tool_use', '完整'],
+    ['pause_turn', '完整'],
+  ])('keeps partial Claude results out of documents on %s', async (reason, message) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ stop_reason: reason, content: [{ type: 'text', text: 'partial' }] }),
+      );
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow(message);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('rejects malformed Claude text blocks instead of inserting a fragment', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'partial' }, { type: 'text' }],
+      }),
+    );
+    await expect(
+      complete({ ...profile(), apiFormat: 'anthropic' }, messages, undefined, fetcher),
+    ).rejects.toThrow('无效的文本片段');
   });
   it('identifies browser-direct local API failure and points to the shared entry', async () => {
     await expect(

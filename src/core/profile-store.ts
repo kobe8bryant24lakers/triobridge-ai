@@ -61,6 +61,7 @@ export const emptyProfile = (): ModelProfile => ({
   id: crypto.randomUUID(),
   name: '',
   baseUrl: 'https://api.openai.com/v1',
+  apiFormat: 'openai',
   model: '',
   apiKey: '',
   timeoutSeconds: 60,
@@ -79,10 +80,11 @@ function parseProfile(raw: unknown): ModelProfile {
     typeof p.timeoutSeconds !== 'number'
   )
     throw new Error('模型配置缺少必要字段。');
-  const profile = {
+  const profile: ModelProfile = {
     id: p.id,
     name: p.name,
     baseUrl: p.baseUrl,
+    apiFormat: p.apiFormat === undefined ? 'openai' : p.apiFormat,
     model: p.model,
     timeoutSeconds: p.timeoutSeconds,
     apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
@@ -162,6 +164,7 @@ export function exportProfiles(profiles: RuntimeModelProfile[]): string {
         id: p.id,
         name: p.name,
         baseUrl: p.baseUrl,
+        apiFormat: p.apiFormat ?? 'openai',
         model: p.model,
         timeoutSeconds: p.timeoutSeconds,
         apiKey: '',
@@ -322,14 +325,17 @@ export function createProfileController(options: ControllerOptions = {}) {
     async listLegacyProfiles() {
       const source = loadProfiles(local, session);
       if (source.warning) throw new Error(source.warning);
-      return source.profiles.map(({ id, name, baseUrl, model, timeoutSeconds, apiKey }) => ({
-        id,
-        name,
-        baseUrl,
-        model,
-        timeoutSeconds,
-        hasKey: Boolean(apiKey),
-      }));
+      return source.profiles.map(
+        ({ id, name, baseUrl, apiFormat, model, timeoutSeconds, apiKey }) => ({
+          id,
+          name,
+          baseUrl,
+          apiFormat,
+          model,
+          timeoutSeconds,
+          hasKey: Boolean(apiKey),
+        }),
+      );
     },
     async migrateLocal(expectedRevision, ids, signal) {
       // This is the only shared-mode operation that reads old browser credentials.
@@ -344,12 +350,14 @@ export function createProfileController(options: ControllerOptions = {}) {
       const migrated = await actions.importProfiles(
         {
           expectedRevision,
-          profiles: selected.map(({ id, name, baseUrl, model, timeoutSeconds, apiKey }) => ({
-            profile: { id, name, baseUrl, model, timeoutSeconds },
-            credential: apiKey
-              ? { action: 'replace' as const, value: apiKey }
-              : { action: 'remove' as const },
-          })),
+          profiles: selected.map(
+            ({ id, name, baseUrl, apiFormat, model, timeoutSeconds, apiKey }) => ({
+              profile: { id, name, baseUrl, apiFormat, model, timeoutSeconds },
+              credential: apiKey
+                ? { action: 'replace' as const, value: apiKey }
+                : { action: 'remove' as const },
+            }),
+          ),
           activeId: selected.some((p) => p.id === source.activeId)
             ? source.activeId
             : sharedActive || selected[0].id,

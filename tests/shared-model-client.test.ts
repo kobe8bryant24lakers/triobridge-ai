@@ -30,7 +30,14 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 describe('shared metadata and fixed local routing', () => {
   it('keeps shared metadata structurally free of saved keys', () => {
     const parsed = parseSharedState({ ...state, warning: 'cleanup pending' });
-    expect(parsed.profiles[0]).toEqual({ ...publicProfile, kind: 'shared' });
+    expect(parsed.profiles[0]).toEqual({ ...publicProfile, kind: 'shared', apiFormat: 'openai' });
+    expect(
+      parseSharedState({ ...state, profiles: [{ ...publicProfile, apiFormat: 'anthropic' }] })
+        .profiles[0].apiFormat,
+    ).toBe('anthropic');
+    expect(() =>
+      parseSharedState({ ...state, profiles: [{ ...publicProfile, apiFormat: 'unknown' }] }),
+    ).toThrow();
     expect(parsed.profiles[0]).not.toHaveProperty('apiKey');
     expect(parsed.warning).toBe('cleanup pending');
     expect(() =>

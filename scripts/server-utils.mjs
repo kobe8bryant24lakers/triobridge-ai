@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { modelHeaders } from './model-protocol.mjs';
 
 export function tlsOptions(env = process.env) {
   const certDir = join(homedir(), '.office-addin-dev-certs');
@@ -81,8 +82,8 @@ export function createProxy(target, allowedOrigin) {
       return;
     }
     const path = requestPath.slice('/model-proxy'.length);
-    if (!/^\/(?:[\w-]+\/)*chat\/completions$/.test(path) || req.url.includes('?')) {
-      sendError(400, 'Only chat/completions paths are supported.');
+    if (!/^\/(?:[\w-]+\/)*(?:chat\/completions|messages)$/.test(path) || req.url.includes('?')) {
+      sendError(400, 'Only Chat Completions and Messages paths are supported.');
       return;
     }
     const controller = new AbortController();
@@ -114,10 +115,12 @@ export function createProxy(target, allowedOrigin) {
         method: 'POST',
         signal: controller.signal,
         redirect: 'error',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-        },
+        headers: path.endsWith('/messages')
+          ? modelHeaders('anthropic', req.headers['x-api-key'])
+          : {
+              'Content-Type': 'application/json',
+              ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+            },
         body: payload,
       });
       const reader = response.body?.getReader();

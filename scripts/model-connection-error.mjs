@@ -40,7 +40,7 @@ export function modelConnectionError(error, endpoint) {
   )
     return `无法验证模型服务 ${target} 的 HTTPS 证书。请检查证书有效期、主机名和 Node.js 的受信任证书配置。`;
   if (has('ERR_SSL_WRONG_VERSION_NUMBER', 'HPE_INVALID_CONSTANT'))
-    return `模型服务 ${target} 未返回有效的 HTTP 响应。请确认协议、端口以及 OpenAI 兼容 API 地址正确。`;
+    return `模型服务 ${target} 未返回有效的 HTTP 响应。请确认 HTTP 或 HTTPS、端口和 API 地址与模型服务一致。`;
   if (has('ENETUNREACH', 'EHOSTUNREACH'))
     return `本机服务无法访问 ${target} 所在的网络。请检查网络连接、路由和防火墙。${localHelp}`;
   return `本机服务无法连接模型服务 ${target}。请检查 API 是否运行、服务地址及 API 日志。${localHelp}`;

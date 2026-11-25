@@ -2,10 +2,14 @@ export type HostKind = 'word' | 'excel' | 'powerpoint';
 export type OutputKind = 'text' | 'formula' | 'outline' | 'document' | 'table';
 export type WriteKind = 'replace' | 'insert' | 'formula' | 'slides' | 'document' | 'table';
 
+export type ModelApiFormat = 'openai' | 'anthropic';
+
 export interface ModelProfile {
   id: string;
   name: string;
   baseUrl: string;
+  /** Profiles created before format selection use OpenAI Chat Completions. */
+  apiFormat?: ModelApiFormat;
   model: string;
   apiKey: string;
   timeoutSeconds: number;
@@ -14,7 +18,7 @@ export interface ModelProfile {
 
 export type ProfileDetails = Pick<
   ModelProfile,
-  'id' | 'name' | 'baseUrl' | 'model' | 'timeoutSeconds'
+  'id' | 'name' | 'baseUrl' | 'apiFormat' | 'model' | 'timeoutSeconds'
 >;
 
 /** Saved shared credentials never enter the browser's profile state. */

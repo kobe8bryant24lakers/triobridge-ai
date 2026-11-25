@@ -12,7 +12,7 @@ web
 
 ## Product Purpose
 
-让 Word、Excel、PowerPoint 连接用户自己的 OpenAI 兼容模型。用户读取选区、选择任务、查看生成结果，然后确认写回。
+让 Word、Excel、PowerPoint 连接用户自己的模型服务，支持 OpenAI Chat Completions 和 Claude（Anthropic Messages）两种接口。用户读取选区、选择任务、查看生成结果，然后确认写回。
 
 ## Operating Context
 

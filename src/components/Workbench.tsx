@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { complete } from '../core/model-client';
+import { customFormatSuffix } from '../core/model-presets';
 import { outlineToText, parseFormula, parseOutline } from '../core/output';
 import {
   HOST_NAMES,
@@ -418,6 +419,7 @@ export function Workbench({
             {profiles.profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} · {p.model}
+                {customFormatSuffix(p)}
               </option>
             ))}
           </select>

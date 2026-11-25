@@ -93,7 +93,33 @@ test('connect-and-save and generation reach a real loopback HTTP API without bro
     });
     res.setHeader('Content-Type', 'application/json');
     // Deliberately no CORS headers: only the local Node service should call this API.
-    res.end(JSON.stringify({ choices: [{ message: { content: 'synthetic transport OK' } }] }));
+    const text = 'synthetic transport OK';
+    const claude = req.url === '/v1/messages';
+    if (claude) res.setHeader('request-id', 'messages-request-id');
+    res.end(
+      JSON.stringify(
+        claude
+          ? {
+              id: 'msg-local',
+              type: 'message',
+              role: 'assistant',
+              model: profile.model,
+              content: [
+                { type: 'thinking', thinking: 'private-reasoning' },
+                { type: 'text', text: 'synthetic ' },
+                { type: 'text', text: 'transport OK' },
+              ],
+              stop_reason: 'end_turn',
+              usage: {
+                input_tokens: 10,
+                cache_creation_input_tokens: 2,
+                cache_read_input_tokens: 3,
+                output_tokens: 4,
+              },
+            }
+          : { choices: [{ message: { content: text } }] },
+      ),
+    );
   });
   api.listen(0, '127.0.0.1');
   await once(api, 'listening');
@@ -102,59 +128,112 @@ test('connect-and-save and generation reach a real loopback HTTP API without bro
     await new Promise((resolve) => api.close(resolve));
   });
   const baseUrl = `http://127.0.0.1:${api.address().port}/v1`;
-  for (const withKey of [false, true]) {
-    await t.test(
-      withKey ? 'with a saved key and full endpoint' : 'without authentication',
-      async (t) => {
-        const { request, keys } = await fixture(t, fetch);
-        const saved = await request('upsert', {
-          expectedRevision: 0,
-          profile: { ...profile, baseUrl: withKey ? `${baseUrl}/chat/completions/` : baseUrl },
-          credential: withKey
-            ? { action: 'replace', value: 'synthetic-api-key' }
-            : { action: 'remove' },
-          testConnection: true,
-          activate: true,
-        });
-        assert.equal(saved.status, 200);
-        const state = await saved.json();
-        assert.equal(state.profiles[0].hasKey, withKey);
-        assert.equal(keys.size, withKey ? 1 : 0);
-        assert.equal(JSON.stringify(state).includes('synthetic-api-key'), false);
-        const completion = await request('complete', {
-          profileId: profile.id,
-          profileRevision: state.profiles[0].revision,
-          messages: [{ role: 'user', content: 'synthetic document' }],
-        });
-        assert.equal(completion.status, 200);
-        assert.equal(
-          (await completion.json()).choices[0].message.content,
-          'synthetic transport OK',
-        );
-        const recent = requests.slice(-2);
-        assert.deepEqual(
-          recent.map((r) => r.path),
-          ['/v1/chat/completions', '/v1/chat/completions'],
-        );
-        assert.deepEqual(
-          recent.map((r) => r.body.model),
-          [profile.model, profile.model],
-        );
-        assert.deepEqual(
-          recent.map((r) => r.body.stream),
-          [false, false],
-        );
-        assert.equal(recent[0].body.messages[0].content, 'Reply with OK.');
-        assert.equal(recent[1].body.messages[0].content, 'synthetic document');
-        for (const r of recent) {
-          assert.equal(r.headers.authorization, withKey ? 'Bearer synthetic-api-key' : undefined);
-          assert.equal(r.headers['x-triobridge-local-token'], undefined);
-          assert.equal(r.headers.origin, undefined);
-        }
-      },
-    );
+  for (const apiFormat of ['openai', 'anthropic']) {
+    for (const withKey of [false, true]) {
+      const claude = apiFormat === 'anthropic';
+      const route = claude ? '/messages' : '/chat/completions';
+      await t.test(
+        apiFormat + (withKey ? ' with a saved key and full endpoint' : ' without authentication'),
+        async (t) => {
+          const { request, keys } = await fixture(t, fetch);
+          const saved = await request('upsert', {
+            expectedRevision: 0,
+            profile: { ...profile, apiFormat, baseUrl: withKey ? baseUrl + route + '/' : baseUrl },
+            credential: withKey
+              ? { action: 'replace', value: 'synthetic-api-key' }
+              : { action: 'remove' },
+            testConnection: true,
+            activate: true,
+          });
+          assert.equal(saved.status, 200);
+          const state = await saved.json();
+          assert.equal(state.profiles[0].apiFormat, apiFormat);
+          assert.equal(state.profiles[0].hasKey, withKey);
+          assert.equal(keys.size, withKey ? 1 : 0);
+          assert.equal(JSON.stringify(state).includes('synthetic-api-key'), false);
+          const completion = await request('complete', {
+            profileId: profile.id,
+            profileRevision: state.profiles[0].revision,
+            messages: [
+              { role: 'system', content: 'Prepare an editable slide.' },
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'synthetic document' },
+                  {
+                    type: 'image_url',
+                    image_url: { url: 'data:image/png;base64,eA==', detail: 'low' },
+                  },
+                ],
+              },
+            ],
+          });
+          assert.equal(completion.status, 200);
+          const data = await completion.json();
+          assert.equal(data.choices[0].message.content, 'synthetic transport OK');
+          if (claude) {
+            assert.equal(completion.headers.get('x-request-id'), 'messages-request-id');
+            assert.equal(data.choices[0].finish_reason, 'stop');
+            assert.deepEqual(data.usage, {
+              prompt_tokens: 15,
+              completion_tokens: 4,
+              total_tokens: 19,
+              prompt_tokens_details: { cached_tokens: 3 },
+            });
+            assert.equal(JSON.stringify(data).includes('private-reasoning'), false);
+          }
+          const recent = requests.slice(-2);
+          assert.deepEqual(
+            recent.map((r) => r.path),
+            ['/v1' + route, '/v1' + route],
+          );
+          assert.deepEqual(
+            recent.map((r) => r.body.model),
+            [profile.model, profile.model],
+          );
+          assert.deepEqual(
+            recent.map((r) => r.body.stream),
+            [false, false],
+          );
+          assert.equal(recent[0].body.messages[0].content, 'Reply with OK.');
+          if (claude) {
+            assert.equal(recent[0].body.system, undefined);
+            assert.equal(recent[1].body.system, 'Prepare an editable slide.');
+            assert.deepEqual(recent[1].body.messages, [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'synthetic document' },
+                  {
+                    type: 'image',
+                    source: { type: 'base64', media_type: 'image/png', data: 'eA==' },
+                  },
+                ],
+              },
+            ]);
+          } else {
+            assert.equal(recent[1].body.messages[0].role, 'system');
+            assert.equal(recent[1].body.messages[1].content[0].text, 'synthetic document');
+          }
+          for (const r of recent) {
+            assert.equal(
+              r.headers.authorization,
+              withKey && !claude ? 'Bearer synthetic-api-key' : undefined,
+            );
+            assert.equal(
+              r.headers['x-api-key'],
+              withKey && claude ? 'synthetic-api-key' : undefined,
+            );
+            assert.equal(r.headers['anthropic-version'], claude ? '2023-06-01' : undefined);
+            if (claude) assert.ok(r.body.max_tokens > 0);
+            assert.equal(r.headers['x-triobridge-local-token'], undefined);
+            assert.equal(r.headers.origin, undefined);
+          }
+        },
+      );
+    }
   }
-  assert.equal(requests.length, 4);
+  assert.equal(requests.length, 8);
 });
 
 test('a refused local API connection explains the port and never saves the proposed key', async (t) => {

@@ -22,10 +22,60 @@ import {
   type SharedProfileState,
   type SharedModelActions,
 } from '../core/profile-store';
-import { testConnection, validateProfile } from '../core/model-client';
-import { MODEL_PRESETS, presetFor } from '../core/model-presets';
+import { completionUrl, testConnection, validateProfile } from '../core/model-client';
+import { MODEL_PRESETS, presetFor, customFormatSuffix } from '../core/model-presets';
 import { officeError } from '../office/bridge';
-import type { ModelProfile, ProfileDetails, SharedModelProfile } from '../core/types';
+import type {
+  ModelApiFormat,
+  ModelProfile,
+  ProfileDetails,
+  SharedModelProfile,
+} from '../core/types';
+
+function ApiFormatField({
+  profile,
+  onChange,
+}: {
+  profile: ModelProfile;
+  onChange: (format: ModelApiFormat) => void;
+}) {
+  let help = '选择本地推理服务提供的接口格式。';
+  let endpoint;
+  if (profile.baseUrl.trim()) {
+    try {
+      endpoint = completionUrl(profile.baseUrl, profile.apiFormat);
+    } catch (error) {
+      help = (error as Error).message;
+    }
+  }
+  return (
+    <>
+      <label>
+        接口格式
+        <select
+          aria-label="接口格式"
+          value={profile.apiFormat ?? 'openai'}
+          onChange={(event) => onChange(event.target.value as ModelApiFormat)}
+          aria-describedby="model-endpoint"
+        >
+          <option value="openai">OpenAI（Chat Completions）</option>
+          <option value="anthropic">Claude（Anthropic Messages）</option>
+        </select>
+      </label>
+      <p className="field-help connection-summary" id="model-endpoint">
+        {endpoint ? (
+          <>
+            请求发送至 <span>{endpoint}</span>
+          </>
+        ) : (
+          help
+        )}
+        {endpoint?.endsWith('/v1/messages/chat/completions') &&
+          '。如需直接调用 /v1/messages，请选择 Claude 格式。'}
+      </p>
+    </>
+  );
+}
 
 function sharedDraft(profile?: SharedModelProfile): ModelProfile {
   const blank = emptyProfile();
@@ -34,6 +84,7 @@ function sharedDraft(profile?: SharedModelProfile): ModelProfile {
     id: profile.id,
     name: profile.name,
     baseUrl: profile.baseUrl,
+    apiFormat: profile.apiFormat ?? 'openai',
     model: profile.model,
     timeoutSeconds: profile.timeoutSeconds,
     apiKey: '',
@@ -112,6 +163,7 @@ function LocalModelSettings({
         ...p,
         name: next.name,
         baseUrl: next.baseUrl,
+        apiFormat: 'openai',
         model: next.model,
         apiKey: '',
         rememberKey: false,
@@ -120,13 +172,14 @@ function LocalModelSettings({
     setDeleting(false);
   }
   function field<K extends keyof ModelProfile>(key: K, value: ModelProfile[K]) {
-    if (key === 'baseUrl' || key === 'model') setShowApiKey(false);
+    const destination = key === 'baseUrl' || key === 'apiFormat';
+    if (destination || key === 'model') setShowApiKey(false);
     setDraft((p) => ({
       ...p,
       [key]: value,
-      ...(key === 'baseUrl' && value !== p.baseUrl ? { apiKey: '', rememberKey: false } : {}),
+      ...(destination && value !== p[key] ? { apiKey: '', rememberKey: false } : {}),
     }));
-    if (key === 'baseUrl' || key === 'model') setProvider('custom');
+    if (destination || key === 'model') setProvider('custom');
     setStatus(undefined);
     setDeleting(false);
   }
@@ -249,6 +302,7 @@ function LocalModelSettings({
               {state.profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                  {customFormatSuffix(p)}
                 </option>
               ))}
             </select>
@@ -287,20 +341,24 @@ function LocalModelSettings({
               <option value="custom">自定义 / 本地模型</option>
             </select>
           </label>
-          {provider && (
-            <p className="field-help connection-summary">
-              请求发送至 <span>{draft.baseUrl}</span>
-              {draft.model && <> · 模型 {draft.model}</>}
-              {preset && (
-                <>
-                  {' '}
-                  ·{' '}
-                  <a href={preset.docsUrl} target="_blank" rel="noreferrer">
-                    服务说明
-                  </a>
-                </>
-              )}
-            </p>
+          {provider === 'custom' ? (
+            <ApiFormatField profile={draft} onChange={(value) => field('apiFormat', value)} />
+          ) : (
+            provider && (
+              <p className="field-help connection-summary">
+                请求发送至 <span>{draft.baseUrl}</span>
+                {draft.model && <> · 模型 {draft.model}</>}
+                {preset && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <a href={preset.docsUrl} target="_blank" rel="noreferrer">
+                      服务说明
+                    </a>
+                  </>
+                )}
+              </p>
+            )
           )}
           <div className="api-key-field">
             <label className="inline-label" htmlFor="model-api-key">
@@ -375,11 +433,11 @@ function LocalModelSettings({
                   placeholder="https://api.example.com/v1"
                   spellCheck={false}
                   autoComplete="off"
-                  aria-describedby="url-help"
+                  aria-describedby={provider === 'custom' ? 'url-help model-endpoint' : 'url-help'}
                 />
               </label>
               <p className="field-help" id="url-help">
-                使用服务商提供的完整地址，不会自动补 /v1。更换地址后需重新填写密钥。
+                可填写基础地址或完整接口地址。更换地址或接口格式后需重新填写密钥。
               </p>
               <label>
                 模型 ID
@@ -532,6 +590,7 @@ function SharedModelSettings({
   const [baseline, setBaseline] = useState(() => ({
     revision: state.revision,
     baseUrl: initial?.baseUrl ?? '',
+    apiFormat: initial?.apiFormat ?? 'openai',
     hasKey: initial?.hasKey ?? false,
   }));
   const [provider, setProvider] = useState(() => sharedProvider(sharedDraft(initial)));
@@ -573,6 +632,7 @@ function SharedModelSettings({
     setBaseline({
       revision: next.revision,
       baseUrl: profile?.baseUrl ?? '',
+      apiFormat: profile?.apiFormat ?? 'openai',
       hasKey: profile?.hasKey ?? false,
     });
     setProvider(sharedProvider(value));
@@ -599,14 +659,14 @@ function SharedModelSettings({
   }, [state.revision, baseline.revision, dirty, busy]);
 
   function field<K extends keyof ModelProfile>(key: K, value: ModelProfile[K]) {
+    const destination = key === 'baseUrl' || key === 'apiFormat';
     setDraft((current) => ({
       ...current,
       [key]: value,
-      ...(key === 'baseUrl' && value !== current.baseUrl ? { apiKey: '' } : {}),
+      ...(destination && value !== current[key] ? { apiKey: '' } : {}),
     }));
-    if (key === 'baseUrl')
-      setCredential((current) => (current === 'remove' ? 'remove' : 'replace'));
-    if (key === 'baseUrl' || key === 'model') {
+    if (destination) setCredential((current) => (current === 'remove' ? 'remove' : 'replace'));
+    if (destination || key === 'model') {
       if (provider !== 'device') setProvider('custom');
       setShowApiKey(false);
     }
@@ -629,6 +689,7 @@ function SharedModelSettings({
         ...current,
         name: '本机模型',
         baseUrl: 'http://127.0.0.1:8001/v1',
+        apiFormat: 'openai',
         model: '',
         apiKey: '',
       }));
@@ -639,6 +700,7 @@ function SharedModelSettings({
         ...current,
         name: preset.name,
         baseUrl: preset.baseUrl,
+        apiFormat: 'openai',
         model: preset.model,
         apiKey: '',
       }));
@@ -682,12 +744,16 @@ function SharedModelSettings({
         id: draft.id,
         name: draft.name.trim(),
         baseUrl: draft.baseUrl.trim(),
+        apiFormat: draft.apiFormat ?? 'openai',
         model: draft.model.trim(),
         timeoutSeconds: draft.timeoutSeconds,
       };
       validateProfile({ ...profile, apiKey: draft.apiKey.trim(), rememberKey: false });
-      if (credential === 'keep' && profile.baseUrl !== baseline.baseUrl)
-        throw new Error('服务地址已更改，请填写新密钥或选择不使用密钥。');
+      if (
+        credential === 'keep' &&
+        (profile.baseUrl !== baseline.baseUrl || profile.apiFormat !== baseline.apiFormat)
+      )
+        throw new Error('服务地址或接口格式已更改，请填写新密钥或选择不使用密钥。');
       if (credential === 'replace' && !draft.apiKey.trim())
         throw new Error('请填写新密钥；无需密钥的服务请选择「不使用密钥」。');
       const key =
@@ -773,8 +839,8 @@ function SharedModelSettings({
     try {
       if (file.size > 100_000) throw new Error('配置文件过大。');
       const profiles = importProfiles(await file.text());
-      const items = profiles.map(({ id, name, baseUrl, model, timeoutSeconds }) => ({
-        profile: { id, name, baseUrl, model, timeoutSeconds },
+      const items = profiles.map(({ id, name, baseUrl, apiFormat, model, timeoutSeconds }) => ({
+        profile: { id, name, baseUrl, apiFormat, model, timeoutSeconds },
         credential: { action: 'remove' as const },
       }));
       void run(
@@ -932,6 +998,7 @@ function SharedModelSettings({
         <label className="grow">
           本机共享模型
           <select
+            aria-label="本机共享模型"
             value={existing ? draft.id : ''}
             disabled={blocked}
             onChange={(event) =>
@@ -947,6 +1014,7 @@ function SharedModelSettings({
             {state.profiles.map((profile) => (
               <option key={profile.id} value={profile.id}>
                 {profile.name}
+                {customFormatSuffix(profile)}
                 {profile.id === state.activeId ? ' · 当前使用' : ''}
               </option>
             ))}
@@ -989,11 +1057,15 @@ function SharedModelSettings({
               <option value="custom">自定义 / 本地模型</option>
             </select>
           </label>
-          {provider && (
-            <p className="field-help connection-summary">
-              请求发送至 <span>{draft.baseUrl}</span>
-              {draft.model && <> · 模型 {draft.model}</>}
-            </p>
+          {provider === 'custom' || provider === 'device' ? (
+            <ApiFormatField profile={draft} onChange={(value) => field('apiFormat', value)} />
+          ) : (
+            provider && (
+              <p className="field-help connection-summary">
+                请求发送至 <span>{draft.baseUrl}</span>
+                {draft.model && <> · 模型 {draft.model}</>}
+              </p>
+            )
           )}
           <div className="shared-key-status">
             <KeyRound size={16} aria-hidden="true" />
@@ -1012,9 +1084,11 @@ function SharedModelSettings({
                 setStatus(undefined);
               }}
             >
-              {baseline.hasKey && draft.baseUrl === baseline.baseUrl && (
-                <option value="keep">保留已保存的密钥</option>
-              )}
+              {baseline.hasKey &&
+                draft.baseUrl === baseline.baseUrl &&
+                draft.apiFormat === baseline.apiFormat && (
+                  <option value="keep">保留已保存的密钥</option>
+                )}
               <option value="replace">{baseline.hasKey ? '替换密钥' : '填写密钥'}</option>
               <option value="remove">{baseline.hasKey ? '删除已保存的密钥' : '不使用密钥'}</option>
             </select>
@@ -1094,11 +1168,15 @@ function SharedModelSettings({
                   placeholder="https://api.example.com/v1"
                   autoComplete="off"
                   spellCheck={false}
-                  aria-describedby="shared-url-help"
+                  aria-describedby={
+                    provider === 'custom' || provider === 'device'
+                      ? 'shared-url-help model-endpoint'
+                      : 'shared-url-help'
+                  }
                 />
               </label>
               <p id="shared-url-help" className="field-help">
-                使用服务商提供的完整地址。更换地址后需填写新密钥，或明确选择不使用密钥。
+                可填写基础地址或完整接口地址。更换地址或接口格式后，请重新填写密钥或选择“不使用密钥”。
               </p>
               <label>
                 模型 ID

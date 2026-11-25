@@ -1,5 +1,22 @@
 # 同机共享模型
 
+## 桌面工作台
+
+打开“模型设置 → 新增 → 本机 API”或“自定义 / 本地模型”。填写推理程序显示的地址和模型 ID。按推理服务支持的接口选择格式。同一模型 ID 可分别保存两种格式，升级前已有的配置默认使用 OpenAI。
+
+| 接口格式 | 基础地址示例 | 工作台发起请求的路径 |
+| --- | --- | --- |
+| OpenAI（Chat Completions） | `http://127.0.0.1:8001/v1` | `/v1/chat/completions` |
+| Claude（Anthropic Messages） | `http://127.0.0.1:8001/v1` | `/v1/messages` |
+
+可根据推理服务文档的请求示例识别格式。OpenAI 响应的正文位于 `choices[0].message.content`，Claude 响应使用 `content` 内容块。[OpenAI 接口文档](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) · [Claude 接口文档](https://platform.claude.com/docs/en/api/messages/create)
+
+设置页会显示实际请求地址，也可以直接粘贴该格式的完整接口地址。推理服务允许匿名访问时，选择“不使用密钥”。点击“连接并保存”会用所选格式发送一条测试消息。在任一工作台切换当前模型，三个应用会共用该配置。原有配置默认使用 OpenAI。
+
+## v0.5.x 及更早版本
+
+以下安装和诊断步骤适用于使用本机 HTTPS 服务的旧版加载项。
+
 本机共享版在同一台电脑、同一个系统账号下，让 Word、Excel、PowerPoint 共用模型列表和当前默认模型。可以新增多个模型，并在任一应用切换；其他应用会在刷新、重新聚焦或下一次同步时更新。
 
 在线静态版仍使用各应用自己的存储，不能保证跨 Office 共享。微软明确不保证 cookies 或 localStorage 在不同 Office 应用之间通用，见[加载项状态与设置](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/persisting-add-in-state-and-settings)。

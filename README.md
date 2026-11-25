@@ -8,10 +8,10 @@ Use your own models in Word, Excel, and PowerPoint. The workbench opens compiled
 
 | System and processor | Installer |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.6.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Reopen a document and choose **三桥 AI → 打开工作台** in the ribbon.
 
@@ -23,7 +23,9 @@ The Mac package uses an ad hoc signature. The Windows package has no Authenticod
 
 ## Model settings
 
-Add a profile in model settings or select an existing provider. Enter your existing OpenAI-compatible API base URL (for example `http://127.0.0.1:8001/v1`), actual model ID, and a key if required. Connect and save sends a real request. The three Office apps share profiles and the active selection. Keys are held in macOS Keychain or Windows Credential Manager.
+In model settings, add a **Local API** or **Custom** profile. Enter your server’s base URL (for example `http://127.0.0.1:8001/v1`) and model ID, then select the **API format** your server supports. With this base URL, OpenAI Chat Completions calls `/v1/chat/completions` and Claude (Anthropic Messages) calls `/v1/messages`. Existing profiles default to OpenAI.
+
+Enter a key if your server requires one. **Connect and save** tests the connection with a real request. Word, Excel and PowerPoint share the saved profiles and the active selection. Keys are stored in macOS Keychain or Windows Credential Manager.
 
 Cloud inference requires a connection to your provider. Local inference uses your existing model API. The installer contains the workbench and Office integration. Model weights are supplied by your inference runtime.
 
