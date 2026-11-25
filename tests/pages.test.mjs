@@ -42,6 +42,7 @@ test('site packaging copies only approved files for both languages and refuses s
       'zh-CN.html',
     ]);
     assert.deepEqual((await readdir(join(output, 'assets'))).sort(), [
+      'TrioBridge-AI-User-Guide-en.pptx',
       'TrioBridge-AI-User-Guide-zh-CN.pptx',
       'icon.svg',
       'workbench.png',

@@ -4,7 +4,7 @@
 
 Use your own models in Word, Excel, and PowerPoint. Open the workbench in a separate desktop window or beside your document in an Office task pane.
 
-Learn how to connect a model, generate content, and confirm changes in each Office app. [Download the illustrated user guide in Simplified Chinese (PowerPoint, 40 slides)](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-zh-CN.pptx)
+Learn how to connect a model, generate content, and confirm changes in each Office app. [Download the illustrated user guide in English (PowerPoint, 40 slides)](https://kobe8bryant24lakers.github.io/triobridge-ai/assets/TrioBridge-AI-User-Guide-en.pptx)
 
 ## Download and install
 
