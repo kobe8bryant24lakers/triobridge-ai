@@ -114,7 +114,19 @@ const [packed] = await packager({
 if (platform === 'win32') {
   const dest = join(payload, 'Workbench');
   await cp(packed, dest, { recursive: true });
-  assembly('library', join(dest, 'TrioBridge.Ribbon.dll'), 'Ribbon.cs');
+  // Desktop Office uses its own bitness, independent of the installed Electron architecture.
+  for (const [target, archName] of [
+    ['Win32', 'x86'],
+    ['x64', 'x64'],
+  ]) {
+    const build = join(work, 'ribbon-' + archName);
+    run('cmake', ['-S', join(root, 'offline/windows'), '-B', build, '-A', target]);
+    run('cmake', ['--build', build, '--config', 'Release']);
+    await copy(
+      join(build, 'Release', 'Ribbon.dll'),
+      join(dest, 'TrioBridge.Ribbon.' + archName + '.dll'),
+    );
+  }
   assembly('exe', join(payload, 'Setup.exe'), 'Setup.cs', ['System.Core']);
   await writeFile(join(dest, 'workbench.id'), 'ai.triobridge.workbench\n');
   for (const [file, args] of [

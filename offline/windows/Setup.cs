@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Win32;
 
 namespace TrioBridge {
@@ -28,23 +27,15 @@ namespace TrioBridge {
       }
     }
     static RegistryKey Key(RegistryKey root,string path){var k=root.CreateSubKey(path);k.SetValue("TrioBridgeOwner",Owner);return k;}
-    static void SetManagedClass(RegistryKey key,string dll,string identity){
-      key.SetValue("Class","TrioBridge.Ribbon");key.SetValue("Assembly",identity);
-      key.SetValue("RuntimeVersion","v4.0.30319");key.SetValue("CodeBase",new Uri(dll).AbsoluteUri);
-    }
     static void Register(){
-      string dll=Path.Combine(Dest,"TrioBridge.Ribbon.dll"),identity=AssemblyName.GetAssemblyName(dll).FullName;
       foreach(var v in Views)using(var root=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,v)){
         using(var cls=Key(root,Clsid)){
           cls.SetValue("","TrioBridge Office Workbench");
-          using(var category=cls.CreateSubKey(@"Implemented Categories\{62C8FE65-4EBB-45E7-B440-6E39B2CDBF29}")){}
           using(var p=cls.CreateSubKey("ProgId"))p.SetValue("",Prog);
-          using(var s=cls.CreateSubKey("InprocServer32")){
-            string windows=Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            string system=Environment.Is64BitOperatingSystem && v==RegistryView.Registry32?"SysWOW64":"System32";
-            s.SetValue("",Path.Combine(windows,system,"mscoree.dll"));s.SetValue("ThreadingModel","Both");
-            SetManagedClass(s,dll,identity);
-            using(var version=s.CreateSubKey(AssemblyName.GetAssemblyName(dll).Version.ToString())) SetManagedClass(version,dll,identity);
+          using(var server=cls.CreateSubKey("InprocServer32")){
+            string binary=v==RegistryView.Registry64?"TrioBridge.Ribbon.x64.dll":"TrioBridge.Ribbon.x86.dll";
+            server.SetValue("",Path.Combine(Dest,binary));
+            server.SetValue("ThreadingModel","Apartment");
           }
         }
         using(var p=Key(root,ProgKey))using(var c=p.CreateSubKey("CLSID"))c.SetValue("",Id);
@@ -65,7 +56,7 @@ namespace TrioBridge {
     }
     static void Install(){
       string src=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Workbench");
-      if(!Owned(src)||!File.Exists(Path.Combine(src,"TrioBridge AI.exe"))||!File.Exists(Path.Combine(src,"TrioBridge.Ribbon.dll")))throw new IOException("请先完整解压安装包，再打开 Install。");
+      if(!Owned(src)||!File.Exists(Path.Combine(src,"TrioBridge AI.exe"))||!File.Exists(Path.Combine(src,"TrioBridge.Ribbon.x86.dll"))||!File.Exists(Path.Combine(src,"TrioBridge.Ribbon.x64.dll")))throw new IOException("请先完整解压安装包，再打开 Install。");
       if(Directory.Exists(Dest)&&!Owned(Dest))throw new IOException("目标文件夹中存在其他程序，请检查安装目录。");
       VerifyKeys();Directory.CreateDirectory(Parent);
       string stage=Path.Combine(Parent,".setup-"+Guid.NewGuid().ToString("N")),old=stage+"-previous";

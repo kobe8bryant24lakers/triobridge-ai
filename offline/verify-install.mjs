@@ -39,10 +39,8 @@ if (mac) {
         ]);
         assert.match(val, /0x3/);
       }
-    const ps = join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe');
-    const verify =
-      "$ErrorActionPreference='Stop'; $t=[type]::GetTypeFromProgID('TrioBridge.Workbench',$true); $o=[Activator]::CreateInstance($t); $a=[Reflection.Assembly]::LoadFrom((Join-Path $env:LOCALAPPDATA 'TrioBridgeAI\\Workbench\\TrioBridge.Ribbon.dll')); $i=$a.GetType('TrioBridge.IRibbon'); $x=[xml]$i.GetMethod('GetCustomUI').Invoke($o,@('Microsoft.Word.Document')); if($x.customUI.ribbon.tabs.tab.group.button.onAction -ne 'OpenWorkbench'){throw 'Invalid ribbon'}";
-    run(ps, ['-NoProfile', '-NonInteractive', '-Command', verify]);
+    for (const arch of ['x86', 'x64'])
+      run(join(bundle, '..', 'ribbon-' + arch, 'Release', 'RibbonCheck.exe'), []);
     const result = JSON.parse(
       execFileSync(join(resources, 'native/Office.exe'), {
         input: JSON.stringify({ host: 'word', op: 'selection' }),
