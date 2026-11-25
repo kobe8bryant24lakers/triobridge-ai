@@ -1,3 +1,4 @@
+import { nativeWorkbench } from '../offline/transport';
 import type { ProfileDetails, SharedModelProfile } from './types';
 import { getLocalCapability } from './local-capability';
 import { startModelAudit } from './model-audit';
@@ -106,6 +107,7 @@ export function parseSharedState(value: unknown): SharedStateSnapshot {
 }
 
 export function localModelHeaders(capability = getLocalCapability()): Record<string, string> {
+  if (nativeWorkbench()) return { 'Content-Type': 'application/json' };
   if (!capability)
     throw new SharedModelClientError(
       '请从本机安装的共享加载项打开。当前入口没有本机共享凭据。',

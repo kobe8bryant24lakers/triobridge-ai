@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Ship a single desktop workbench for Word, Excel and PowerPoint. Windows uses an Office ribbon button and Mac uses an application Services menu.
+- Open the packaged page directly from disk. Model calls use the selected endpoint and credentials shared across the current user's three applications.
+- Distribute installers by OS and processor. The download site hosts the guide and links to release assets.
+
+
 ## 0.5.2 — 2026-11-24
 
 Windows shared setup verifies existing private permissions before changing them. A temporary file lock can clear during startup. After an unreadable first catalog is corrected, the same service can read it again. UTF-8 BOM catalogs retain their original bytes on read. The installer records a specific storage reason and the standalone diagnostic checks file metadata.

@@ -38,13 +38,6 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - run: npm run test:pages
-      - name: Save quick-install packages
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: triobridge-installers
-          path: dist-pages/install/*.zip
-          if-no-files-found: error
-          retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: failure()
         with:
@@ -71,12 +64,12 @@ jobs:
       group: github-pages
       cancel-in-progress: false
     steps:
-      - name: Publish site and Office add-in
+      - name: Publish download and installation guide
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
 
   local-installers:
-    name: Local installer (${{ matrix.platform }}-${{ matrix.arch }})
+    name: Desktop installer (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     strategy:
@@ -108,19 +101,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Exercise Windows startup checks over loopback TLS
-        if: runner.os == 'Windows'
-        run: node --test tests/local-service-readiness.test.mjs
-      - run: npm run build:local
-      - name: Verify bundled runtime and native credential binding
-        run: node scripts/verify-local-package.mjs dist-local/TrioBridge-AI-Local-${{ matrix.asset }}-${{ matrix.arch }}.zip
-      - name: Verify Windows installation lifecycle
-        if: runner.os == 'Windows'
-        run: node scripts/verify-local-package.mjs dist-local/TrioBridge-AI-Local-${{ matrix.asset }}-${{ matrix.arch }}.zip --install
-      - name: Save local shared installer
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - run: npm ci --prefix offline/tooling
+      - run: npm run build:installer
+      - run: npm run verify:installer
+      - run: node offline/verify-ui.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: local-installer-${{ matrix.platform }}-${{ matrix.arch }}
-          path: dist-local/*.zip
+          name: installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist-install/TrioBridge-AI-${{ matrix.asset }}-${{ matrix.arch }}.zip
           if-no-files-found: error
           retention-days: 14

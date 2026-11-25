@@ -1,3 +1,4 @@
+import { nativeWorkbench } from './offline/transport';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   BookOpen,
@@ -130,7 +131,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             把选择留在你手里。
           </p>
-          <span>TrioBridge AI · 0.5.2</span>
+          <span>TrioBridge AI · 0.6.0</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -144,7 +145,7 @@ export default function App({ officeBridge }: Props) {
           </span>
           <span>
             <Monitor size={14} />
-            {officeBridge ? 'Office 加载项' : '交互演示'}
+            {nativeWorkbench() ? '本机工作台' : officeBridge ? 'Office 加载项' : '交互演示'}
           </span>
         </header>
         <main id="main" className="main-content">

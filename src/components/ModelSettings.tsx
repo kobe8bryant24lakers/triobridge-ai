@@ -1,3 +1,4 @@
+import { nativeWorkbench } from '../offline/transport';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -596,12 +597,22 @@ function SharedModelSettings({
   function selectProvider(value: string) {
     const preset = MODEL_PRESETS.find((item) => item.id === value);
     setProvider(value);
-    setAdvanced(value === 'custom');
+    setAdvanced(value === 'custom' || value === 'device');
     setShowApiKey(false);
     setCredential('replace');
     setDirty(true);
     setStatus(undefined);
     setDeleting(false);
+    if (value === 'device') {
+      setDraft((current) => ({
+        ...current,
+        name: '本机模型',
+        baseUrl: 'http://127.0.0.1:8001/v1',
+        model: '',
+        apiKey: '',
+      }));
+      setCredential('remove');
+    }
     if (preset)
       setDraft((current) => ({
         ...current,
@@ -949,6 +960,7 @@ function SharedModelSettings({
                   {preset.name}
                 </option>
               ))}
+              {nativeWorkbench() && <option value="device">本机 API（127.0.0.1）</option>}
               <option value="custom">自定义 / 本地模型</option>
             </select>
           </label>

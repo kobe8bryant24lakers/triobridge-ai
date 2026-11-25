@@ -12,7 +12,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'node scripts/preview-pages.mjs',
-    url: 'http://127.0.0.1:34156/triobridge-ai/app/',
+    url: 'http://127.0.0.1:34156/triobridge-ai/',
     reuseExistingServer: false,
   },
 });

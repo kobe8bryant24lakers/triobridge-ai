@@ -1,6 +1,6 @@
 {
   "name": "triobridge-ai",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "overrides": {
@@ -31,7 +31,9 @@
     "check": "npm run typecheck && npm test && npm run build",
     "format": "prettier --write src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json",
     "format:check": "prettier --check src tests scripts vite.config.ts playwright*.config.ts tsconfig.json package.json",
-    "build:local": "npm run build && node scripts/build-local-installers.mjs"
+    "build:local": "npm run build && node scripts/build-local-installers.mjs",
+    "build:installer": "node offline/build.mjs",
+    "verify:installer": "node offline/verify-install.mjs"
   },
   "dependencies": {
     "@napi-rs/keyring": "2.1.2",

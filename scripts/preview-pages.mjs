@@ -14,7 +14,7 @@ const types = {
   '.png': 'image/png',
   '.xml': 'application/xml',
 };
-await stat(resolve(root, 'app/index.html'));
+await stat(resolve(root, 'index.html'));
 createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

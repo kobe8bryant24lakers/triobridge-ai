@@ -1,3 +1,4 @@
+import { modelTransport } from '../offline/transport';
 import type { ChatMessage, RuntimeModelProfile, SharedModelProfile } from './types';
 import { MAX_RESULT_LENGTH } from './tasks';
 import { startModelAudit } from './model-audit';
@@ -78,7 +79,7 @@ export async function complete(
   profile: RuntimeModelProfile,
   messages: ChatMessage[],
   signal?: AbortSignal,
-  fetcher: typeof fetch = fetch,
+  fetcher: typeof fetch = modelTransport,
 ): Promise<string> {
   validateProfile(profile);
   if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
