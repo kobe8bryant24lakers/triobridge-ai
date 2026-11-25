@@ -1,3 +1,4 @@
+import { storageDetailMessage } from './shared/model-storage-diagnostic.mjs';
 import { SharedModelError } from './shared/shared-model-store.mjs';
 
 const fields = new Map(
@@ -37,7 +38,11 @@ export async function modelAction(store, action, payload, signal) {
       return {
         status: error.status,
         body: {
-          error: { code: error.code, message: error.message },
+          error: {
+            code: error.code,
+            message: error.message,
+            ...(storageDetailMessage(error.storageDetail) ? { detail: error.storageDetail } : {}),
+          },
           ...(error.state ? { state: error.state } : {}),
         },
       };

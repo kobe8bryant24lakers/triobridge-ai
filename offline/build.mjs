@@ -27,6 +27,7 @@ run(
   { cwd: root },
 );
 await copy(join(root, 'offline/app'), stage);
+await copy(join(root, 'LICENSE'), join(stage, 'LICENSE'));
 await copy(join(root, 'build/native-ui'), join(stage, 'ui'));
 await copy(join(root, 'public/icon.svg'), join(stage, 'ui/icon.svg'));
 await mkdir(join(stage, 'shared'));

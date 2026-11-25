@@ -3,9 +3,18 @@ import { link, lstat, mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { enforcePrivatePath } from './private-local-permissions.mjs';
 
-export async function ensurePrivateModelDirectory(directory) {
-  const created = await mkdir(directory, { recursive: true, mode: 0o700 });
-  await enforcePrivatePath(directory, 'directory', { created: created !== undefined });
+const preparingDirectories = new Map();
+
+export function ensurePrivateModelDirectory(directory) {
+  const preparing = preparingDirectories.get(directory);
+  if (preparing) return preparing;
+  // Concurrent first opens must see the ACL installed by the caller that created the directory.
+  const operation = (async () => {
+    const created = await mkdir(directory, { recursive: true, mode: 0o700 });
+    await enforcePrivatePath(directory, 'directory', { created: created !== undefined });
+  })().finally(() => preparingDirectories.delete(directory));
+  preparingDirectories.set(directory, operation);
+  return operation;
 }
 
 /** Provision once per OS-user installation. Never place this token in logs or command arguments. */

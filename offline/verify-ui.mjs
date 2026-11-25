@@ -27,16 +27,24 @@ try {
       assert.equal(new URL(page.url()).protocol, 'file:');
       const result = await page.evaluate(async () => {
         const native = window.trioWorkbench;
-        const { status, body } = await native.model(crypto.randomUUID(), 'state', '{}');
+        const replies = await Promise.all(
+          [1, 2, 3].map(() => native.model(crypto.randomUUID(), 'state', '{}')),
+        );
+        const { status, body } = replies.find((r) => r.status !== 200) || replies[0];
         return {
           host: native.host,
           status,
+          detail: body.error?.detail || body.error?.code,
           hasProfileList: Array.isArray(body.profiles),
           resources: performance.getEntriesByType('resource').map((r) => new URL(r.name).protocol),
         };
       });
       assert.equal(result.host, host);
-      assert.equal(result.status, 200);
+      assert.equal(
+        result.status,
+        200,
+        'Shared catalog first-open check: ' + (result.detail || 'unknown'),
+      );
       assert.ok(result.hasProfileList);
       assert.ok(result.resources.every((p) => ['file:', 'data:', 'blob:'].includes(p)));
       await page.getByRole('button', { name: '模型设置', exact: true }).first().click();
