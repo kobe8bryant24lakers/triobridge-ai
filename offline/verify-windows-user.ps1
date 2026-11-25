@@ -27,7 +27,10 @@ if ($Verify) {
     $env:TEMP = $env:TMP = Join-Path $env:LOCALAPPDATA 'Temp'
     [void][IO.Directory]::CreateDirectory($env:TEMP)
     [void][IO.Directory]::CreateDirectory($env:APPDATA)
-    if ([Environment]::GetFolderPath('LocalApplicationData', 'Create') -ne $env:LOCALAPPDATA) {
+    # Windows Shell caches the inherited runner paths inside this first process.
+    # Setup and its COM clients run in fresh processes with the corrected environment.
+    & "$PSHOME\powershell.exe" -NoProfile -Command 'if ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData) -ne $env:LOCALAPPDATA) { exit 1 }'
+    if ($LASTEXITCODE -ne 0) {
         throw 'The standard user profile did not resolve its application-data folder.'
     }
     $env:TRIOBRIDGE_TEST_WINRAR = $WinRAR
