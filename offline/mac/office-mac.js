@@ -219,7 +219,7 @@ function pptSnapshot(a, scope) {
         shape.alignment = optional(
           () =>
             String(r.paragraphFormat.alignment())
-              .replace(/^align /, '')
+              .replace(/^paragraph align /, '')
               .replace(/^./, (c) => c.toUpperCase()),
           null,
         );
@@ -274,7 +274,7 @@ function powerpoint(a, q) {
     const added = [];
     try {
       for (const spec of q.value) {
-        const slide = a.Slide({ layout: 'slide layout text' });
+        const slide = a.Slide({ layout: 'slide layout text slide' });
         doc.slides.push(slide);
         const last = doc.slides[doc.slides.length - 1];
         added.push(last.slideID());
@@ -321,7 +321,7 @@ function powerpoint(a, q) {
           [1, 3, 5].map((i) => parseInt(p.fontColor.slice(i, i + 2), 16) * 257),
         );
       if (p.alignment !== undefined)
-        set(r.paragraphFormat, 'alignment', 'align ' + p.alignment.toLowerCase());
+        set(r.paragraphFormat, 'alignment', 'paragraph align ' + p.alignment.toLowerCase());
       for (const key of ['left', 'top', 'width', 'height'])
         if (p[key] !== undefined) set(obj, key === 'left' ? 'leftPosition' : key, p[key]);
     }

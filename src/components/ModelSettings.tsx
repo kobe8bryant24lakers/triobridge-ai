@@ -972,7 +972,11 @@ function SharedModelSettings({
         <fieldset disabled={blocked}>
           <label>
             模型服务
-            <select value={provider} onChange={(event) => selectProvider(event.target.value)}>
+            <select
+              aria-label="模型服务"
+              value={provider}
+              onChange={(event) => selectProvider(event.target.value)}
+            >
               <option value="" disabled>
                 请选择你使用的服务
               </option>
@@ -998,6 +1002,7 @@ function SharedModelSettings({
           <label>
             密钥操作
             <select
+              aria-label="密钥操作"
               value={credential}
               onChange={(event) => {
                 setCredential(event.target.value as typeof credential);
@@ -1083,6 +1088,7 @@ function SharedModelSettings({
                 API Base URL
                 <input
                   required
+                  aria-label="API Base URL"
                   value={draft.baseUrl}
                   onChange={(event) => field('baseUrl', event.target.value)}
                   placeholder="https://api.example.com/v1"
@@ -1099,6 +1105,7 @@ function SharedModelSettings({
                 <input
                   required
                   maxLength={200}
+                  aria-label="模型 ID"
                   value={draft.model}
                   onChange={(event) => field('model', event.target.value)}
                   placeholder="填写服务提供的模型名称"

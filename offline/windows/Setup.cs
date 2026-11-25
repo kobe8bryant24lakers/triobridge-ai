@@ -28,16 +28,23 @@ namespace TrioBridge {
       }
     }
     static RegistryKey Key(RegistryKey root,string path){var k=root.CreateSubKey(path);k.SetValue("TrioBridgeOwner",Owner);return k;}
+    static void SetManagedClass(RegistryKey key,string dll,string identity){
+      key.SetValue("Class","TrioBridge.Ribbon");key.SetValue("Assembly",identity);
+      key.SetValue("RuntimeVersion","v4.0.30319");key.SetValue("CodeBase",new Uri(dll).AbsoluteUri);
+    }
     static void Register(){
       string dll=Path.Combine(Dest,"TrioBridge.Ribbon.dll"),identity=AssemblyName.GetAssemblyName(dll).FullName;
       foreach(var v in Views)using(var root=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,v)){
         using(var cls=Key(root,Clsid)){
           cls.SetValue("","TrioBridge Office Workbench");
+          using(var category=cls.CreateSubKey(@"Implemented Categories\{62C8FE65-4EBB-45E7-B440-6E39B2CDBF29}")){}
           using(var p=cls.CreateSubKey("ProgId"))p.SetValue("",Prog);
           using(var s=cls.CreateSubKey("InprocServer32")){
-            s.SetValue("","mscoree.dll");s.SetValue("ThreadingModel","Both");
-            s.SetValue("Class","TrioBridge.Ribbon");s.SetValue("Assembly",identity);
-            s.SetValue("RuntimeVersion","v4.0.30319");s.SetValue("CodeBase",new Uri(dll).AbsoluteUri);
+            string windows=Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            string system=Environment.Is64BitOperatingSystem && v==RegistryView.Registry32?"SysWOW64":"System32";
+            s.SetValue("",Path.Combine(windows,system,"mscoree.dll"));s.SetValue("ThreadingModel","Both");
+            SetManagedClass(s,dll,identity);
+            using(var version=s.CreateSubKey(AssemblyName.GetAssemblyName(dll).Version.ToString())) SetManagedClass(version,dll,identity);
           }
         }
         using(var p=Key(root,ProgKey))using(var c=p.CreateSubKey("CLSID"))c.SetValue("",Id);
