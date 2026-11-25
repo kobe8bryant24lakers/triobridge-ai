@@ -38,6 +38,32 @@ export function modelEndpoint(baseUrl, apiFormat = 'openai') {
 
 export class ModelProtocolError extends Error {}
 
+// A connection probe verifies the endpoint and credentials, not whether a document
+// generation finished. Local reasoning models may exhaust the server's output
+// budget before producing final text, while still returning a valid response.
+export function connectionTestWarning(data) {
+  const choice = Array.isArray(data?.choices) ? data.choices[0] : undefined;
+  const message = choice?.message;
+  if (
+    !message ||
+    typeof message !== 'object' ||
+    Array.isArray(message) ||
+    (typeof message.content !== 'string' && message.content !== null)
+  )
+    throw new ModelProtocolError('连接测试未返回兼容的文本响应，请检查接口格式。');
+  if (message.refusal || choice.finish_reason === 'content_filter')
+    throw new ModelProtocolError('模型未完成连接测试，请检查模型权限或服务策略。');
+  if (typeof message.content === 'string' && message.content.length > 100_000)
+    throw new ModelProtocolError('模型返回内容过长，请检查服务端配置。');
+  if (choice.finish_reason === 'length')
+    return '测试回复达到服务端输出长度上限；正式生成前请提高服务端输出上限。';
+  if (choice.finish_reason === 'context_length')
+    return '测试回复因模型上下文空间用尽而停止；正式生成前请减少输入内容，或在服务端增大上下文窗口。';
+  if (!message.content?.trim() || (choice.finish_reason != null && choice.finish_reason !== 'stop'))
+    throw new ModelProtocolError('连接测试未返回可用文本，请检查模型输出和接口格式。');
+  return undefined;
+}
+
 function anthropicContent(content) {
   if (typeof content === 'string') return content;
   return content.map((part) => {
@@ -78,12 +104,153 @@ export function modelRequest(apiFormat, model, messages, key) {
     headers,
     body: {
       model,
-      max_tokens: 4096,
       ...(system.length ? { system: system.join('\n\n') } : {}),
       messages: turns,
       stream: false,
     },
   };
+}
+
+async function protocolJson(response) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new ModelProtocolError('模型信息接口未返回 JSON。');
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 65_536) {
+        void reader.cancel().catch(() => {});
+        throw new ModelProtocolError('模型信息接口返回的数据过大。');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return JSON.parse(text + decoder.decode());
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function requiresMaxTokens(data) {
+  if (
+    Array.isArray(data?.detail) &&
+    data.detail.length > 0 &&
+    data.detail.every(
+      (entry) =>
+        Array.isArray(entry?.loc) &&
+        entry.loc.length === 2 &&
+        entry.loc[0] === 'body' &&
+        entry.loc[1] === 'max_tokens' &&
+        ['missing', 'value_error.missing'].includes(entry.type),
+    )
+  )
+    return true;
+  const message = data?.error?.message ?? data?.message;
+  if (typeof message !== 'string') return false;
+  return [
+    /^max_tokens\s+is\s+required\s+and\s+must\s+be\s+positive[.!]?$/i,
+    /^missing\s+(?:required\s+)?(?:parameter|field|argument)\s*[:=]?\s*["'`]?max_tokens["'`]?[.!]?$/i,
+    /^["'`]?max_tokens["'`]?\s*[:=]?\s*(?:(?:is|was)\s+)?(?:a\s+)?(?:required(?:\s+(?:field|parameter|argument))?|(?:field|parameter|argument)\s+(?:is\s+)?required|missing(?:\s+required\s+(?:field|parameter|argument))?)[.!]?$/i,
+    /^(?:field|parameter|argument)\s+(?:required|missing)\s*[:=]?\s*["'`]?max_tokens["'`]?[.!]?$/i,
+  ].some((pattern) => pattern.test(message.trim()));
+}
+
+function checkAborted(signal) {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+}
+
+function modelInfoEndpoint(endpoint, model) {
+  if (!endpoint.endsWith('/messages') || model === '.' || model === '..')
+    throw new ModelProtocolError('无法从当前 Claude 接口地址查询模型输出上限。');
+  // Derive the lookup from the configured endpoint, never from response URLs.
+  return endpoint.slice(0, -'/messages'.length) + '/models/' + encodeURIComponent(model);
+}
+
+async function modelOutputLimit(fetcher, endpoint, model, headers, signal) {
+  const url = modelInfoEndpoint(endpoint, model);
+  try {
+    checkAborted(signal);
+    const response = await fetcher(url, {
+      // The fixed local proxy validates same-origin POSTs and translates this
+      // allowlisted model lookup to GET at its configured upstream.
+      method: url.startsWith('/model-proxy/') ? 'POST' : 'GET',
+      headers,
+      signal,
+      redirect: 'error',
+      credentials: 'omit',
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new ModelProtocolError(
+        `Claude 接口要求 max_tokens，但模型信息查询返回 HTTP ${response.status}。请确认服务支持查询该模型的输出上限；若同一服务提供 OpenAI 兼容接口，也可在模型设置中手动选择该格式与地址。`,
+      );
+    }
+    const data = await protocolJson(response);
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !Number.isSafeInteger(data.max_tokens) ||
+      data.max_tokens <= 0
+    )
+      throw new ModelProtocolError(
+        'Claude 接口要求 max_tokens，但模型信息未提供有效的 max_tokens 输出上限。请让服务提供该模型的真实上限后重试；若同一服务提供 OpenAI 兼容接口，也可在模型设置中手动选择该格式与地址。',
+      );
+    checkAborted(signal);
+    return data.max_tokens;
+  } catch (error) {
+    checkAborted(signal);
+    if (error instanceof ModelProtocolError) throw error;
+    throw new ModelProtocolError(
+      'Claude 接口要求 max_tokens，但无法读取同一服务的模型输出上限。请检查模型信息接口、网络和访问权限。',
+    );
+  }
+}
+
+/** Share capability negotiation between browser-direct and native/shared calls. */
+export async function sendModelRequest(fetcher, endpoint, apiFormat, model, messages, key, signal) {
+  const { headers, body } = modelRequest(apiFormat, model, messages, key);
+  const send = (maxTokens) => {
+    checkAborted(signal);
+    return fetcher(endpoint, {
+      method: 'POST',
+      signal,
+      redirect: 'error',
+      credentials: 'omit',
+      cache: 'no-store',
+      headers,
+      body: JSON.stringify({
+        ...body,
+        ...(maxTokens === undefined ? {} : { max_tokens: maxTokens }),
+      }),
+    });
+  };
+  if (apiFormat !== 'anthropic') return send();
+  if (!endpoint.startsWith('/') && new URL(endpoint).origin === 'https://api.anthropic.com')
+    return send(await modelOutputLimit(fetcher, endpoint, model, headers, signal));
+  const response = await send();
+  // Never replay a successful (including partially generated) response, or a
+  // rejection unrelated to the one required field that we can negotiate.
+  if (![400, 422].includes(response.status)) return response;
+  let missing = false;
+  try {
+    missing = requiresMaxTokens(await protocolJson(response));
+  } catch {
+    checkAborted(signal);
+  }
+  // Both callers deliberately expose only status/headers for upstream errors.
+  // Return an empty error response after inspecting its bounded body; cloning
+  // would retain an unread tee when a gateway sends a large or slow error page.
+  if (!missing)
+    return new Response(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  return send(await modelOutputLimit(fetcher, endpoint, model, headers, signal));
 }
 
 const tokenCount = (value) => Number.isSafeInteger(value) && value >= 0;
@@ -115,8 +282,10 @@ export function normalizeModelResponse(apiFormat, data) {
       reason = 'stop';
       break;
     case 'max_tokens':
-    case 'model_context_window_exceeded':
       reason = 'length';
+      break;
+    case 'model_context_window_exceeded':
+      reason = 'context_length';
       break;
     case 'refusal':
       reason = 'content_filter';

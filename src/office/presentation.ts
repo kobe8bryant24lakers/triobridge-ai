@@ -1,6 +1,7 @@
 import type {
   EditProposal,
   PresentationAccess,
+  PresentationInsertTarget,
   PresentationSnapshot,
   ShapeState,
 } from '../presentation/types';
@@ -16,6 +17,21 @@ const supports = (version: string) =>
   Office.context.requirements.isSetSupported('PowerPointApi', version);
 const textTypes = new Set(['TextBox', 'GeometricShape', 'Placeholder']);
 const round = (n: number) => Math.round(n * 100) / 100;
+
+async function loadInsertTarget(ctx: PowerPoint.RequestContext): Promise<PresentationInsertTarget> {
+  if (!supports('1.10'))
+    throw new Error('当前 Office 无法读取准确页面尺寸，请下载 PPT 后手动导入。');
+  const slides = ctx.presentation.slides,
+    pageSize = ctx.presentation.pageSetup;
+  slides.load('items/id');
+  pageSize.load('slideWidth,slideHeight');
+  await ctx.sync();
+  if (slides.items.length > 500) throw new Error('演示稿超过 500 页，请拆分后再插入。');
+  return {
+    slideIds: slides.items.map((slide) => slide.id),
+    size: { width: pageSize.slideWidth, height: pageSize.slideHeight },
+  };
+}
 
 async function readPresentation(
   scope: 'selected' | 'all',
@@ -258,20 +274,25 @@ export function createPresentationAccess(): PresentationAccess {
       backup: Office.context.requirements.isSetSupported('CompressedFile', '1.1'),
     },
     read: readPresentation,
+    prepareInsert: () => PowerPoint.run(loadInsertTarget),
     apply: applyEdits,
     create: async (base64) => {
       await PowerPoint.createPresentation(base64);
     },
-    insert: async (base64, count, snapshot) => {
+    insert: async (base64, count, target) => {
       if (!supports('1.2')) throw new Error('当前 Office 不支持插入整页，请下载后手动导入。');
-      if (snapshot) assertSnapshotUnchanged(snapshot, await readPresentation(snapshot.scope));
       let started = false;
       try {
         await PowerPoint.run(async (ctx) => {
+          const now = await loadInsertTarget(ctx);
+          if (
+            JSON.stringify(target.slideIds) !== JSON.stringify(now.slideIds) ||
+            target.size?.width !== now.size?.width ||
+            target.size?.height !== now.size?.height
+          )
+            throw new Error('演示稿页序或尺寸已变化，尚未插入。请检查当前演示稿并更新预览。');
           const slides = ctx.presentation.slides;
-          slides.load('items/id');
-          await ctx.sync();
-          const before = slides.items.map((s) => s.id);
+          const before = now.slideIds;
           ctx.presentation.insertSlidesFromBase64(base64, {
             formatting: PowerPoint.InsertSlideFormatting.keepSourceFormatting,
             ...(before.length ? { targetSlideId: before[before.length - 1] } : {}),

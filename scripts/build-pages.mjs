@@ -12,6 +12,7 @@ export const SITE_FILES = [
   ['docs/site.css', 'site.css'],
   ['docs/assets/icon.svg', 'assets/icon.svg'],
   ['docs/assets/workbench.png', 'assets/workbench.png'],
+  ['docs/assets/TrioBridge-AI-User-Guide-zh-CN.pptx', 'assets/TrioBridge-AI-User-Guide-zh-CN.pptx'],
 ];
 export const APP_ICONS = ['icon.svg', 'icon-32.png', 'icon-80.png'];
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

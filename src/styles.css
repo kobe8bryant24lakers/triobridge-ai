@@ -548,7 +548,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
-.write-comparison pre:focus-visible,
+.write-comparison [role='region']:focus-visible,
 .result-content:focus-visible {
   outline: 3px solid #d0a23f;
   outline-offset: 3px;
@@ -1174,6 +1174,23 @@ pre {
   line-height: 1.95;
   margin: 0 0 20px;
 }
+.word-rich-text {
+  overflow-wrap: anywhere;
+}
+.word-rich-text > :first-child {
+  margin-top: 0;
+}
+.word-rich-text > :last-child {
+  margin-bottom: 0;
+}
+.word-rich-text table {
+  border-collapse: collapse;
+}
+.word-rich-text th,
+.word-rich-text td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+}
 .result-content {
   min-width: 0;
   max-height: 560px;
@@ -1614,11 +1631,11 @@ pre {
   align-self: stretch;
   min-width: 0;
 }
-.write-comparison h3 {
+.write-comparison > div > h3 {
   font-size: 12px;
   color: var(--muted);
 }
-.write-comparison pre {
+.write-comparison [role='region'] {
   margin: 0;
   max-height: 260px;
   min-height: 100px;
@@ -1922,7 +1939,7 @@ summary {
     transform: rotate(90deg);
     justify-self: center;
   }
-  .write-comparison pre {
+  .write-comparison [role='region'] {
     max-height: 170px;
   }
   .confirm-dialog {

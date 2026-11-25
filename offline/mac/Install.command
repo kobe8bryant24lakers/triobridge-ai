@@ -40,3 +40,4 @@ lsregister='/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchS
 /System/Library/CoreServices/pbs -update
 trap - ERR
 echo '安装完成。在 Word、Excel 或 PowerPoint 的应用菜单中选择“服务 → 打开三桥 AI”。'
+echo '如需 Office 内嵌窗格，请另行运行 Enable-Embedded-Taskpane.command；该入口需要本机 HTTPS 证书和联网加载微软 Office.js。'

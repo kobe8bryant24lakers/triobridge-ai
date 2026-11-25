@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ModelSettings } from './components/ModelSettings';
 import { Workbench } from './components/Workbench';
+import { WordTextPreview } from './components/WordTextPreview';
 import { HOST_NAMES } from './core/tasks';
 import { createProfileController, type LocalProfileState } from './core/profile-store';
 import type { HostBridge, HostKind } from './core/types';
@@ -131,7 +132,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             把选择留在你手里。
           </p>
-          <span>TrioBridge AI · 0.7.1</span>
+          <span>TrioBridge AI · 0.8.0</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -195,7 +196,8 @@ export default function App({ officeBridge }: Props) {
               </ol>
               <h2>从桌面 Office 打开</h2>
               <p>
-                Windows 在“三桥 AI”功能区打开工作台。Mac 在当前应用菜单的“服务”中选择“打开三桥 AI”。
+                Windows 在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。Mac
+                在当前应用的“服务”菜单打开独立窗口，启用内嵌窗格后也可从“我的加载项”打开。
                 首次读写文档时，macOS 可能请求允许工作台控制该应用。
               </p>
               <h2>本地模型与隐私</h2>
@@ -235,7 +237,11 @@ export default function App({ officeBridge }: Props) {
             {demoDocument && (
               <details className="demo-document">
                 <summary>查看模拟文档 · 已应用的内容</summary>
-                <pre>{demoDocument}</pre>
+                {host === 'word' ? (
+                  <WordTextPreview text={demoDocument} />
+                ) : (
+                  <pre>{demoDocument}</pre>
+                )}
               </details>
             )}
           </div>

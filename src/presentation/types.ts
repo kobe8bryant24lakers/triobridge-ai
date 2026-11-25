@@ -92,6 +92,11 @@ export interface PresentationSnapshot {
   size: PageSize | null;
   skipped: number;
 }
+/** Appending pages depends on the deck and its size, not the current selection. */
+export interface PresentationInsertTarget {
+  slideIds: string[];
+  size: PageSize | null;
+}
 export interface ShapePatch {
   slideId: string;
   shapeId: string;
@@ -124,7 +129,8 @@ export interface PresentationAccess {
   };
   read: (scope: 'selected' | 'all') => Promise<PresentationSnapshot>;
   apply: (snapshot: PresentationSnapshot, proposal: EditProposal) => Promise<void>;
-  insert: (base64: string, count: number, snapshot?: PresentationSnapshot) => Promise<void>;
+  prepareInsert: () => Promise<PresentationInsertTarget>;
+  insert: (base64: string, count: number, target: PresentationInsertTarget) => Promise<void>;
   create: (base64: string) => Promise<void>;
   thumbnail: (id: string) => Promise<string>;
   backup: () => Promise<Blob>;

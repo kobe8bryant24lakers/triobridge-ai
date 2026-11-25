@@ -22,18 +22,25 @@ test('local model proxy enforces fixed target, source, path and body boundaries'
     for await (const chunk of req) parts.push(chunk);
     lastRequest = {
       url: req.url,
+      method: req.method,
       authorization: req.headers.authorization,
       key: req.headers['x-api-key'],
       version: req.headers['anthropic-version'],
-      body: JSON.parse(Buffer.concat(parts)),
+      body: parts.length ? JSON.parse(Buffer.concat(parts)) : null,
     };
+    if (req.url === '/v1/models/org%2Flocal%3Frevision%3D1') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ max_tokens: 65536 }));
+      return;
+    }
     if (req.url === '/redirect/chat/completions') {
       res.writeHead(302, { Location: 'https://example.invalid' });
       res.end();
       return;
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ message: { content: 'Hello' } }] }));
+    const content = req.url === '/long/messages' ? '全'.repeat(350000) : 'Hello';
+    res.end(JSON.stringify({ choices: [{ message: { content } }] }));
   });
   const upstreamPort = await listen(upstream);
   let handler;
@@ -114,6 +121,49 @@ test('local model proxy enforces fixed target, source, path and body boundaries'
         ).status,
         405,
       );
+    });
+    await t.test(
+      'relays a same-origin model lookup as a bodyless GET to the configured service',
+      async () => {
+        const url = '/model-proxy/v1/models/org%2Flocal%3Frevision%3D1';
+        const headers = {
+          Origin: origin,
+          'Content-Type': 'application/json',
+          'x-api-key': 'model-key',
+        };
+        const response = await request(url, { headers, body: undefined });
+        assert.deepEqual(await response.json(), { max_tokens: 65536 });
+        assert.deepEqual(lastRequest, {
+          url: '/v1/models/org%2Flocal%3Frevision%3D1',
+          method: 'GET',
+          body: null,
+          key: 'model-key',
+          authorization: undefined,
+          version: '2023-06-01',
+        });
+        const previous = lastRequest;
+        assert.equal((await request(url, { headers })).status, 400);
+        assert.equal(
+          (await request('/model-proxy/v1/models/org%2F..%2Fadmin', { headers, body: undefined }))
+            .status,
+          400,
+        );
+        assert.equal(
+          (
+            await request(url, {
+              headers: { ...headers, Origin: 'https://example.invalid' },
+              body: undefined,
+            })
+          ).status,
+          403,
+        );
+        assert.equal(lastRequest, previous);
+      },
+    );
+    await t.test('forwards a complete long reply through the proxy', async () => {
+      const response = await request('/model-proxy/long/messages');
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).choices[0].message.content, '全'.repeat(350000));
     });
     await t.test('does not follow upstream redirects', async () => {
       assert.equal((await request('/model-proxy/redirect/chat/completions')).status, 502);

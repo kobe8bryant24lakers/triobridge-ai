@@ -71,8 +71,8 @@ function office() {
     presentation: {
       slides: collection,
       pageSetup: { slideWidth: 720, slideHeight: 540, load },
-      getSelectedSlides: () => ({ items: [slides.find((s) => s.id === 'b')!], load }),
-      getSelectedShapes: () => ({ items: [heading], load }),
+      getSelectedSlides: vi.fn(() => ({ items: [slides.find((s) => s.id === 'b')!], load })),
+      getSelectedShapes: vi.fn(() => ({ items: [heading], load })),
       insertSlidesFromBase64: () => {
         writes.push('insert');
         for (let i = 0; i < insertCount; i++) slides.push({ ...slides[0], id: `inserted${i}` });
@@ -93,6 +93,7 @@ function office() {
     heading,
     footer,
     slides,
+    presentation: ctx.presentation,
     partial: () => {
       partial = true;
     },
@@ -112,7 +113,7 @@ describe('native PowerPoint bridge transaction boundaries', () => {
     expect(snap.selectedShapeIds).toEqual(['title']);
     expect(f.writes).toEqual([]);
   });
-  it('refuses a moved object before any setter or insertion is invoked', async () => {
+  it('refuses a moved object before applying edits', async () => {
     const f = office(),
       snap = await f.access.read('selected');
     f.heading.left += 1;
@@ -122,8 +123,47 @@ describe('native PowerPoint bridge transaction boundaries', () => {
         changes: [{ slideId: 'b', shapeId: 'title', text: '更新概览' }],
       }),
     ).rejects.toThrow('尚未应用');
-    await expect(f.access.insert('test', 1, snap)).rejects.toThrow('尚未应用');
     expect(f.writes).toEqual([]);
+  });
+  it('appends without reading selection or objects, even after unrelated objects change', async () => {
+    const f = office();
+    f.presentation.getSelectedSlides.mockImplementation(() => {
+      throw new Error('Invalid selection');
+    });
+    f.presentation.getSelectedShapes.mockImplementation(() => {
+      throw new Error('Invalid selection');
+    });
+    for (const slide of f.slides)
+      slide.shapes.load = () => {
+        throw new Error('Unsupported object');
+      };
+    const target = await f.access.prepareInsert();
+    expect(target).toEqual({ slideIds: ['a', 'b', 'c'], size: { width: 720, height: 540 } });
+    f.heading.left += 1;
+    await f.access.insert('test', 1, target);
+    expect(f.writes).toEqual(['insert']);
+    expect(f.presentation.getSelectedSlides).not.toHaveBeenCalled();
+    expect(f.presentation.getSelectedShapes).not.toHaveBeenCalled();
+  });
+  it.each(['order', 'size'] as const)(
+    'rejects a changed deck %s before insertion',
+    async (change) => {
+      const f = office(),
+        target = await f.access.prepareInsert();
+      if (change === 'order') f.slides.reverse();
+      else f.presentation.pageSetup.slideWidth = 960;
+      await expect(f.access.insert('test', 1, target)).rejects.toThrow('尚未插入');
+      expect(f.writes).toEqual([]);
+    },
+  );
+  it('prepares an empty presentation without requiring a selected slide', async () => {
+    const f = office();
+    f.slides.length = 0;
+    const target = await f.access.prepareInsert();
+    expect(target.slideIds).toEqual([]);
+    await f.access.insert('test', 1, target);
+    expect(f.slides.map((slide) => slide.id)).toEqual(['inserted0']);
+    expect(f.presentation.getSelectedSlides).not.toHaveBeenCalled();
   });
   it('writes allowed text/style changes, then verifies data against a fresh read', async () => {
     const f = office(),
@@ -160,11 +200,11 @@ describe('native PowerPoint bridge transaction boundaries', () => {
   });
   it('verifies appended IDs/count and detects ambiguous insertion results', async () => {
     const f = office();
-    await f.access.insert('test', 1, await f.access.read('all'));
+    await f.access.insert('test', 1, await f.access.prepareInsert());
     expect(f.slides.map((s) => s.id)).toEqual(['a', 'b', 'c', 'inserted0']);
     const bad = office();
     bad.wrongInsertCount();
-    await expect(bad.access.insert('test', 1, await bad.access.read('all'))).rejects.toThrow(
+    await expect(bad.access.insert('test', 1, await bad.access.prepareInsert())).rejects.toThrow(
       '不要直接重复插入',
     );
   });

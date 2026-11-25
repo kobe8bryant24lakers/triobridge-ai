@@ -108,17 +108,14 @@ export function DeckGenerator(runtime: PresentationRuntime) {
     if (!draft || !usedContext || outdated) return;
     await run(target === 'append' ? '插入完整页面' : '构建可编辑 PPT', async (signal) => {
       // Match the current deck when appending; never silently assume a custom slide size.
-      const snapshot =
-        target === 'append' && access
-          ? await access.read(access.capabilities.selected ? 'selected' : 'all')
-          : undefined;
-      if (target === 'append' && !snapshot?.size)
+      const insertTarget = target === 'append' && access ? await access.prepareInsert() : undefined;
+      if (target === 'append' && !insertTarget?.size)
         throw new Error('无法确认当前页面尺寸，请下载 PPT 后手动导入。');
       const base64 = await renderDeck(
         draft,
         usedContext,
         theme,
-        snapshot?.size || (ratio === 'wide' ? WIDE : STANDARD),
+        insertTarget?.size || (ratio === 'wide' ? WIDE : STANDARD),
       );
       if (signal.aborted) return;
       if (target === 'download') {
@@ -129,12 +126,12 @@ export function DeckGenerator(runtime: PresentationRuntime) {
         await access.create(base64);
         notify('已请求 PowerPoint 打开新演示稿，请查看新窗口并保存。');
       }
-      if (target === 'append' && access) {
+      if (target === 'append' && access && insertTarget) {
         // A failed Office response can follow a partial write. Require a new preview
         // instead of allowing a second click to duplicate pages blindly.
         setAppended(true);
         setConfirmAppend(false);
-        await access.insert(base64, draft.slides.length, snapshot);
+        await access.insert(base64, draft.slides.length, insertTarget);
         notify(
           `已在当前演示稿末尾插入 ${draft.slides.length} 页，请检查页面。可使用 Office 撤销。`,
         );

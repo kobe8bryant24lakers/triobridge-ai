@@ -221,10 +221,14 @@ function LocalModelSettings({
     setStatus(undefined);
     try {
       const profile = normalizedProfile();
-      await testConnection(profile, abort.signal);
+      const result = await testConnection(profile, abort.signal);
       if (abort.signal.aborted) return;
       persist(profile);
-      setStatus({ text: '连接成功，配置已保存。返回工作台即可使用。' });
+      setStatus({
+        text: result.warning
+          ? `连接成功，配置已保存。${result.warning}`
+          : '连接成功，配置已保存。返回工作台即可使用。',
+      });
     } catch (error) {
       setStatus({ text: officeError(error), error: true });
     } finally {
@@ -778,7 +782,11 @@ function SharedModelSettings({
             next.profiles.find((item) => item.id === profile.id),
             next,
           );
-          setStatus({ text: test ? '连接成功，配置已在三个应用间共享。' : '共享配置已保存。' });
+          setStatus({
+            text: [test ? '连接成功，配置已在三个应用间共享。' : '共享配置已保存。', next.warning]
+              .filter(Boolean)
+              .join(' '),
+          });
         },
       );
     } catch (error) {

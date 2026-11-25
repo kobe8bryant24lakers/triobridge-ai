@@ -132,6 +132,19 @@ describe('shared model settings', () => {
     );
   });
 
+  it('reports a saved shared connection and keeps its output-limit warning visible', async () => {
+    const { user } = setup(sharedState(), {
+      upsert: vi
+        .fn()
+        .mockResolvedValue(
+          sharedState({ revision: 5, warning: '测试回复达到服务端输出长度上限。' }),
+        ),
+    });
+    await user.click(screen.getByRole('button', { name: '连接并保存' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('连接成功，配置已在三个应用间共享');
+    expect(screen.getByRole('status')).toHaveTextContent('服务端输出长度上限');
+  });
+
   it('requires an explicit replacement or deletion and never exposes the previous key', async () => {
     const { user, actions } = setup();
     await user.selectOptions(screen.getByLabelText('密钥操作'), 'replace');

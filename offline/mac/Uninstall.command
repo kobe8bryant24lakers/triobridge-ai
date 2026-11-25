@@ -11,3 +11,4 @@ remove_owned "$HOME/Library/Services/TrioBridge AI.service" ai.triobridge.workbe
 remove_owned "$HOME/Applications/TrioBridge AI.app" ai.triobridge.workbench
 /System/Library/CoreServices/pbs -update
 echo '已移除三桥 AI 工作台和 Office 入口。模型设置和凭据保留在当前账户中。'
+echo '如曾启用内嵌窗格，请运行 Disable-Embedded-Taskpane.command 移除对应本机服务和证书。'

@@ -8,9 +8,10 @@ import { enforcePrivatePath } from './private-local-permissions.mjs';
 import { modelConnectionError } from './model-connection-error.mjs';
 import {
   modelEndpoint,
-  modelRequest,
+  sendModelRequest,
   normalizeModelResponse,
   ModelProtocolError,
+  connectionTestWarning,
 } from './model-protocol.mjs';
 import { storageDetailMessage, storageFailureDetail } from './model-storage-diagnostic.mjs';
 
@@ -208,28 +209,21 @@ function redact(value, secret) {
 }
 
 async function readResponse(response) {
-  const reader = response.body?.getReader();
-  const chunks = [];
-  let bytes = 0;
-  if (reader)
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > 1_000_000) {
-        await reader.cancel();
-        fail('response', '模型响应过大，请缩小任务。', 502);
-      }
-      chunks.push(Buffer.from(value));
-    }
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return await response.json();
   } catch {
     fail('response', '模型服务返回了无效 JSON。', 502);
   }
 }
 
-async function requestCompletion(profile, secret, messages, signal, fetcher) {
+async function requestCompletion(
+  profile,
+  secret,
+  messages,
+  signal,
+  fetcher,
+  connectionTest = false,
+) {
   const controller = new AbortController();
   let timeout = false;
   const abort = () => controller.abort();
@@ -241,21 +235,15 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
   }, profile.timeoutSeconds * 1000);
   const endpoint = profile.endpoint;
   try {
-    const { headers, body: payload } = modelRequest(
+    const response = await sendModelRequest(
+      fetcher,
+      endpoint,
       profile.apiFormat,
       profile.model,
       messages,
       secret,
+      controller.signal,
     );
-    const response = await fetcher(endpoint, {
-      method: 'POST',
-      redirect: 'error',
-      credentials: 'omit',
-      cache: 'no-store',
-      signal: controller.signal,
-      headers,
-      body: JSON.stringify(payload),
-    });
     if (!response.ok) {
       await response.body?.cancel();
       const errors = {
@@ -272,22 +260,28 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
       );
     }
     const data = normalizeModelResponse(profile.apiFormat, await readResponse(response));
+    const warning = connectionTest ? connectionTestWarning(data) : undefined;
     const choice = isObject(data) && Array.isArray(data.choices) ? data.choices[0] : undefined;
+    const stoppedWithoutText =
+      isObject(choice) &&
+      isObject(choice.message) &&
+      choice.message.content === null &&
+      ['length', 'content_filter', 'context_length'].includes(choice.finish_reason);
     if (
       !isObject(choice) ||
       !isObject(choice.message) ||
-      (typeof choice.message.content !== 'string' && typeof choice.message.refusal !== 'string')
+      (typeof choice.message.content !== 'string' &&
+        typeof choice.message.refusal !== 'string' &&
+        !stoppedWithoutText)
     )
       fail('response', '模型服务未返回兼容的文本响应，请检查接口格式。', 502);
-    if (typeof choice.message.content === 'string' && choice.message.content.length > 100_000)
-      fail('response', '模型输出超过 100,000 字符。', 502);
     const body = {
       ...(typeof data.id === 'string' ? { id: data.id.slice(0, 300) } : {}),
       ...(typeof data.model === 'string' ? { model: data.model.slice(0, 200) } : {}),
       choices: [
         {
           message: {
-            ...(typeof choice.message.content === 'string'
+            ...(typeof choice.message.content === 'string' || stoppedWithoutText
               ? { content: choice.message.content }
               : {}),
             ...(typeof choice.message.refusal === 'string'
@@ -308,6 +302,7 @@ async function requestCompletion(profile, secret, messages, signal, fetcher) {
       },
     };
     return {
+      ...(warning ? { warning } : {}),
       body: redact(body, secret),
       requestId: redact(
         (response.headers.get('request-id') || response.headers.get('x-request-id'))?.slice(
@@ -613,14 +608,8 @@ export function createSharedModelStore({
           [{ role: 'user', content: 'Reply with OK.' }],
           signal,
           fetcher,
+          true,
         );
-        const choice = connectionTest.body.choices[0];
-        if (
-          !choice.message.content?.trim() ||
-          choice.message.refusal ||
-          ['length', 'content_filter'].includes(choice.finish_reason)
-        )
-          fail('response', '连接测试未返回完整可用的文本，本次配置未保存。', 502);
       }
       const result = await locked(async () => {
         const current = await load();
@@ -650,7 +639,13 @@ export function createSharedModelStore({
           signal,
         );
       });
-      return { ...result, ...(connectionTest ? { connectionTest: connectionTest.body } : {}) };
+      return {
+        ...result,
+        ...(connectionTest ? { connectionTest: connectionTest.body } : {}),
+        ...(connectionTest?.warning
+          ? { warning: [result.warning, connectionTest.warning].filter(Boolean).join(' ') }
+          : {}),
+      };
     },
     async import(input, signal) {
       if (!Array.isArray(input.profiles) || !input.profiles.length || input.profiles.length > 30)

@@ -47,7 +47,7 @@ try {
         request.headers.authorization === undefined &&
         request.headers['x-api-key'] === (claude && !mac ? fixtureKey : undefined) &&
         request.headers['anthropic-version'] === (claude ? '2023-06-01' : undefined) &&
-        (!claude || input.max_tokens > 0);
+        input.max_tokens === undefined;
       const status = valid ? 200 : 400;
       response.writeHead(status, { 'Content-Type': 'application/json' });
       response.end(

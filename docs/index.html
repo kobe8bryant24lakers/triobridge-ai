@@ -131,8 +131,7 @@
               </li>
             </ul>
             <p class="writeback">
-              <strong>Review before writing</strong>Replace the selection you read, or insert at the
-              cursor.
+              <strong>Review before writing</strong>Check the formatted preview, then replace the selection or insert at the cursor. Markdown headings, lists, and tables remain editable in Word.
             </p>
           </article>
           <article class="feature">
@@ -217,17 +216,17 @@
             <p>Check System type in Settings → System → About. Intel and AMD PCs use x64.</p>
             <p>
               Save your documents, quit all three Office apps, extract the ZIP, and double-click
-              Install.cmd. Reopen a document and select 三桥 AI → 打开工作台 on the ribbon.
+              Install.cmd. Reopen a document. On the 三桥 AI ribbon, choose 打开侧边栏 for the task pane or 打开独立窗口 for a separate window.
             </p>
           </div>
           <div class="download-actions">
             <a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-x64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-x64.zip"
               >Windows x64</a
             ><a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Windows-arm64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Windows-arm64.zip"
               >Windows ARM64</a
             >
           </div>
@@ -241,24 +240,27 @@
             <p>
               Extract the ZIP and double-click Install.command. In the Word, Excel, or PowerPoint
               app menu, choose Services → 打开三桥 AI. macOS may request permission to control the
-              selected Office app.
+              selected Office app. To add the optional task pane, quit Office, run Enable-Embedded-Taskpane.command, and trust the local certificate when prompted. Reopen Office and select 三桥 AI（本机共享） under My Add-ins.
             </p>
           </div>
           <div class="download-actions">
             <a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-arm64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip"
               >Mac · Apple silicon</a
             ><a
               class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.7.1/TrioBridge-AI-Mac-x64.zip"
+              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip"
               >Mac · Intel</a
             >
           </div>
         </div>
       </section>
       <section id="guide" class="section wrap">
-        <div class="section-heading"><h2>From selection to result</h2></div>
+        <div class="section-heading">
+          <h2>From selection to result</h2>
+          <p><a href="./assets/TrioBridge-AI-User-Guide-zh-CN.pptx" download>Download the illustrated user guide (PowerPoint, 40 slides, Simplified Chinese)</a></p>
+        </div>
         <ol class="workflow-steps">
           <li>
             <h3>Connect a model</h3>
@@ -298,16 +300,13 @@
           <div>
             <dt>Desktop Office</dt>
             <dd>
-              Windows desktop Office opens the workbench from the ribbon. Mac desktop Office uses
-              the Services menu. Each window stays associated with its Office app.
+              Use the Windows ribbon to open either the task pane or a separate window. On a Mac, open the separate window from Services, or use the optional pane from My Add-ins.
             </dd>
           </div>
           <div>
             <dt>Installation and permissions</dt>
             <dd>
-              The installer includes the page, styles, and runtime. The plugin does not start a
-              localhost server or install a localhost certificate. Your system may ask you to
-              approve the application.
+              The standalone window and the Windows pane load their interface from the package. If Windows needs WebView2, run the offline WebView2 installer in the ZIP. The optional Mac pane uses a local HTTPS service and downloads Office.js from Microsoft.
             </dd>
           </div>
           <div>

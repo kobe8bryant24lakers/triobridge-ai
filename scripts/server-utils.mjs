@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { modelHeaders } from './model-protocol.mjs';
 
 export function tlsOptions(env = process.env) {
@@ -82,9 +84,28 @@ export function createProxy(target, allowedOrigin) {
       return;
     }
     const path = requestPath.slice('/model-proxy'.length);
-    if (!/^\/(?:[\w-]+\/)*(?:chat\/completions|messages)$/.test(path) || req.url.includes('?')) {
-      sendError(400, 'Only Chat Completions and Messages paths are supported.');
+    const modelId = /^\/(?:[\w-]+\/)*models\/([\w.%!~'()*-]+)$/.exec(path)?.[1];
+    if (
+      req.url.includes('?') ||
+      (!modelId && !/^\/(?:[\w-]+\/)*(?:chat\/completions|messages)$/.test(path))
+    ) {
+      sendError(400, 'Unsupported model API path.');
       return;
+    }
+    if (modelId) {
+      try {
+        const id = decodeURIComponent(modelId);
+        if (
+          !id ||
+          id.length > 200 ||
+          /[\\%\u0000-\u001f]/.test(id) ||
+          id.split('/').some((s) => !s || s === '.' || s === '..')
+        )
+          throw new Error();
+      } catch {
+        sendError(400, 'Invalid model identifier.');
+        return;
+      }
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300_000);
@@ -104,49 +125,45 @@ export function createProxy(target, allowedOrigin) {
         chunks.push(chunk);
       }
       const payload = Buffer.concat(chunks).toString('utf8');
-      try {
-        const parsed = JSON.parse(payload);
-        if (parsed.stream !== false || !Array.isArray(parsed.messages)) throw new Error();
-      } catch {
-        sendError(400, 'Invalid chat request.');
-        return;
+      if (modelId) {
+        // Keep the browser-facing POST origin check. The upstream lookup is a bodyless GET.
+        if (payload) {
+          sendError(400, 'Model lookup does not accept a body.');
+          return;
+        }
+      } else {
+        try {
+          const parsed = JSON.parse(payload);
+          if (parsed.stream !== false || !Array.isArray(parsed.messages)) throw new Error();
+        } catch {
+          sendError(400, 'Invalid chat request.');
+          return;
+        }
       }
       const response = await fetch(new URL(path, upstream), {
-        method: 'POST',
+        method: modelId ? 'GET' : 'POST',
         signal: controller.signal,
         redirect: 'error',
-        headers: path.endsWith('/messages')
-          ? modelHeaders('anthropic', req.headers['x-api-key'])
-          : {
-              'Content-Type': 'application/json',
-              ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-            },
-        body: payload,
+        headers:
+          modelId || path.endsWith('/messages')
+            ? modelHeaders('anthropic', req.headers['x-api-key'])
+            : {
+                'Content-Type': 'application/json',
+                ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+              },
+        body: modelId ? undefined : payload,
       });
-      const reader = response.body?.getReader();
-      const result = [];
-      let bytes = 0;
-      if (reader)
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          bytes += value.byteLength;
-          if (bytes > 1_000_000) {
-            await reader.cancel();
-            sendError(502, 'Upstream response too large.');
-            return;
-          }
-          result.push(Buffer.from(value));
-        }
       if (!res.destroyed) {
         res.writeHead(response.status, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         });
-        res.end(Buffer.concat(result));
+        if (response.body) await pipeline(Readable.fromWeb(response.body), res);
+        else res.end();
       }
     } catch {
-      if (!res.destroyed)
+      if (res.headersSent) res.destroy();
+      else if (!res.destroyed)
         sendError(controller.signal.aborted ? 504 : 502, 'Model upstream unavailable.');
     } finally {
       clearTimeout(timeout);

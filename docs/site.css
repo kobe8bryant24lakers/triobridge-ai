@@ -104,7 +104,7 @@ summary { cursor: pointer; }
 .workflow-steps { list-style: none; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 36px; padding: 0; margin: 50px 0 42px; }
 .step-number { display: block; width: 35px; height: 35px; border: 1px solid #80ae9b; border-radius: 50%; color: #d4e9df; text-align: center; line-height: 33px; margin-bottom: 22px; font-size: .9375rem; }
 .workflow-steps h3 { font-size: 1.25rem; }
-.workflow-steps p { margin-top: 12px; color: #d1e5dc; font-size: 1rem; }
+.workflow-steps p { margin-top: 12px; color: var(--muted); font-size: 1rem; }
 .workflow-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 30px; border-top: 1px solid #477f6f; padding-top: 26px; }
 .workflow-footer a { color: var(--white); font-weight: 600; }
 .workflow-footer p { color: #c2ded1; font-size: .875rem; }

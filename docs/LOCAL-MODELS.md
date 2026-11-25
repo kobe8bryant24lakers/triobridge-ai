@@ -9,6 +9,10 @@
 | OpenAI（Chat Completions） | `http://127.0.0.1:8001/v1` | `/v1/chat/completions` |
 | Claude（Anthropic Messages） | `http://127.0.0.1:8001/v1` | `/v1/messages` |
 
+Word 改写使用本机推理服务的输出设置。Claude 兼容服务允许省略 `max_tokens` 时，工作台直接发送正文请求。若服务要求这个参数，工作台从同一服务的 `/v1/models/{模型 ID}` 读取该模型声明的最大输出值。若服务要求这个参数却未公布上限，工作台会提示模型信息查询失败。模型报告输出额度耗尽或上下文窗口已满时，工作台会说明停止原因，并保留原文。[Claude Messages 文档](https://platform.claude.com/docs/en/api/messages/create) · [模型信息接口](https://platform.claude.com/docs/en/api/models/retrieve)
+
+在 Mac 上使用 Ollama 0.40.18 时，可为同一模型选择 **OpenAI 兼容**。实际生成可以省略 `max_tokens`。这一版 Ollama 的 Claude 入口强制要求正值，模型信息接口又未返回最大输出值。llama.cpp b12728 的 Claude 入口支持省略该字段，服务端自己的输出设置仍然生效。[Mac 验收记录](TESTING.md)
+
 可根据推理服务文档的请求示例识别格式。OpenAI 响应的正文位于 `choices[0].message.content`，Claude 响应使用 `content` 内容块。[OpenAI 接口文档](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) · [Claude 接口文档](https://platform.claude.com/docs/en/api/messages/create)
 
 设置页会显示实际请求地址，也可以直接粘贴该格式的完整接口地址。推理服务允许匿名访问时，选择“不使用密钥”。点击“连接并保存”会用所选格式发送一条测试消息。在任一工作台切换当前模型，三个应用会共用该配置。原有配置默认使用 OpenAI。

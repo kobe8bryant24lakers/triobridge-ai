@@ -86,14 +86,46 @@ describe('Office API version fallback', () => {
     bridge.dispose!();
     expect(doc.removeHandlerAsync).toHaveBeenCalled();
   });
+  it('keeps Word text-only fallback readable without enabling untracked rich-text writes', async () => {
+    const doc = office(['TextCoercion:1.1']);
+    const bridge = await createOfficeBridge('word');
+    const source = await bridge.readSelection();
+    expect(source.text).toBe('Selected text');
+    expect(source.warning).toContain('不支持自动写入排版结果');
+    expect(source.replace).toBeUndefined();
+    expect(bridge.capabilities).toMatchObject({ read: true, replace: false, insert: false });
+    await expect(bridge.prepareWrite('replace', source, '# 中文标题')).rejects.toThrow('不支持');
+    await expect(bridge.prepareWrite('insert', source, '# 中文标题')).rejects.toThrow('不支持');
+    expect(doc.setSelectedDataAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('Word tracked range and stale content protection', () => {
-  function setup() {
-    office(['WordApi:1.1']);
+  const leadingBoundary = '<p class="trioWordBefore"><br></p>';
+  const trailingBoundary = '<p class="trioWordAfter"><br></p>';
+  function setup(boundaryApi = false) {
+    office(['WordApi:1.1', ...(boundaryApi ? ['WordApi:1.3'] : [])]);
     const paragraph = { insertHtml: vi.fn() };
+    const boundary = { before: 'After', after: 'Before' };
+    const paragraphStart = {},
+      paragraphEnd = {};
+    const paragraphs = {
+      items: [{ style: 'Normal' }, { style: 'Quote' }],
+      load: vi.fn(),
+      getFirst: () => ({ getRange: () => paragraphStart }),
+      getLast: () => ({ getRange: () => paragraphEnd }),
+    };
+    const point = {
+      paragraphs,
+      getRange: (_location: string): unknown => point,
+      compareLocationWith: vi.fn((other) => ({
+        value: other === paragraphStart ? boundary.before : boundary.after,
+      })),
+    };
     const range = {
       text: 'Original',
+      paragraphs,
+      getRange: vi.fn((_location: string) => point),
       load: vi.fn(),
       insertText: vi.fn(),
       insertHtml: vi.fn(),
@@ -109,7 +141,7 @@ describe('Word tracked range and stale content protection', () => {
       InsertLocation: { replace: 'Replace', end: 'End', after: 'After' },
       run: vi.fn((...args) => args[args.length - 1](context)),
     });
-    return { range, context, paragraph };
+    return { range, context, paragraph, boundary, point, paragraphs };
   }
   it('writes back to the tracked source rather than a later cursor location', async () => {
     const { range, context } = setup();
@@ -122,6 +154,7 @@ describe('Word tracked range and stale content protection', () => {
     });
     await source.replace!('New text');
     expect(range.insertText).toHaveBeenCalledWith('New text', 'Replace');
+    expect(range.insertHtml).not.toHaveBeenCalled();
     await source.dispose!();
     expect(context.trackedObjects.remove).toHaveBeenCalledWith(range);
   });
@@ -137,6 +170,221 @@ describe('Word tracked range and stale content protection', () => {
     const plan = await (await createOfficeBridge('word')).prepareWrite('insert');
     await plan.commit('New text');
     expect(range.insertText).toHaveBeenCalledWith('New text', 'End');
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+  });
+  it('replaces the tracked selection with formatted Chinese Markdown only after confirmation', async () => {
+    const { range, context } = setup();
+    const bridge = await createOfficeBridge('word');
+    const source = await bridge.readSelection();
+    const output = '# 季度经营回顾\n\n**重点结论**：保持原始日期。\n\n- 完成复盘\n- 确认计划';
+    const plan = await bridge.prepareWrite('replace', source, output);
+    expect(plan.warning).toContain('按 Markdown 排版');
+    const laterSelection = { ...range, text: 'Later cursor', insertHtml: vi.fn() };
+    context.document.getSelection = () => laterSelection;
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    await plan.commit(output);
+    expect(range.insertHtml).toHaveBeenCalledWith(
+      expect.stringContaining('季度经营回顾'),
+      'Replace',
+    );
+    const html = range.insertHtml.mock.calls[0][0];
+    expect(html).toContain(leadingBoundary + '<h1');
+    expect(html.endsWith(trailingBoundary)).toBe(true);
+    expect(html).toContain('<h1');
+    expect(html).toContain('<strong>重点结论</strong>');
+    expect(html).toContain('<li');
+    expect(html).not.toContain('# 季度经营回顾');
+    expect(range.insertText).not.toHaveBeenCalled();
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+    expect(range.insertHtml).toHaveBeenCalledTimes(1);
+    expect(laterSelection.insertHtml).not.toHaveBeenCalled();
+  });
+  it.each(['Original paragraph text', ''])(
+    'inserts a bounded Markdown block at the exact reviewed range end or cursor (%j)',
+    async (before) => {
+      const { range, paragraph } = setup();
+      range.text = before;
+      range.insertParagraph.mockImplementation(() => {
+        throw new Error('Must not move insertion after the whole parent paragraph');
+      });
+      const output = '# 中文标题\n\n正文中的**重点**。';
+      const bridge = await createOfficeBridge('word');
+      const plan = await bridge.prepareWrite('insert', undefined, output);
+      expect(plan.before).toBe(before);
+      expect(plan.label).toContain('新起段落');
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+      await plan.commit(output);
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+      expect(paragraph.insertHtml).not.toHaveBeenCalled();
+      expect(range.insertHtml).toHaveBeenCalledWith(
+        expect.stringContaining(leadingBoundary + '<h1'),
+        'End',
+      );
+      expect(range.insertHtml.mock.calls[0][0]).toContain('中文标题');
+      expect(range.insertHtml.mock.calls[0][0].endsWith(trailingBoundary)).toBe(true);
+      expect(range.insertHtml).toHaveBeenCalledTimes(1);
+      expect(range.insertText).not.toHaveBeenCalled();
+      expect(range.text).toBe(before);
+    },
+  );
+  it.each(['replace', 'insert'] as const)(
+    'keeps inline emphasis in the existing paragraph during %s',
+    async (kind) => {
+      const { range, paragraph, point, paragraphs } = setup(true);
+      const bridge = await createOfficeBridge('word');
+      const source = await bridge.readSelection();
+      const output = '中文 **重点** 与原文衔接';
+      const plan = await bridge.prepareWrite(kind, source, output);
+      expect(plan.label).not.toContain('新起段落');
+      await plan.commit(output);
+      expect(range.insertHtml).toHaveBeenCalledWith(
+        '中文 <strong>重点</strong> 与原文衔接',
+        kind === 'replace' ? 'Replace' : 'End',
+      );
+      expect(range.insertHtml).toHaveBeenCalledTimes(1);
+      expect(range.insertText).not.toHaveBeenCalled();
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+      expect(paragraph.insertHtml).not.toHaveBeenCalled();
+      expect(point.compareLocationWith).not.toHaveBeenCalled();
+      expect(paragraphs.load).not.toHaveBeenCalled();
+    },
+  );
+  it('isolates a list replacement from neighboring paragraph text in one write', async () => {
+    const { range } = setup();
+    const source = await (await createOfficeBridge('word')).readSelection();
+    await source.replace!('- 第一项\n- 第二项');
+    const html = range.insertHtml.mock.calls[0][0];
+    expect(html).toContain(leadingBoundary + '<ul');
+    expect(html.endsWith('</ul>' + trailingBoundary)).toBe(true);
+    expect(range.insertHtml).toHaveBeenCalledTimes(1);
+    expect(range.insertText).not.toHaveBeenCalled();
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+  });
+  it.each([false, true])(
+    'preserves distinct localized paragraph styles around a block replacement (exact boundaries: %s)',
+    async (precise) => {
+      const { range, paragraphs } = setup(precise);
+      paragraphs.items = [{ style: '正文' }, { style: 'QA Edit 自定义' }];
+      const source = await (await createOfficeBridge('word')).readSelection();
+      await source.replace!('## 新标题\n\n- 新项目');
+      const html = range.insertHtml.mock.calls[0][0];
+      expect(paragraphs.load).toHaveBeenCalledWith('items/style');
+      expect(html).toContain('p.trioWordBefore{mso-style-name:"正文";}');
+      expect(html).toContain('p.trioWordAfter{mso-style-name:"QA Edit 自定义";}');
+      expect(html).toContain(leadingBoundary + '<h2');
+      expect(html.endsWith(trailingBoundary)).toBe(true);
+      expect(range.insertHtml).toHaveBeenCalledTimes(1);
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+    },
+  );
+  it('uses the end paragraph style on both sides of an insertion into a multi-paragraph selection', async () => {
+    const { range, paragraphs } = setup();
+    paragraphs.items = [{ style: 'Heading 1' }, { style: 'Quote' }];
+    const output = '## 新标题';
+    const plan = await (await createOfficeBridge('word')).prepareWrite('insert', undefined, output);
+    await plan.commit(output);
+    const html = range.insertHtml.mock.calls[0][0];
+    expect(html).toContain('p.trioWordBefore{mso-style-name:"Quote";}');
+    expect(html).toContain('p.trioWordAfter{mso-style-name:"Quote";}');
+    expect(html).not.toContain('Heading 1');
+    expect(range.insertHtml).toHaveBeenCalledTimes(1);
+  });
+  it('escapes document style names as CSS strings without allowing HTML or CSS injection', async () => {
+    const { range, paragraphs } = setup(true);
+    paragraphs.items = [{ style: 'QA "quoted"\\style\n</style><img src=x>&' }];
+    const source = await (await createOfficeBridge('word')).readSelection();
+    await source.replace!('## 新标题');
+    const html = range.insertHtml.mock.calls[0][0];
+    expect(html).toContain(
+      'QA \\22 quoted\\22 \\5c style\\a \\3c /style\\3e \\3c img src=x\\3e \\26 ',
+    );
+    expect(html.match(/<style>/g)).toHaveLength(1);
+    expect(html.match(/<\/style>/g)).toHaveLength(1);
+    expect(html).not.toContain('<img');
+  });
+  it('leaves the source untouched if its outside paragraph style cannot be confirmed', async () => {
+    const { range, paragraphs } = setup(true);
+    paragraphs.items = [];
+    const source = await (await createOfficeBridge('word')).readSelection();
+    await expect(source.replace!('## 新标题')).rejects.toThrow('无法确认原段落样式');
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+    expect(range.insertText).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['After', 'Before', true, true],
+    ['Equal', 'Before', false, true],
+    ['After', 'Equal', true, false],
+    ['Equal', 'Equal', false, false],
+    ['Equal', 'After', false, false],
+  ] as const)(
+    'adds only necessary boundaries for a Word 1.3 replacement (%s / %s)',
+    async (before, after, leading, trailing) => {
+      const { range, boundary, point } = setup(true);
+      boundary.before = before;
+      boundary.after = after;
+      const source = await (await createOfficeBridge('word')).readSelection();
+      await source.replace!('# 标题\n\n正文');
+      const html = range.insertHtml.mock.calls[0][0];
+      expect(html.includes(leadingBoundary)).toBe(leading);
+      expect(html.endsWith(trailingBoundary)).toBe(trailing);
+      expect(html.includes('<style>')).toBe(leading || trailing);
+      expect(point.compareLocationWith).toHaveBeenCalledTimes(2);
+      expect(range.insertHtml).toHaveBeenCalledTimes(1);
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+      expect(range.insertText).not.toHaveBeenCalled();
+    },
+  );
+  it('does not add a trailing blank paragraph when inserting a block at document end', async () => {
+    const { range, boundary } = setup(true);
+    boundary.before = 'After';
+    boundary.after = 'Equal';
+    const output = '# 文末标题';
+    const plan = await (await createOfficeBridge('word')).prepareWrite('insert', undefined, output);
+    await plan.commit(output);
+    expect(range.getRange).toHaveBeenCalledWith('End');
+    const [html, location] = range.insertHtml.mock.calls[0];
+    expect(html.includes(leadingBoundary)).toBe(true);
+    expect(html.endsWith(trailingBoundary)).toBe(false);
+    expect(location).toBe('End');
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+  });
+  it('rejects a stale Markdown insertion anchor before creating any paragraph', async () => {
+    const { range, paragraph } = setup();
+    const output = '# 标题\n\n正文';
+    const plan = await (await createOfficeBridge('word')).prepareWrite('insert', undefined, output);
+    range.text = 'User changed this';
+    await expect(plan.commit(output)).rejects.toThrow('已经变化');
+    expect(range.insertParagraph).not.toHaveBeenCalled();
+    expect(paragraph.insertHtml).not.toHaveBeenCalled();
+  });
+  it.each(['replace', 'insert'] as const)(
+    'does not pre-edit or retry the source when the single Markdown %s fails',
+    async (kind) => {
+      const { range, paragraph, context } = setup(true);
+      const bridge = await createOfficeBridge('word');
+      const source = await bridge.readSelection();
+      const output = '## 新标题\n\n- 新项目';
+      const plan = await bridge.prepareWrite(kind, source, output);
+      context.sync
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Word import failed'));
+      await expect(plan.commit(output)).rejects.toThrow('Word import failed');
+      expect(range.insertHtml).toHaveBeenCalledTimes(1);
+      expect(range.text).toBe('Original');
+      expect(range.insertText).not.toHaveBeenCalled();
+      expect(range.insertParagraph).not.toHaveBeenCalled();
+      expect(paragraph.insertHtml).not.toHaveBeenCalled();
+    },
+  );
+  it('rechecks protected Word objects before rich-text replacement', async () => {
+    const { range } = setup();
+    const source = await (await createOfficeBridge('word')).readSelection();
+    range.getOoxml.mockReturnValue({ value: wordXml('<w:drawing/>') });
+    await expect(source.replace!('# 新标题\n\n**新文字**')).rejects.toThrow('保留结构');
+    expect(range.insertHtml).not.toHaveBeenCalled();
+    expect(range.insertText).not.toHaveBeenCalled();
   });
   it('isolates report headings in a new paragraph so existing text is not restyled', async () => {
     const { range, context, paragraph } = setup();

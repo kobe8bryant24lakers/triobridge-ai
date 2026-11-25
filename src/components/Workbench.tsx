@@ -40,6 +40,7 @@ import type {
 import { officeError } from '../office/bridge';
 import { demoComplete } from '../office/demo';
 import { ConfirmWrite } from './ConfirmWrite';
+import { WordTextPreview } from './WordTextPreview';
 import { OutlineEditor } from './OutlineEditor';
 import { parseReport, parseTable, reportToText, tableToText } from '../core/structured-output';
 import { ReportPreview, TablePreview } from './StructuredPreview';
@@ -263,12 +264,13 @@ export function Workbench({
     setBusy('preparing');
     setNotice(undefined);
     try {
-      const text = kind === 'formula' ? parseFormula(result) : result.trim();
+      const wordText = bridge.host === 'word' && task.output === 'text';
+      const text = wordText ? result : kind === 'formula' ? parseFormula(result) : result.trim();
       if (kind === 'slides') parseOutline(text);
       if (kind === 'document') parseReport(text);
       if (kind === 'table') parseTable(text);
-      if (!text) throw new Error('结果为空，请先生成内容。');
-      if (text.length > MAX_RESULT_LENGTH)
+      if (!text.trim()) throw new Error('结果为空，请先生成内容。');
+      if (task.output !== 'text' && text.length > MAX_RESULT_LENGTH)
         throw new Error('结果超过 100,000 字符，请缩短后再写入。');
       const next = await bridge.prepareWrite(kind, snapshot.current, text);
       if (disposed.current) {
@@ -348,7 +350,7 @@ export function Workbench({
   const { slides, report, table, formatError } = useMemo(() => {
     if (!hasResult) return { formatError: '' };
     if (!result.trim()) return { formatError: '结果为空，请输入内容后再写入。' };
-    if (result.length > MAX_RESULT_LENGTH)
+    if (task.output !== 'text' && result.length > MAX_RESULT_LENGTH)
       return { formatError: '结果超过 100,000 字符。内容已保留，请缩短后再写入。' };
     try {
       if (task.output === 'outline') return { slides: parseOutline(result), formatError: '' };
@@ -806,6 +808,8 @@ export function Workbench({
                         </li>
                       ))}
                     </ol>
+                  ) : bridge.host === 'word' && task.output === 'text' ? (
+                    <WordTextPreview text={result} className="result-text" />
                   ) : (
                     <pre
                       className={`result-text ${task.output === 'formula' ? 'formula-text' : ''}`}
@@ -990,6 +994,7 @@ export function Workbench({
           plan={plan}
           output={writeValue}
           outputKind={task.output}
+          wordText={bridge.host === 'word' && task.output === 'text'}
           returnFocus={writeTrigger.current}
           busy={busy === 'writing'}
           error={writeError}

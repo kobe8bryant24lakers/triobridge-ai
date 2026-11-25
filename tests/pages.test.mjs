@@ -41,7 +41,11 @@ test('site packaging copies only approved files for both languages and refuses s
       'site.css',
       'zh-CN.html',
     ]);
-    assert.deepEqual((await readdir(join(output, 'assets'))).sort(), ['icon.svg', 'workbench.png']);
+    assert.deepEqual((await readdir(join(output, 'assets'))).sort(), [
+      'TrioBridge-AI-User-Guide-zh-CN.pptx',
+      'icon.svg',
+      'workbench.png',
+    ]);
     await rm(join(root, 'docs/assets/icon.svg'));
     await symlink(join(root, 'docs/private-test-data.json'), join(root, 'docs/assets/icon.svg'));
     await assert.rejects(copySiteFiles(root, output), /regular, explicitly approved/);

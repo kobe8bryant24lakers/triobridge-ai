@@ -102,7 +102,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm ci --prefix offline/tooling
+      - run: node --test tests/native-office-session.test.mjs tests/native-office-windows.test.mjs tests/native-word-richtext.test.mjs tests/pane-session.test.mjs
       - run: npm run build:installer
+      - name: Prepare WebView2 for the registered task pane smoke test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installed = @(${env:ProgramFiles(x86)}, $env:ProgramFiles, $env:LOCALAPPDATA) |
+            Where-Object { $_ } |
+            ForEach-Object { Get-Item (Join-Path $_ 'Microsoft/EdgeWebView/Application/*/msedgewebview2.exe') -ErrorAction SilentlyContinue }
+          if (-not $installed) {
+            $installer = Get-Item 'build/native-win32-*/bundle/MicrosoftEdgeWebView2RuntimeInstaller*.exe'
+            $result = Start-Process $installer.FullName -ArgumentList '/silent','/install' -Wait -PassThru
+            if ($result.ExitCode -ne 0) { throw "WebView2 installation failed ($($result.ExitCode))." }
+          }
       - name: Set up WinRAR for manual Windows ZIP acceptance
         if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch'
         shell: pwsh
