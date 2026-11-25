@@ -15,7 +15,7 @@
 | Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip) |
 | Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip) |
 
-**Windows** 保存文档，完全退出三款 Office，解压 ZIP，再双击 **Install.cmd**。重新打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。Intel / AMD 电脑选 x64，ARM 电脑选 ARM64。
+**Windows** 保存文档，完全退出三款 Office，解压 ZIP，再双击 **Install.cmd**。安装后用同一 Windows 账户以普通权限打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。Intel / AMD 电脑选 x64，ARM 电脑选 ARM64。
 
 **Mac** 在“关于本机”确认芯片，解压 ZIP，双击 **Install.command**。在目标应用的菜单栏选择 **Word / Excel / PowerPoint → 服务 → 打开三桥 AI**。首次使用可能出现 macOS 自动化或钥匙串访问提示。
 

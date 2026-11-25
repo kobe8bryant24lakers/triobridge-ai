@@ -15,7 +15,7 @@ Learn how to connect a model, generate content, and confirm changes in each Offi
 | Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-arm64.zip) |
 | Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.8.0/TrioBridge-AI-Mac-x64.zip) |
 
-**Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Reopen a document and choose **打开侧边栏** (task pane) or **打开独立窗口** (separate window) on the **三桥 AI** ribbon.
+**Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Open Office normally under the same Windows account and choose **打开侧边栏** (task pane) or **打开独立窗口** (separate window) on the **三桥 AI** ribbon.
 
 **Mac** Check your processor in About This Mac, extract the ZIP, and double-click **Install.command**. In Word, Excel, or PowerPoint, choose the application menu → **Services → 打开三桥 AI**. macOS may ask for Automation or Keychain access.
 
