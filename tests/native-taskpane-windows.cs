@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace TrioBridge
@@ -76,6 +77,28 @@ internal static class TaskPaneTests
     }
     static void RegisteredSmoke(bool webView)
     {
+        // Use the same merged registry view as the actual x86/x64 COM client.
+        const string paneServer = @"CLSID\{640D4723-A40B-46E5-A862-30C4254606D4}\InprocServer32";
+        using (var server = Registry.ClassesRoot.OpenSubKey(paneServer))
+        {
+            Check(server != null && string.Equals(server.GetValue("") as string, "mscoree.dll",
+                  StringComparison.OrdinalIgnoreCase), "Missing managed class registration in the client registry view.");
+            var codeBase = new Uri((string)server.GetValue("CodeBase"), UriKind.Absolute);
+            Check(codeBase.IsFile && File.Exists(codeBase.LocalPath), "Registered task pane DLL is missing.");
+            var identity = AssemblyName.GetAssemblyName(codeBase.LocalPath);
+            using (var version = server.OpenSubKey(identity.Version.ToString()))
+                foreach (var entry in new[] { server, version })
+                {
+                    Check(entry != null && (string)entry.GetValue("Assembly") == identity.FullName &&
+                          (string)entry.GetValue("Class") == "TrioBridge.TaskPane" &&
+                          (string)entry.GetValue("RuntimeVersion") == "v4.0.30319" &&
+                          (string)entry.GetValue("CodeBase") == codeBase.AbsoluteUri,
+                          "Managed class registration does not match the installed assembly.");
+                }
+            foreach (string name in new[] { "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll" })
+                Check(File.Exists(Path.Combine(Path.GetDirectoryName(codeBase.LocalPath), name)), "WebView2 dependency missing: " + name);
+        }
+        Console.WriteLine("Verified the installed managed class, both registration records and WebView2 dependencies.");
         // Isolate backend configuration and credentials from the current account.
         string directory = Path.Combine(Path.GetTempPath(), "triobridge-pane-smoke-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

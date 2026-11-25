@@ -16,6 +16,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 [assembly: ComVisible(false)]
+[assembly: AssemblyVersion("1.0.0.0")]
 
 namespace TrioBridge
 {

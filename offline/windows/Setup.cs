@@ -103,6 +103,8 @@ class Setup
     static void RegisterPane(RegistryKey root)
     {
         string file = PaneAssembly(Dest);
+        AssemblyName identity = AssemblyName.GetAssemblyName(file);
+        string codeBase = new Uri(file).AbsoluteUri;
         using (var cls = Key(root, PaneClsid))
         {
             cls.SetValue("", "三桥 AI 工作台侧边栏");
@@ -113,10 +115,16 @@ class Setup
             {
                 server.SetValue("", "mscoree.dll");
                 server.SetValue("ThreadingModel", "Both");
-                server.SetValue("Class", PaneProg);
-                server.SetValue("Assembly", AssemblyName.GetAssemblyName(file).FullName);
-                server.SetValue("RuntimeVersion", "v4.0.30319");
-                server.SetValue("CodeBase", new Uri(file).AbsoluteUri);
+                // Match RegAsm /codebase for each registry view. The CLR shim
+                // resolves the managed class from its version-specific registration.
+                using (var version = server.CreateSubKey(identity.Version.ToString()))
+                    foreach (var entry in new[] { server, version })
+                    {
+                        entry.SetValue("Class", PaneProg);
+                        entry.SetValue("Assembly", identity.FullName);
+                        entry.SetValue("RuntimeVersion", "v4.0.30319");
+                        entry.SetValue("CodeBase", codeBase);
+                    }
             }
         }
         using (var p = Key(root, PaneProgKey))
