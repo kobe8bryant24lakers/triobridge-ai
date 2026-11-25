@@ -1,3 +1,4 @@
+import { nativeWorkbench } from '../offline/transport';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -504,6 +505,18 @@ function LocalModelSettings({
   );
 }
 
+function sharedProvider(profile: ModelProfile) {
+  if (nativeWorkbench()) {
+    try {
+      if (['localhost', '127.0.0.1', '[::1]'].includes(new URL(profile.baseUrl).hostname))
+        return 'device';
+    } catch {
+      /* A new profile starts without an address. */
+    }
+  }
+  return presetFor(profile);
+}
+
 function SharedModelSettings({
   state,
   actions,
@@ -521,10 +534,16 @@ function SharedModelSettings({
     baseUrl: initial?.baseUrl ?? '',
     hasKey: initial?.hasKey ?? false,
   }));
-  const [provider, setProvider] = useState(() => presetFor(sharedDraft(initial)));
-  const [advanced, setAdvanced] = useState(() => presetFor(sharedDraft(initial)) === 'custom');
+  const [provider, setProvider] = useState(() => sharedProvider(sharedDraft(initial)));
+  const [advanced, setAdvanced] = useState(() =>
+    ['custom', 'device'].includes(sharedProvider(sharedDraft(initial))),
+  );
   const [credential, setCredential] = useState<'keep' | 'replace' | 'remove'>(
-    initial?.hasKey ? 'keep' : 'replace',
+    initial?.hasKey
+      ? 'keep'
+      : sharedProvider(sharedDraft(initial)) === 'device'
+        ? 'remove'
+        : 'replace',
   );
   const [activate, setActivate] = useState(!initial || initial.id === state.activeId);
   const [dirty, setDirty] = useState(false);
@@ -556,9 +575,11 @@ function SharedModelSettings({
       baseUrl: profile?.baseUrl ?? '',
       hasKey: profile?.hasKey ?? false,
     });
-    setProvider(presetFor(value));
-    setAdvanced(presetFor(value) === 'custom');
-    setCredential(profile?.hasKey ? 'keep' : 'replace');
+    setProvider(sharedProvider(value));
+    setAdvanced(['custom', 'device'].includes(sharedProvider(value)));
+    setCredential(
+      profile?.hasKey ? 'keep' : sharedProvider(value) === 'device' ? 'remove' : 'replace',
+    );
     setActivate(!profile || profile.id === next.activeId);
     setDirty(false);
     setShowApiKey(false);
@@ -583,9 +604,10 @@ function SharedModelSettings({
       [key]: value,
       ...(key === 'baseUrl' && value !== current.baseUrl ? { apiKey: '' } : {}),
     }));
-    if (key === 'baseUrl') setCredential('replace');
+    if (key === 'baseUrl')
+      setCredential((current) => (current === 'remove' ? 'remove' : 'replace'));
     if (key === 'baseUrl' || key === 'model') {
-      setProvider('custom');
+      if (provider !== 'device') setProvider('custom');
       setShowApiKey(false);
     }
     setDirty(true);
@@ -596,12 +618,22 @@ function SharedModelSettings({
   function selectProvider(value: string) {
     const preset = MODEL_PRESETS.find((item) => item.id === value);
     setProvider(value);
-    setAdvanced(value === 'custom');
+    setAdvanced(value === 'custom' || value === 'device');
     setShowApiKey(false);
     setCredential('replace');
     setDirty(true);
     setStatus(undefined);
     setDeleting(false);
+    if (value === 'device') {
+      setDraft((current) => ({
+        ...current,
+        name: '本机模型',
+        baseUrl: 'http://127.0.0.1:8001/v1',
+        model: '',
+        apiKey: '',
+      }));
+      setCredential('remove');
+    }
     if (preset)
       setDraft((current) => ({
         ...current,
@@ -715,7 +747,7 @@ function SharedModelSettings({
             next.profiles.find((profile) => profile.id === draft.id),
             next,
           );
-        setStatus({ text: '共享服务已恢复连接。未保存的修改仍保留。' });
+        setStatus({ text: '已重新读取共享配置。草稿仍可编辑。' });
       },
     );
   }
@@ -788,7 +820,7 @@ function SharedModelSettings({
       </p>
       {offline && (
         <div className="notice error" role="alert">
-          共享服务暂时无法连接。配置与草稿仍保留，恢复连接后再保存。
+          暂时无法读取共享配置。草稿已保留，可重新连接后保存。
           <button
             type="button"
             className="text-button"
@@ -940,7 +972,11 @@ function SharedModelSettings({
         <fieldset disabled={blocked}>
           <label>
             模型服务
-            <select value={provider} onChange={(event) => selectProvider(event.target.value)}>
+            <select
+              aria-label="模型服务"
+              value={provider}
+              onChange={(event) => selectProvider(event.target.value)}
+            >
               <option value="" disabled>
                 请选择你使用的服务
               </option>
@@ -949,6 +985,7 @@ function SharedModelSettings({
                   {preset.name}
                 </option>
               ))}
+              {nativeWorkbench() && <option value="device">本机 API（127.0.0.1）</option>}
               <option value="custom">自定义 / 本地模型</option>
             </select>
           </label>
@@ -965,6 +1002,7 @@ function SharedModelSettings({
           <label>
             密钥操作
             <select
+              aria-label="密钥操作"
               value={credential}
               onChange={(event) => {
                 setCredential(event.target.value as typeof credential);
@@ -1020,8 +1058,8 @@ function SharedModelSettings({
           </p>
           {state.storage === 'macos-keychain' && credential !== 'remove' && (
             <p className="field-help">
-              首次使用或升级后，macOS
-              可能请求允许本机服务访问钥匙串。请在系统窗口确认，无需在插件中重新填写已保存的密钥。
+              首次使用或升级后，macOS 可能请求允许三桥 AI
+              访问钥匙串。请在系统窗口确认，无需在插件中重新填写已保存的密钥。
             </p>
           )}
           <button
@@ -1050,6 +1088,7 @@ function SharedModelSettings({
                 API Base URL
                 <input
                   required
+                  aria-label="API Base URL"
                   value={draft.baseUrl}
                   onChange={(event) => field('baseUrl', event.target.value)}
                   placeholder="https://api.example.com/v1"
@@ -1066,6 +1105,7 @@ function SharedModelSettings({
                 <input
                   required
                   maxLength={200}
+                  aria-label="模型 ID"
                   value={draft.model}
                   onChange={(event) => field('model', event.target.value)}
                   placeholder="填写服务提供的模型名称"

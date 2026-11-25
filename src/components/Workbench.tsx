@@ -227,7 +227,8 @@ export function Workbench({
     try {
       const messages = buildMessages(task, source, instruction, language);
       if (!model && !isDemoModel) throw new Error('请先添加并选择一个模型配置。');
-      if (!isDemoModel && sharedUnavailable) throw new Error('请先恢复本机共享服务连接后再生成。');
+      if (!isDemoModel && sharedUnavailable)
+        throw new Error('请在模型设置中重新读取共享配置后再生成。');
       const controller = new AbortController();
       request.current = controller;
       setBusy('generating');

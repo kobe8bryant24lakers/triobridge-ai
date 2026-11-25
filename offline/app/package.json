@@ -1,0 +1,8 @@
+{
+  "name": "triobridge-local-workbench",
+  "productName": "TrioBridge AI",
+  "version": "0.6.0",
+  "type": "module",
+  "main": "main.mjs",
+  "private": true
+}

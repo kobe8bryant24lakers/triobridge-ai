@@ -1,3 +1,4 @@
+import { modelTransport, nativeWorkbench } from '../offline/transport';
 import type {
   ModelProfile,
   ProfileDetails,
@@ -217,8 +218,9 @@ export function createProfileController(options: ControllerOptions = {}) {
   const local = options.local ?? availableStorage('localStorage');
   const session = options.session ?? availableStorage('sessionStorage');
   const capability = options.capability ?? getLocalCapability;
-  const requireShared = options.requireShared ?? requiresLocalSharedMode();
-  const client = createSharedModelClient(options.fetcher ?? fetch, capability);
+  const requireShared =
+    options.requireShared ?? (Boolean(nativeWorkbench()) || requiresLocalSharedMode());
+  const client = createSharedModelClient(options.fetcher ?? modelTransport, capability);
   let state: ProfileState =
     capability() || requireShared
       ? { mode: 'checking', profiles: [], activeId: '' }
@@ -259,8 +261,10 @@ export function createProfileController(options: ControllerOptions = {}) {
       storage: previous?.storage,
       connection: 'offline',
       legacyAvailable: hasLegacyProfiles(local),
-      warning:
-        error instanceof SharedModelClientError && ['capability', 'local_auth'].includes(error.code)
+      warning: nativeWorkbench()
+        ? '无法读取本机模型配置。请核对当前账户的文件权限并点击重新连接。'
+        : error instanceof SharedModelClientError &&
+            ['capability', 'local_auth'].includes(error.code)
           ? '本机共享入口缺少有效的安装凭证。请重新运行本机共享安装包中的 Install，保存文档并完全退出、重开 Office。旧模型配置未修改。'
           : '本机共享服务暂时未连接。请双击本机共享安装包中的 Restart，恢复后重试。已保留共享配置，未切换到旧本地密钥。',
     });
@@ -286,7 +290,7 @@ export function createProfileController(options: ControllerOptions = {}) {
   ): Promise<SharedProfileState> {
     if (mutating) throw new Error('正在保存模型配置，请等待当前操作完成。');
     if (state.mode !== 'shared' || state.connection !== 'ready')
-      throw new Error('请先恢复本机共享服务连接后再修改配置。');
+      throw new Error('请重新读取共享配置后再修改。');
     mutating = true;
     try {
       return apply(await operation());
