@@ -12,10 +12,10 @@ The workbench opens in Simplified Chinese by default. Use the language selector 
 
 | System and processor | Installer |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.1/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.1/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.1/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.9.1/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Open Office normally under the same Windows account and choose **打开侧边栏** (task pane) or **打开独立窗口** (separate window) on the **三桥 AI** ribbon.
 

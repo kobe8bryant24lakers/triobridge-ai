@@ -180,7 +180,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             {t('把选择留在你手里。', 'You choose what to share.')}
           </p>
-          <span>TrioBridge AI · 0.9.0</span>
+          <span>TrioBridge AI · 0.9.1</span>
         </div>
       </aside>
       <div className="main-shell">
