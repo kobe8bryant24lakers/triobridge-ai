@@ -19,6 +19,12 @@ import {
   X,
 } from 'lucide-react';
 import { complete } from '../core/model-client';
+import {
+  appendEditingTurn,
+  buildEditingFollowUp,
+  MAX_EDITING_FOLLOW_UP_LENGTH,
+  type EditingTurn,
+} from '../core/editing-conversation';
 import { customFormatSuffix } from '../core/model-presets';
 import { outlineToText, parseFormula, parseOutline } from '../core/output';
 import {
@@ -50,6 +56,7 @@ import { ReportEditor } from './ReportEditor';
 import { TableEditor } from './TableEditor';
 import { getComplexSamples, type DemoScenario } from '../office/complex-samples';
 import { PresentationWorkspace, type PresentationMode } from './PresentationWorkspace';
+import { EditingConversation } from './EditingConversation';
 
 interface Props {
   bridge: HostBridge;
@@ -129,6 +136,8 @@ export function Workbench({
   const [instruction, setInstruction] = useState('');
   const [language, setLanguage] = useState<string>(TRANSLATION_LANGUAGES[0][0]);
   const [result, setResult] = useState('');
+  const [editingTurns, setEditingTurns] = useState<EditingTurn[]>([]);
+  const [followUp, setFollowUp] = useState('');
   const [resultModel, setResultModel] = useState<{ label: string } | 'demo'>();
   const [editing, setEditing] = useState(false);
   const [slideDraft, setSlideDraft] = useState<SlideContent[] | null>(null);
@@ -181,7 +190,7 @@ export function Workbench({
       // Shared activation is authoritative in the revisioned catalog. A newer
       // activation from another host may already have arrived while awaiting.
       if (profiles.mode !== 'shared' || id === '__demo__') setModelId(id);
-      invalidate();
+      setNotice(undefined);
     } catch (error) {
       setNotice({ text: officeError(error), error: true });
     } finally {
@@ -207,6 +216,8 @@ export function Workbench({
   }, []);
 
   function invalidate(clear = false) {
+    setEditingTurns([]);
+    setFollowUp('');
     if (clear) {
       setResult('');
       setResultModel(undefined);
@@ -253,18 +264,22 @@ export function Workbench({
       if (!disposed.current) setBusy('');
     }
   }
-  async function generate() {
-    if (operation.current) return;
+  async function generate(continuing = false) {
+    if (operation.current || active || pendingCell) return;
+    if (continuing && (!hasResult || outdated || editing || !followUp.trim())) return;
     operation.current = true;
     setNotice(undefined);
     try {
-      const messages = buildMessages(
+      const baseMessages = buildMessages(
         task,
         source,
         instruction,
         TRANSLATION_LANGUAGES.find(([id]) => id === language)?.[uiLanguage === 'en' ? 1 : 0] ??
           language,
       );
+      const messages = continuing
+        ? buildEditingFollowUp(baseMessages, editingTurns, result, followUp)
+        : baseMessages;
       if (!model && !isDemoModel)
         throw new Error(t('请先添加并选择一个模型配置。', 'Add and select a model first.'));
       if (!isDemoModel && sharedUnavailable)
@@ -278,15 +293,49 @@ export function Workbench({
       request.current = controller;
       setBusy('generating');
       const text = isDemoModel
-        ? await demoComplete(task, source, instruction, controller.signal, demoScenario)
+        ? continuing
+          ? result
+          : await demoComplete(task, source, instruction, controller.signal, demoScenario)
         : await complete(model!, messages, controller.signal);
       if (controller.signal.aborted || disposed.current) return;
+      // An invalid follow-up must not replace a usable draft or enter its history.
+      if (continuing) {
+        if (!text.trim())
+          throw new Error(t('结果为空，请重试。', 'The result is empty. Try again.'));
+        if (task.output !== 'text' && text.length > MAX_RESULT_LENGTH)
+          throw new Error(
+            t(
+              '结果超过 100,000 字符，请缩短后重试。',
+              'The result exceeds 100,000 characters. Shorten the request and try again.',
+            ),
+          );
+        if (task.output === 'outline') parseOutline(text);
+        if (task.output === 'document') parseReport(text);
+        if (task.output === 'table') parseTable(text);
+        if (task.output === 'formula') parseFormula(text);
+      }
       setResult(text);
+      setEditingTurns(
+        continuing
+          ? appendEditingTurn(editingTurns, result, followUp, text)
+          : [{ instruction: instruction.trim() || task.label, result: text }],
+      );
+      setFollowUp('');
       setOutdated(false);
       setWritten(false);
       setEditing(false);
       setSlideDraft(null);
+      setReportDraft(null);
+      setTableDraft(null);
       setResultModel(isDemoModel ? 'demo' : { label: `${model!.name} / ${model!.model}` });
+      if (isDemoModel && continuing)
+        setNotice({
+          text: () =>
+            t(
+              '演示模型已保留当前预览。连接真实模型后可按多轮要求调整内容。',
+              'The demo model keeps the current preview. Connect a real model to refine it across turns.',
+            ),
+        });
       setTimeout(() => outputRef.current?.focus(), 0);
     } catch (error) {
       if (!disposed.current)
@@ -782,7 +831,7 @@ export function Workbench({
             <div className="generate-row">
               <button
                 className="primary generate-button"
-                onClick={generate}
+                onClick={() => void generate()}
                 disabled={
                   active ||
                   pendingCell ||
@@ -820,8 +869,8 @@ export function Workbench({
                     'The demo model does not send content to a model service or change Office files.',
                   )
                 : t(
-                    '生成时仅将上方参考内容和要求发送给所选模型服务。',
-                    'Only the source and instructions above are sent to your selected model service when you generate.',
+                    '生成时发送参考内容和要求；继续调整时还会发送当前预览与近期编辑对话。',
+                    'Generation sends the source and instructions. Follow-ups also send the current preview and recent editing conversation.',
                   )}
             </p>
           </section>
@@ -1090,6 +1139,22 @@ export function Workbench({
                     {structured ? t('下载 JSON', 'Download JSON') : t('下载文本', 'Download Text')}
                   </button>
                 </div>
+                <EditingConversation
+                  id="workbench-editing"
+                  turns={editingTurns}
+                  value={followUp}
+                  onChange={setFollowUp}
+                  onSubmit={() => {
+                    if (followUp.length <= MAX_EDITING_FOLLOW_UP_LENGTH) void generate(true);
+                  }}
+                  onReset={() => {
+                    setEditingTurns([]);
+                    setFollowUp('');
+                  }}
+                  disabled={active || pendingCell || editing}
+                  unavailable={(!model && !isDemoModel) || (!isDemoModel && sharedUnavailable)}
+                  stale={outdated}
+                />
                 <div className="write-actions">
                   {canDocument && (
                     <button

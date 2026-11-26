@@ -16,6 +16,12 @@ import {
 } from '../presentation/editing';
 import { downloadBlob } from '../presentation/render';
 import type { PresentationRuntime } from './presentation-runtime';
+import {
+  appendEditingTurn,
+  buildEditingFollowUp,
+  type EditingTurn,
+} from '../core/editing-conversation';
+import { EditingConversation } from './EditingConversation';
 
 export function PresentationEdit({
   context,
@@ -25,6 +31,7 @@ export function PresentationEdit({
   request,
   notify,
   modelStamp,
+  demo,
 }: PresentationRuntime) {
   const [scope, setScope] = useState<'selected' | 'all'>(
       access?.capabilities.selected ? 'selected' : 'all',
@@ -44,9 +51,12 @@ export function PresentationEdit({
     [font, setFont] = useState(''),
     [accent, setAccent] = useState('#28604A'),
     [thumbnail, setThumbnail] = useState('');
+  const [turns, setTurns] = useState<EditingTurn[]>([]),
+    [followUp, setFollowUp] = useState(''),
+    [initialInstruction, setInitialInstruction] = useState('');
   const fingerprint = JSON.stringify([
     brief,
-    context.materials.map((m) => [m.id, m.name, m.text, m.image?.modelData]),
+    context.materials.map((m) => [m.id, m.name, m.text, m.tables, m.image?.modelData]),
     context.includeImages,
     modelStamp,
   ]);
@@ -85,6 +95,9 @@ export function PresentationEdit({
         setWritten(false);
         setThumbnail('');
         setConfirmed(false);
+        setTurns([]);
+        setFollowUp('');
+        setInitialInstruction('');
         notify(
           t(
             `已读取 ${value.slides.length} 页、${objects} 个对象。`,
@@ -123,15 +136,65 @@ export function PresentationEdit({
           JSON.stringify(demo),
         );
         if (signal.aborted) return;
-        preview(parseEdit(raw, snapshot), fingerprint);
+        const result = parseEdit(raw, snapshot);
+        preview(result, fingerprint);
+        setTurns([{ instruction: brief, result: JSON.stringify(result) }]);
+        setInitialInstruction(brief);
+        setFollowUp('');
       },
       true,
     );
   }
   async function quick(action: () => EditProposal) {
     await run(t('准备改动预览', 'Preparing change preview'), async () => {
-      preview(action());
+      const result = action();
+      preview(result, fingerprint);
+      setInitialInstruction(result.summary);
+      setTurns([{ instruction: result.summary, result: JSON.stringify(result) }]);
+      setFollowUp('');
     });
+  }
+  async function refine() {
+    if (!snapshot || !proposal || outdated || written || busy || !followUp.trim()) return;
+    const instruction = followUp.trim();
+    await run(
+      t('根据对话调整修改方案', 'Refining the edit proposal'),
+      async (signal) => {
+        // Revisions remain a complete proposal against the original read snapshot.
+        // Unchecked changes are absent from the current draft sent to the model.
+        const current = JSON.stringify({
+          summary: proposal.summary,
+          changes: proposal.changes.filter((_, i) => chosen.has(i)),
+          ...(includeOrder && proposal.slideOrder ? { slideOrder: proposal.slideOrder } : {}),
+        });
+        const messages = buildEditingFollowUp(
+          editMessages(context, snapshot, initialInstruction),
+          turns,
+          current,
+          instruction,
+        );
+        const raw = await request(messages, signal, current);
+        if (signal.aborted) return;
+        const result = parseEdit(raw, snapshot);
+        preview(result, fingerprint);
+        setTurns((previous) =>
+          appendEditingTurn(previous, current, instruction, JSON.stringify(result)),
+        );
+        setFollowUp('');
+        notify(
+          demo
+            ? t(
+                '固定演示保留当前方案；连接真实模型后可按对话调整。',
+                'The demo keeps the current proposal. Connect a model to refine it through conversation.',
+              )
+            : t(
+                '已更新修改方案，请检查后确认应用。',
+                'Edit proposal updated. Review it before confirming changes.',
+              ),
+        );
+      },
+      true,
+    );
   }
   async function apply() {
     if (!snapshot || !proposal || !access || outdated || written) return;
@@ -589,6 +652,19 @@ export function PresentationEdit({
               'Rewriting can change local formatting. Applying one font replaces mixed styles. Save a backup first. Use Office Undo to revert.',
             )}
           </p>
+          <EditingConversation
+            id="slides-conversation"
+            turns={turns}
+            value={followUp}
+            onChange={setFollowUp}
+            onSubmit={() => void refine()}
+            onReset={() => {
+              setTurns([]);
+              setFollowUp('');
+            }}
+            disabled={busy}
+            stale={outdated || written}
+          />
           <div className="button-row">
             <button
               className="primary"

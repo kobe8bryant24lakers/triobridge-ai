@@ -103,7 +103,7 @@ export interface TableContent {
   formats: ColumnFormat[];
 }
 export interface ChatMessage {
-  role: 'system' | 'user';
+  role: 'system' | 'user' | 'assistant';
   content: string | ChatContentPart[];
 }
 export type ChatContentPart =

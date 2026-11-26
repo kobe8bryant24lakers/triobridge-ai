@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.0 — 2026-11-26
+
+- Add **Conversation** for multi-turn questions about the add-in, presentation planning, and general topics. This mode does not read or change the current document.
+- Refine Word and Excel results, PowerPoint decks, existing-slide proposals, and chart recommendations across multiple turns. Editing uses the current preview, including manual changes, and recent history. Conversation and editing keep separate histories; document writes still require confirmation.
+- Keep the previous preview and pending request when a revision fails or is cancelled. Clear editing history without discarding the current preview.
+
+### 简体中文
+
+- 新增「对话模式」，支持连续询问插件用法、整理 PPT 思路及一般问题，不读取或修改当前文档。
+- Word、Excel 结果及 PowerPoint 整稿、现有页面修改方案、图表建议均支持多轮调整，结合当前预览、手动修改和近期历史继续编辑。两种模式分别保留历史，写入文档仍需确认。
+- 修改失败或取消时保留上一版预览与待发送要求；清空编辑记录会保留当前预览。
+
 ## 0.9.1 — 2026-11-26
 
 - PowerPoint’s **Create from Files → Generate deck** can now wait beyond the model profile’s request timeout, which defaults to 60 seconds. Other tasks and connection tests continue to use the configured timeout. Choose **Stop** to cancel a generation and keep the previous preview.

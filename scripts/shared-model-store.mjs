@@ -131,7 +131,7 @@ export function validateSharedMessages(messages) {
     if (
       !isObject(message) ||
       Object.keys(message).some((key) => !['role', 'content'].includes(key)) ||
-      !['system', 'user'].includes(message.role)
+      !['system', 'user', 'assistant'].includes(message.role)
     )
       fail('request', '模型消息格式无效。');
     let content;
