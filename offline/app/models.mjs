@@ -5,7 +5,7 @@ const fields = new Map(
   Object.entries({
     state: [],
     language: ['uiLanguage'],
-    complete: ['profileId', 'profileRevision', 'messages'],
+    complete: ['profileId', 'profileRevision', 'messages', 'purpose'],
     activate: ['expectedRevision', 'id'],
     delete: ['expectedRevision', 'id'],
     import: ['expectedRevision', 'profiles', 'activeId'],

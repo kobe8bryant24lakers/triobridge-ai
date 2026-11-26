@@ -3,6 +3,7 @@ export type OutputKind = 'text' | 'formula' | 'outline' | 'document' | 'table';
 export type WriteKind = 'replace' | 'insert' | 'formula' | 'slides' | 'document' | 'table';
 
 export type ModelApiFormat = 'openai' | 'anthropic';
+export type CompletionPurpose = 'presentation-deck';
 
 export interface ModelProfile {
   id: string;

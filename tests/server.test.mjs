@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createServer as createHttp2Server, connect } from 'node:http2';
 import { once } from 'node:events';
+import { Readable, Writable } from 'node:stream';
+import { sendModelRequest } from '../scripts/model-protocol.mjs';
 import { createProxy } from '../scripts/server-utils.mjs';
 
 async function listen(server) {
@@ -14,6 +16,81 @@ async function close(server) {
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 }
+
+test('only a deck completion directed to the local proxy carries the internal purpose header', async () => {
+  const messages = [{ role: 'user', content: 'Prepare a deck' }];
+  const calls = [];
+  const fetcher = async (url, options) => {
+    const body = options.body && JSON.parse(options.body);
+    calls.push([url, options.headers['x-triobridge-purpose']]);
+    assert.equal(body?.purpose, undefined);
+    if (url.endsWith('/models/local')) return Response.json({ max_tokens: 8192 });
+    if (url.endsWith('/messages') && body.max_tokens === undefined)
+      return Response.json({ error: { message: 'max_tokens is required' } }, { status: 400 });
+    return Response.json({ done: true });
+  };
+  const claude = '/model-proxy/v1/messages';
+  const openai = '/model-proxy/v1/chat/completions';
+  const direct = 'https://example.test/v1/chat/completions';
+  const send = (url, format, purpose) =>
+    sendModelRequest(fetcher, url, format, 'local', messages, '', undefined, purpose);
+  await send(claude, 'anthropic', 'presentation-deck');
+  await send(openai, 'openai', 'presentation-deck');
+  await send(direct, 'openai', 'presentation-deck');
+  await send(openai, 'openai');
+  assert.deepEqual(calls, [
+    [claude, 'presentation-deck'],
+    ['/model-proxy/v1/models/local', undefined],
+    [claude, 'presentation-deck'],
+    [openai, 'presentation-deck'],
+    [direct, undefined],
+    [openai, undefined],
+  ]);
+});
+
+test('proxy deadline excludes deck generation, preserves cancellation and bounds ordinary requests and lookups', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const origin = 'http://localhost:3000';
+  const proxy = createProxy('http://127.0.0.1:8001', origin);
+  const chat = '/v1/chat/completions';
+  const body = JSON.stringify({ stream: false, messages: [{ role: 'user', content: 'Example' }] });
+  for (const [path, purpose, disconnect, expected] of [
+    [chat, 'presentation-deck', false, 200],
+    [chat, 'presentation-deck', true, 504],
+    [chat, undefined, false, 504],
+    [chat, 'unknown', false, 504],
+    ['/v1/models/local', 'presentation-deck', false, 504],
+  ]) {
+    const request = Readable.from(path === chat ? [Buffer.from(body)] : []);
+    request.url = '/model-proxy' + path;
+    request.method = 'POST';
+    request.headers = {
+      origin,
+      host: 'localhost:3000',
+      'content-type': 'application/json',
+      'x-triobridge-purpose': purpose,
+    };
+    const response = new Writable({
+      write(_chunk, _encoding, callback) {
+        callback();
+      },
+    });
+    let status;
+    response.writeHead = (value) => {
+      status = value;
+    };
+    const upstream = t.mock.method(globalThis, 'fetch', async (_url, options) => {
+      assert.equal(new Headers(options.headers).has('x-triobridge-purpose'), false);
+      t.mock.timers.tick(300_001);
+      if (disconnect) response.emit('close');
+      options.signal.throwIfAborted();
+      return new Response(null, { status: 200 });
+    });
+    await proxy(request, response, assert.fail);
+    upstream.mock.restore();
+    assert.equal(status, expected);
+  }
+});
 
 test('local model proxy enforces fixed target, source, path and body boundaries', async (t) => {
   let lastRequest;

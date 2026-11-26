@@ -1,7 +1,12 @@
 import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Square, X } from 'lucide-react';
-import type { ChatMessage, HostBridge, RuntimeModelProfile } from '../core/types';
+import type {
+  ChatMessage,
+  CompletionPurpose,
+  HostBridge,
+  RuntimeModelProfile,
+} from '../core/types';
 import type { MaterialContext } from '../presentation/types';
 import { complete } from '../core/model-client';
 import { officeError } from '../office/bridge';
@@ -79,7 +84,12 @@ export function PresentationWorkspace({
       if (alive.current) setBusy(undefined);
     }
   }
-  async function request(messages: ChatMessage[], signal: AbortSignal, demoResult: string) {
+  async function request(
+    messages: ChatMessage[],
+    signal: AbortSignal,
+    demoResult: string,
+    purpose?: CompletionPurpose,
+  ) {
     if (demoModel) return demoResult;
     if (!model)
       throw new Error(
@@ -95,7 +105,7 @@ export function PresentationWorkspace({
           'The shared model service is unavailable. Check Model Settings.',
         ),
       );
-    return complete(model, messages, signal);
+    return complete(model, messages, signal, undefined, purpose);
   }
   const runtime: PresentationRuntime = {
     context,

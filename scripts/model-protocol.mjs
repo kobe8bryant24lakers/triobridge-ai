@@ -211,8 +211,21 @@ async function modelOutputLimit(fetcher, endpoint, model, headers, signal) {
 }
 
 /** Share capability negotiation between browser-direct and native/shared calls. */
-export async function sendModelRequest(fetcher, endpoint, apiFormat, model, messages, key, signal) {
+export async function sendModelRequest(
+  fetcher,
+  endpoint,
+  apiFormat,
+  model,
+  messages,
+  key,
+  signal,
+  purpose,
+) {
   const { headers, body } = modelRequest(apiFormat, model, messages, key);
+  const completionHeaders =
+    purpose === 'presentation-deck' && endpoint.startsWith('/model-proxy/')
+      ? { ...headers, 'x-triobridge-purpose': purpose }
+      : headers;
   const send = (maxTokens) => {
     checkAborted(signal);
     return fetcher(endpoint, {
@@ -221,7 +234,7 @@ export async function sendModelRequest(fetcher, endpoint, apiFormat, model, mess
       redirect: 'error',
       credentials: 'omit',
       cache: 'no-store',
-      headers,
+      headers: completionHeaders,
       body: JSON.stringify({
         ...body,
         ...(maxTokens === undefined ? {} : { max_tokens: maxTokens }),

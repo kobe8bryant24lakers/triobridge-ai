@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../core/types';
+import type { ChatMessage, CompletionPurpose } from '../core/types';
 import type { MaterialContext, PresentationAccess } from '../presentation/types';
 export interface PresentationRuntime {
   context: MaterialContext;
@@ -11,7 +11,12 @@ export interface PresentationRuntime {
     work: (signal: AbortSignal) => Promise<void>,
     cancellable?: boolean,
   ) => Promise<void>;
-  request: (messages: ChatMessage[], signal: AbortSignal, demoResult: string) => Promise<string>;
+  request: (
+    messages: ChatMessage[],
+    signal: AbortSignal,
+    demoResult: string,
+    purpose?: CompletionPurpose,
+  ) => Promise<string>;
   notify: (message: string) => void;
 }
 
