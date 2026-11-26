@@ -236,7 +236,10 @@ changes 仅包含实际要修改的字段，不输出 null，不超过600个对�
         slideIds: snapshot.slides.map((slide) => slide.id),
         selectedShapeIds: snapshot.selectedShapeIds.filter((id) => visibleShapes.has(id)),
         slides: snapshot.slides.map(
-          ({ backgroundStamp: _stamp, comments: _comments, ...slide }) => slide,
+          ({ backgroundStamp: _stamp, comments: _comments, ...slide }) => ({
+            ...slide,
+            shapes: slide.shapes.map(({ picturePart: _localPicture, ...shape }) => shape),
+          }),
         ),
       },
     },

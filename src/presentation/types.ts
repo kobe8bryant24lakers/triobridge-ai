@@ -1,3 +1,4 @@
+import type { Arrangement } from './layout-optimization';
 export type ChartKind = 'column' | 'bar' | 'line' | 'pie' | 'doughnut';
 export interface ChartData {
   categories: string[];
@@ -59,6 +60,7 @@ export type SlideLayout =
   | 'table'
   | 'closing';
 export interface DeckSlide {
+  arrangement?: Arrangement;
   background?: BackgroundFill;
   title: string;
   layout: SlideLayout;
@@ -78,6 +80,8 @@ export interface DeckContent {
   slides: DeckSlide[];
 }
 export interface PresentationTheme {
+  headingFont?: string;
+  secondary?: string;
   font: string;
   accent: string;
   ink: string;
@@ -92,6 +96,8 @@ export interface ShapeState {
   id: string;
   name: string;
   type: string;
+  /** Embedded image part in a local working copy, used only for previews. */
+  picturePart?: string;
   left: number;
   top: number;
   width: number;

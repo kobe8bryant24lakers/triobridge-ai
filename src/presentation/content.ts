@@ -69,6 +69,7 @@ export function parseDeck(raw: string, context: MaterialContext, count?: number)
           'title',
           'layout',
           'background',
+          'arrangement',
           'subtitle',
           'bullets',
           'columns',
@@ -108,6 +109,7 @@ export function parseDeck(raw: string, context: MaterialContext, count?: number)
           'notes',
           'sources',
           'background',
+          'arrangement',
           ...layoutFields[s.layout as SlideLayout],
         ],
         t(`第 ${i + 1} 页版式`, `Slide ${i + 1} layout`),
@@ -118,6 +120,16 @@ export function parseDeck(raw: string, context: MaterialContext, count?: number)
         notes: text(s.notes ?? '', 2500, t('备注', 'Notes'), true),
         sources: texts(s.sources ?? [], 40, 30, t('来源', 'Sources')),
       };
+      if (s.arrangement !== undefined) {
+        if (
+          (s.layout === 'image' && s.arrangement === 'imageRight') ||
+          (s.layout === 'bullets' && s.arrangement === 'bulletsInColumns') ||
+          (s.layout === 'process' && s.arrangement === 'stackSteps')
+        )
+          result.arrangement = s.arrangement;
+        else
+          throw Error(t('版式变体与页面不匹配。', 'The layout variant does not match its slide.'));
+      }
       if (s.background !== undefined) {
         const fill = parseFill(s.background);
         if (

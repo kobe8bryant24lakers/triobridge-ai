@@ -1,10 +1,50 @@
 import { test, expect } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { strFromU8, unzipSync } from 'fflate';
+import Pptx from 'pptxgenjs';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'PowerPoint', exact: true }).click();
+});
+test('compares a saved slide using its embedded picture and follows the selected geometry changes', async ({
+  page,
+}) => {
+  const deck = new Pptx();
+  deck.layout = 'LAYOUT_WIDE';
+  const slide = deck.addSlide();
+  slide.addText('一页案例', { x: 0.4, y: 0.25, w: 8, h: 0.6, objectName: 'Title' });
+  slide.addText('验收条件', { x: 7.4, y: 2.2, w: 4.2, h: 1.2, objectName: '说明' });
+  slide.addImage({
+    data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qXkAAAAASUVORK5CYII=',
+    x: 0.6,
+    y: 1.7,
+    w: 4.8,
+    h: 3.5,
+    objectName: '案例图片',
+  });
+  const data = await deck.write({ outputType: 'nodebuffer' });
+  await page.getByRole('button', { name: '编辑现有', exact: true }).click();
+  await page.getByLabel('打开 PPTX 工作副本').setInputFiles({
+    name: 'example.pptx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    buffer: data as Buffer,
+  });
+  await page.getByRole('button', { name: '快速换主题' }).click();
+  await page.getByRole('radio', { name: '蓝色简报' }).check();
+  await page.getByRole('button', { name: '应用到全部 1 页' }).click();
+  await expect(page.getByText('主题「蓝色简报」已应用到 1 页。')).toBeVisible();
+  await page.getByRole('button', { name: '优化布局', exact: true }).click();
+  await page.getByLabel('布局调整').selectOption('swap');
+  await page.getByRole('button', { name: '预览布局改动' }).click();
+  const comparison = page.getByRole('region', { name: '布局前后对比' });
+  await expect(comparison.locator('image')).toHaveCount(2);
+  const boxes = comparison.locator('image');
+  const x = (index: number) => boxes.nth(index).locator('..').getAttribute('x');
+  expect(Number(await x(1))).toBeGreaterThan(Number(await x(0)));
+  await page.getByRole('checkbox', { name: '第 1 页 · 案例图片' }).uncheck();
+  expect(await x(1)).toBe(await x(0));
+  await expect(page.getByRole('button', { name: '应用所选 1 项改动' })).toBeEnabled();
 });
 async function capture(page: import('@playwright/test').Page, name: string) {
   if (process.env.PPT_REVIEW_SCREENSHOTS !== '1') return;

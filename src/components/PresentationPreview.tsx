@@ -1,3 +1,5 @@
+import { chartPalette, readableOn } from '../presentation/design-themes';
+import type { CSSProperties } from 'react';
 import { fillStyle } from './SlideBackground';
 import { englishCount } from './presentation-runtime';
 import { t, getUiLanguage } from '../i18n';
@@ -11,16 +13,19 @@ import type {
 import { allTables, LAYOUT_LABELS } from '../presentation/content';
 import { CHART_LABELS, chartData } from '../presentation/charts';
 
-const palette = ['#28604A', '#6F94A8', '#C59B53', '#937A9B', '#9AAB75', '#C88176'];
 export function ChartPreview({
   data,
   kind,
   unit = '',
+  theme,
 }: {
   data: ChartData;
   kind: ChartKind;
   unit?: string;
+  theme?: PresentationTheme;
 }) {
+  const palette = chartPalette(theme),
+    labelColor = theme?.ink || '#526359';
   const values = data.series.flatMap((s) => s.values).filter((v): v is number => v !== null),
     low = Math.min(0, ...values),
     high = Math.max(0, ...values),
@@ -89,7 +94,7 @@ export function ChartPreview({
                   y="258"
                   textAnchor="middle"
                   fontSize="11"
-                  fill="#526359"
+                  fill={labelColor}
                 >
                   {label(low + t * span)}
                 </text>
@@ -104,7 +109,7 @@ export function ChartPreview({
                     y={25 + ((i + 0.5) * 213) / n + 3}
                     textAnchor="end"
                     fontSize="10"
-                    fill="#526359"
+                    fill={labelColor}
                   >
                     {category.length > 8 ? `${category.slice(0, 7)}…` : category}
                   </text>
@@ -147,7 +152,7 @@ export function ChartPreview({
                   y={y(low + t * span) + 4}
                   textAnchor="end"
                   fontSize="11"
-                  fill="#526359"
+                  fill={labelColor}
                 >
                   {label(low + t * span)}
                 </text>
@@ -208,7 +213,14 @@ export function ChartPreview({
             {data.categories.map(
               (c, i) =>
                 (n <= 12 || i % Math.ceil(n / 12) === 0) && (
-                  <text key={i} x={x(i)} y="243" fontSize="10" textAnchor="middle" fill="#526359">
+                  <text
+                    key={i}
+                    x={x(i)}
+                    y="243"
+                    fontSize="10"
+                    textAnchor="middle"
+                    fill={labelColor}
+                  >
                     {c.length > 7 ? `${c.slice(0, 6)}…` : c}
                   </text>
                 ),
@@ -252,17 +264,29 @@ export function SlidePreview({
   const table = allTables(context).find((t) => t.id === (page.chart?.tableId || page.tableId));
   return (
     <div
-      className={`slide-preview layout-${page.layout}`}
-      style={{
-        fontFamily: theme?.font,
-        color: theme?.ink,
-        ...fillStyle(
-          page.background ||
-            theme?.fill ||
-            (theme ? { kind: 'solid', color: theme.background } : undefined),
-          (id) => context.materials.find((m) => m.id === id)?.image?.data,
-        ),
-      }}
+      className={['slide-preview', 'layout-' + page.layout, page.arrangement]
+        .filter(Boolean)
+        .join(' ')}
+      style={
+        {
+          '--slide-accent': theme ? readableOn(theme.background, theme.accent) : undefined,
+          '--slide-ink': theme?.ink,
+          '--slide-heading': theme?.headingFont,
+          '--slide-heading-color': theme?.headingFont
+            ? readableOn(theme.background, theme.accent)
+            : undefined,
+          '--slide-header-fill': theme?.accent,
+          '--slide-header-ink': theme ? readableOn(theme.accent, '#FFFFFF') : undefined,
+          fontFamily: theme?.font,
+          color: theme?.ink,
+          ...fillStyle(
+            page.background ||
+              theme?.fill ||
+              (theme ? { kind: 'solid', color: theme.background } : undefined),
+            (id) => context.materials.find((m) => m.id === id)?.image?.data,
+          ),
+        } as CSSProperties
+      }
     >
       <h3>{page.title}</h3>
       <span className="slide-layout-name">{LAYOUT_LABELS[page.layout]}</span>
@@ -317,6 +341,7 @@ export function SlidePreview({
       )}
       {page.chart && table && (
         <ChartPreview
+          theme={theme}
           kind={page.chart.type}
           unit={page.chart.unit}
           data={chartData(table, page.chart.category, page.chart.series, page.chart.type)}
