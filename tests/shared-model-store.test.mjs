@@ -762,6 +762,43 @@ test('upstream timeout aborts the request and distinguishes cancellation from ti
   assert.equal(wasAborted, true);
 });
 
+test('only a full presentation skips the configured deadline; the purpose stays local', async (t) => {
+  let calls = 0;
+  const { store } = await fixture(t, {
+    async fetcher(_url, { body: payload, signal }) {
+      calls++;
+      assert.equal(Object.hasOwn(JSON.parse(payload), 'purpose'), false);
+      t.mock.timers.tick(61_000);
+      signal.throwIfAborted();
+      return new Response(JSON.stringify(body()));
+    },
+  });
+  const settings = {
+    expectedRevision: 0,
+    profile: profile('slow', { timeoutSeconds: 60 }),
+    credential: { action: 'remove' },
+  };
+  await store.upsert(settings);
+  const input = {
+    profileId: 'slow',
+    profileRevision: 1,
+    messages: [{ role: 'user', content: 'Synthetic slide source' }],
+  };
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const completion = await store.complete({ ...input, purpose: 'presentation-deck' });
+  assert.equal(completion.body.choices[0].message.content, '合成结果');
+  await assert.rejects(store.complete(input), { code: 'timeout', status: 504 });
+  await assert.rejects(store.upsert({ ...settings, expectedRevision: 1, testConnection: true }), {
+    code: 'timeout',
+    status: 504,
+  });
+  await assert.rejects(store.complete({ ...input, purpose: 'connection-test' }), {
+    code: 'request',
+    status: 400,
+  });
+  assert.equal(calls, 3);
+});
+
 test('Office hosts share language without changing model revisions or credentials', async (t) => {
   const { store, directory, vault, fetcher, operations } = await fixture(t);
   const original = await add(store);

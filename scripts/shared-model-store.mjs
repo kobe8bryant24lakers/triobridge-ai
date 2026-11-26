@@ -216,23 +216,19 @@ async function readResponse(response) {
   }
 }
 
-async function requestCompletion(
-  profile,
-  secret,
-  messages,
-  signal,
-  fetcher,
-  connectionTest = false,
-) {
+async function requestCompletion(profile, secret, messages, signal, fetcher, purpose) {
   const controller = new AbortController();
   let timeout = false;
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) controller.abort();
-  const timer = setTimeout(() => {
-    timeout = true;
-    controller.abort();
-  }, profile.timeoutSeconds * 1000);
+  let timer;
+  if (purpose !== 'presentation-deck') {
+    timer = setTimeout(() => {
+      timeout = true;
+      controller.abort();
+    }, profile.timeoutSeconds * 1000);
+  }
   const endpoint = profile.endpoint;
   try {
     const response = await sendModelRequest(
@@ -260,7 +256,7 @@ async function requestCompletion(
       );
     }
     const data = normalizeModelResponse(profile.apiFormat, await readResponse(response));
-    const warning = connectionTest ? connectionTestWarning(data) : undefined;
+    const warning = purpose === 'connection-test' ? connectionTestWarning(data) : undefined;
     const choice = isObject(data) && Array.isArray(data.choices) ? data.choices[0] : undefined;
     const stoppedWithoutText =
       isObject(choice) &&
@@ -628,7 +624,7 @@ export function createSharedModelStore({
           [{ role: 'user', content: 'Reply with OK.' }],
           signal,
           fetcher,
-          true,
+          'connection-test',
         );
       }
       const result = await locked(async () => {
@@ -745,6 +741,8 @@ export function createSharedModelStore({
       });
     },
     async complete(input, signal) {
+      if (input.purpose !== undefined && input.purpose !== 'presentation-deck')
+        fail('request', '无效的模型请求。');
       const messages = validateSharedMessages(input.messages);
       const state = await load();
       const profile = state.profiles.find((p) => p.id === input.profileId);
@@ -756,7 +754,14 @@ export function createSharedModelStore({
           409,
           publicState(state),
         );
-      return requestCompletion(profile, await secret(profile, signal), messages, signal, fetcher);
+      return requestCompletion(
+        profile,
+        await secret(profile, signal),
+        messages,
+        signal,
+        fetcher,
+        input.purpose,
+      );
     },
     async cleanup() {
       const snapshot = await load();

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1 — 2026-11-26
+
+- PowerPoint’s **Create from Files → Generate deck** can now wait beyond the model profile’s request timeout, which defaults to 60 seconds. Other tasks and connection tests continue to use the configured timeout. Choose **Stop** to cancel a generation and keep the previous preview.
+- A regression test used the production workbench, a simulated Windows task-pane bridge in Chromium on macOS, and a local Claude-compatible service that waited 65 seconds to respond. The two-slide preview appeared after 65.314 seconds. Stopping a second generation closed the request and preserved the first preview. Testing in desktop PowerPoint on physical Windows x64 and ARM64 machines, in both the task pane and standalone window, is still pending.
+
 ## 0.9.0 — 2026-11-25
 
 - Switch between English and Simplified Chinese below the TrioBridge AI logo in the standalone workbench and Office task pane. Simplified Chinese is the default. The installed workbench shares the interface preference across Word, Excel and PowerPoint.

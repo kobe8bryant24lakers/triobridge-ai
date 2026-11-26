@@ -120,7 +120,12 @@ export function DeckGenerator(runtime: PresentationRuntime) {
       t('根据素材生成整套 PPT', 'Generating a deck from files'),
       async (signal) => {
         const messages = deckMessages(context, brief, count),
-          raw = await request(messages, signal, JSON.stringify(demoDeck(count)));
+          raw = await request(
+            messages,
+            signal,
+            JSON.stringify(demoDeck(count)),
+            'presentation-deck',
+          );
         if (signal.aborted) return;
         const result = parseDeck(raw, context, count);
         setDraft(result);

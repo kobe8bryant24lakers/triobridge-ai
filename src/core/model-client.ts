@@ -6,7 +6,13 @@ import {
   ModelProtocolError,
   connectionTestWarning,
 } from '../../scripts/model-protocol.mjs';
-import type { ChatMessage, ModelApiFormat, RuntimeModelProfile, SharedModelProfile } from './types';
+import type {
+  ChatMessage,
+  CompletionPurpose,
+  ModelApiFormat,
+  RuntimeModelProfile,
+  SharedModelProfile,
+} from './types';
 import { startModelAudit } from './model-audit';
 import {
   localModelHeaders,
@@ -70,7 +76,7 @@ async function requestModel(
   messages: ChatMessage[],
   signal?: AbortSignal,
   fetcher: typeof fetch = modelTransport,
-  connectionTest = false,
+  purpose?: CompletionPurpose | 'connection-test',
 ): Promise<{ content: string; warning?: string }> {
   validateProfile(profile);
   if (signal?.aborted) throw new ModelError('已取消生成。', 'cancelled');
@@ -82,10 +88,13 @@ async function requestModel(
   let timedOut = false;
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, profile.timeoutSeconds * 1000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (purpose !== 'presentation-deck') {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, profile.timeoutSeconds * 1000);
+  }
   try {
     const shared = isSharedProfile(profile);
     const response = shared
@@ -100,6 +109,7 @@ async function requestModel(
             profileId: profile.id,
             profileRevision: profile.revision,
             messages,
+            ...(purpose === 'presentation-deck' && { purpose }),
           }),
         })
       : await sendModelRequest(
@@ -110,6 +120,7 @@ async function requestModel(
           messages,
           secret,
           controller.signal,
+          purpose === 'presentation-deck' ? purpose : undefined,
         );
     audit?.response(response);
     if (!response.ok && shared) {
@@ -150,7 +161,7 @@ async function requestModel(
     audit?.payload(data);
     if (!data || typeof data !== 'object')
       throw new ModelError('服务返回的数据格式无效，请检查所选接口格式。', 'response');
-    if (connectionTest) {
+    if (purpose === 'connection-test') {
       const warning = connectionTestWarning(data);
       auditOutcome = 'success';
       return { content: '', ...(warning ? { warning } : {}) };
@@ -223,8 +234,9 @@ export async function complete(
   messages: ChatMessage[],
   signal?: AbortSignal,
   fetcher: typeof fetch = modelTransport,
+  purpose?: CompletionPurpose,
 ): Promise<string> {
-  return (await requestModel(profile, messages, signal, fetcher)).content;
+  return (await requestModel(profile, messages, signal, fetcher, purpose)).content;
 }
 
 export async function testConnection(
@@ -236,7 +248,7 @@ export async function testConnection(
     [{ role: 'user', content: 'Reply with OK.' }],
     signal,
     modelTransport,
-    true,
+    'connection-test',
   );
   return warning ? { warning } : {};
 }

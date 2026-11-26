@@ -10,7 +10,7 @@ const fields = {
   import: ['expectedRevision', 'profiles', 'activeId'],
   delete: ['expectedRevision', 'id'],
   activate: ['expectedRevision', 'id'],
-  complete: ['profileId', 'profileRevision', 'messages'],
+  complete: ['profileId', 'profileRevision', 'messages', 'purpose'],
 };
 
 export function createSharedModelMiddleware({ store, allowedOrigin, authToken }) {

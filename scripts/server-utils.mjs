@@ -139,6 +139,8 @@ export function createProxy(target, allowedOrigin) {
           sendError(400, 'Invalid chat request.');
           return;
         }
+        // The complete body has arrived. A deck can now wait for generation until the client disconnects.
+        if (req.headers['x-triobridge-purpose'] === 'presentation-deck') clearTimeout(timeout);
       }
       const response = await fetch(new URL(path, upstream), {
         method: modelId ? 'GET' : 'POST',

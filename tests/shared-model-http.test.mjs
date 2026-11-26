@@ -154,6 +154,7 @@ test('connect-and-save and generation reach a real loopback HTTP API without bro
           const completion = await request('complete', {
             profileId: profile.id,
             profileRevision: state.profiles[0].revision,
+            purpose: 'presentation-deck',
             messages: [
               { role: 'system', content: 'Prepare an editable slide.' },
               {
@@ -183,6 +184,7 @@ test('connect-and-save and generation reach a real loopback HTTP API without bro
             assert.equal(JSON.stringify(data).includes('private-reasoning'), false);
           }
           const recent = requests.slice(-2);
+          assert.ok(recent.every((r) => !Object.hasOwn(r.body, 'purpose')));
           assert.deepEqual(
             recent.map((r) => r.path),
             ['/v1' + route, '/v1' + route],
@@ -582,6 +584,7 @@ test('client disconnection reaches the actual in-flight upstream abort signal', 
     {
       profileId: profile.id,
       profileRevision: 1,
+      purpose: 'presentation-deck',
       messages: [{ role: 'user', content: 'slow request' }],
     },
     { signal: controller.signal },

@@ -1,4 +1,4 @@
-import type { ChatMessage, ModelApiFormat } from '../src/core/types';
+import type { ChatMessage, CompletionPurpose, ModelApiFormat } from '../src/core/types';
 
 export function isModelApiFormat(value: unknown): value is ModelApiFormat;
 export function modelEndpoint(baseUrl: string, apiFormat?: ModelApiFormat): string;
@@ -22,6 +22,7 @@ export function sendModelRequest(
   messages: ChatMessage[],
   key: string,
   signal?: AbortSignal,
+  purpose?: CompletionPurpose,
 ): Promise<Response>;
 export function normalizeModelResponse(
   apiFormat: ModelApiFormat | undefined,
