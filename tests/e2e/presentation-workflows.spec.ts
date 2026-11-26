@@ -138,3 +138,56 @@ test('narrow Office pane keeps workflows and previews reachable without horizont
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await capture(page, 'narrow-edit');
 });
+
+test('a new local picture can be used on one generated slide without regenerating the draft', async ({
+  page,
+}) => {
+  await page.getByLabel('演示要求', { exact: true }).fill('季度经营复盘');
+  await page.getByLabel('生成页数', { exact: true }).fill('2');
+  await page.getByRole('button', { name: '生成整套 PPT', exact: true }).click();
+  const preview = page.getByRole('region', { name: '整稿预览' });
+  await preview.getByText('本页背景', { exact: true }).click();
+  await preview.getByRole('combobox', { name: '背景样式' }).selectOption('image');
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 4;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#18324A';
+    context.fillRect(0, 0, 4, 4);
+    return canvas.toDataURL().split(',')[1];
+  });
+  await preview.getByLabel('选择本地背景图片', { exact: true }).setInputFiles({
+    name: 'brand.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+  await expect(preview.getByRole('combobox', { name: '背景图片', exact: true })).toHaveValue(
+    /^bg-/,
+  );
+  const opacity = preview.getByRole('slider', { name: /图片透明度/ });
+  await opacity.focus();
+  await opacity.press('Home');
+  await opacity.press('ArrowRight');
+  const download = page.waitForEvent('download');
+  await preview.getByRole('button', { name: '下载完整 PPT' }).click();
+  const pkg = unzipSync(new Uint8Array(await readFile((await (await download).path())!)));
+  expect(strFromU8(pkg['ppt/slides/slide1.xml'])).toMatch(/<a:alphaModFix amt="99000"/);
+  expect(strFromU8(pkg['ppt/slides/slide2.xml'])).not.toContain('a:blipFill');
+});
+
+test('background instructions can name the whole deck from the selected-slide entry', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: '编辑现有', exact: true }).click();
+  await page.getByRole('button', { name: '读取页面与对象', exact: true }).click();
+  await page
+    .getByLabel('编辑要求', { exact: true })
+    .fill('把整份PPT背景改为米白色，但第2页改为深蓝色');
+  await page.getByRole('button', { name: '生成局部修改方案', exact: true }).click();
+  const preview = page.getByRole('region', { name: '改动预览' });
+  await expect(preview.getByText('已选 3 项改动，涉及第 1–3 页。')).toBeVisible();
+  await expect(preview.locator('.change-row').nth(1)).toContainText('#17365D');
+  await preview.getByRole('checkbox', { name: '第 2 页 · 页面背景' }).uncheck();
+  await expect(preview.getByText('已选 2 项改动，涉及第 1、3 页。')).toBeVisible();
+});

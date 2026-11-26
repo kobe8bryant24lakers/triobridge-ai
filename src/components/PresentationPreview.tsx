@@ -1,6 +1,13 @@
+import { fillStyle } from './SlideBackground';
 import { englishCount } from './presentation-runtime';
 import { t, getUiLanguage } from '../i18n';
-import type { ChartData, ChartKind, DeckSlide, MaterialContext } from '../presentation/types';
+import type {
+  ChartData,
+  ChartKind,
+  DeckSlide,
+  MaterialContext,
+  PresentationTheme,
+} from '../presentation/types';
 import { allTables, LAYOUT_LABELS } from '../presentation/content';
 import { CHART_LABELS, chartData } from '../presentation/charts';
 
@@ -233,10 +240,30 @@ export function ChartPreview({
     </figure>
   );
 }
-export function SlidePreview({ page, context }: { page: DeckSlide; context: MaterialContext }) {
+export function SlidePreview({
+  page,
+  context,
+  theme,
+}: {
+  page: DeckSlide;
+  context: MaterialContext;
+  theme?: PresentationTheme;
+}) {
   const table = allTables(context).find((t) => t.id === (page.chart?.tableId || page.tableId));
   return (
-    <div className={`slide-preview layout-${page.layout}`}>
+    <div
+      className={`slide-preview layout-${page.layout}`}
+      style={{
+        fontFamily: theme?.font,
+        color: theme?.ink,
+        ...fillStyle(
+          page.background ||
+            theme?.fill ||
+            (theme ? { kind: 'solid', color: theme.background } : undefined),
+          (id) => context.materials.find((m) => m.id === id)?.image?.data,
+        ),
+      }}
+    >
       <h3>{page.title}</h3>
       <span className="slide-layout-name">{LAYOUT_LABELS[page.layout]}</span>
       {page.subtitle && <p>{page.subtitle}</p>}

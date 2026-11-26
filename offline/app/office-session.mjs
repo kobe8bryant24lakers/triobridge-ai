@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile, copyFile, rename, unlink } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, stat, writeFile, copyFile, rename, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { constants } from 'node:fs';
@@ -89,6 +89,14 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck, ope
         const { guard, snapshot } = await office(action, { scope: data.scope });
         return { token: remember({ guard, snapshot, kind: 'presentation' }), snapshot };
       }
+      if (action === 'presentationCopy' && host === 'powerpoint') {
+        temp = await mkdtemp(join(tmpdir(), 'triobridge-copy-'));
+        const file = join(temp, 'presentation.pptx');
+        await office('presentationCopy', { file });
+        if ((await stat(file)).size > 65_000_000)
+          throw Error('当前稿过大，请通过文件选择器打开 PPTX 工作副本。');
+        return (await readFile(file)).toString('base64');
+      }
       if (action === 'presentationTarget' && host === 'powerpoint') {
         const { guard, target } = await office(action);
         return { token: remember({ guard, target, kind: 'presentation-insert' }), target };
@@ -170,11 +178,14 @@ export function createOfficeSession(host, root, { run = runOffice, saveDeck, ope
           }
           return;
         }
+        if (data.afterSlideId !== undefined && !entry.target.slideIds.includes(data.afterSlideId))
+          throw Error('目标页面已经改变，请重新读取。');
         await office('append', {
           file,
           guard: entry.guard,
           target: entry.target,
           count: data.count,
+          ...(data.afterSlideId ? { afterSlideId: data.afterSlideId } : {}),
         });
         targets.delete(data.token);
         return;

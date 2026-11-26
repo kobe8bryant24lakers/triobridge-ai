@@ -2,6 +2,7 @@ import { uiMessage } from '../i18n-errors';
 import type { HostBridge, SelectionSnapshot, WriteKind } from '../core/types';
 import { parseFormula, parseOutline } from '../core/output';
 import { parseReport, parseTable, tableMatrix, NUMBER_FORMATS } from '../core/structured-output';
+import { bytes64 } from '../presentation/package-xml';
 import { validateEdit } from '../presentation/editing';
 import type { PresentationInsertTarget, PresentationSnapshot } from '../presentation/types';
 import type { NativeWorkbench } from './transport';
@@ -99,7 +100,9 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
             insert: navigator.platform.startsWith('Win'),
             create: true,
             thumbnail: false,
-            backup: false,
+            backup: true,
+            backgrounds: true,
+            gradient: true,
           },
           async read(scope) {
             const result = await call<{ token: string; snapshot: PresentationSnapshot }>(
@@ -120,8 +123,13 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
             insertTokens.set(result.target, result.token);
             return result.target;
           },
-          async insert(base64, count, target) {
-            await call('append', { token: insertTokens.get(target), base64, count });
+          async insert(base64, count, target, afterSlideId) {
+            await call('append', {
+              token: insertTokens.get(target),
+              base64,
+              count,
+              ...(afterSlideId ? { afterSlideId } : {}),
+            });
           },
           async create(base64) {
             await call('create', { base64 });
@@ -130,7 +138,9 @@ export function createNativeBridge(native: NativeWorkbench): HostBridge {
             throw Error('此入口无法预览页面缩略图。');
           },
           async backup() {
-            throw Error('请在 PowerPoint 中另存为副本。');
+            return new Blob([bytes64(await call<string>('presentationCopy'))], {
+              type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            });
           },
         }
       : undefined,

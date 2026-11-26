@@ -12,10 +12,10 @@ The workbench opens in Simplified Chinese by default. Use the language selector 
 
 | System and processor | Installer |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** Save your documents, close all three desktop Office apps, extract the ZIP, then double-click **Install.cmd**. Open Office normally under the same Windows account and choose **打开侧边栏** (task pane) or **打开独立窗口** (separate window) on the **三桥 AI** ribbon.
 
@@ -44,6 +44,8 @@ Cloud inference requires a connection to your provider. Local inference uses you
 - **Word** Rewrite, summarize, or translate a selection, or generate a structured report. Preview Markdown results, then insert or replace text with editable Word headings, lists, tables, and emphasis.
 - **Excel** Read values and formulas from a contiguous selection, preview a formula for a target cell, or create data on a new worksheet.
 - **PowerPoint** Generate editable PPTX slides, charts, and tables from a local materials folder. Read existing slides and review changes to text, styling, and positions. To append a generated deck to the current presentation, use the Windows workbench or the Mac task pane. The Mac standalone window can open the deck as a new presentation.
+
+Set a background for the entire deck or selected pages. Open a PPTX working copy to match another slide, insert or split slides, update a chart and its embedded workbook, or review comments and layout issues. [PowerPoint editing guide (Chinese)](docs/POWERPOINT.md)
 
 The integration targets desktop Office for Windows and Mac. Interactive Windows Office acceptance is manual. [Verification notes](docs/TESTING.md) · [Download and installation guide](https://kobe8bryant24lakers.github.io/triobridge-ai/#install)
 

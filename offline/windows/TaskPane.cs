@@ -332,7 +332,7 @@ public sealed class TaskPane : UserControl, ITaskPane
                     action == "delete" || action == "import" || action == "upsert");
         return method == "office" &&
                (action == "release" || action == "selection" || action == "target" ||
-                action == "presentation" || action == "presentationTarget" || action == "write" ||
+                action == "presentation" || action == "presentationCopy" || action == "presentationTarget" || action == "write" ||
                 action == "edit" || action == "create" || action == "append");
     }
     async void WebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)

@@ -35,6 +35,10 @@ test(
       );
       const output = execFileSync(executable, { encoding: 'utf8', timeout: 30000 });
       assert.match(output, /Windows PowerPoint insertion: 9 scenarios passed/);
+      assert.match(
+        output,
+        /Windows PowerPoint backgrounds and anchored insertion: 4 scenarios passed/,
+      );
       assert.match(output, /Windows Word writing: 32 scenarios passed/);
       assert.match(output, /Windows pane dispatch: 8 scenarios passed/);
     } finally {

@@ -2224,3 +2224,151 @@ summary {
     margin-bottom: 14px;
   }
 }
+
+.ppt-tool-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+}
+.ppt-tool-fields > button,
+.ppt-tool-fields > .secondary {
+  justify-self: start;
+}
+.ppt-tool-fields .ppt-field-grid,
+.ppt-tool-fields details {
+  margin: 0;
+}
+.ppt-tool-fields > label,
+.ppt-background-fields label,
+.ppt-tool-fields details > label {
+  display: grid;
+  gap: 5px;
+}
+.ppt-tool-fields label.checkbox-label {
+  display: flex;
+}
+.ppt-tool-fields legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.ppt-background-fields {
+  display: grid;
+  gap: 10px;
+}
+.ppt-color-field {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 6px;
+  align-items: stretch;
+}
+.ppt-color-field input[type='color'] {
+  width: 38px;
+  padding: 3px;
+  height: 36px;
+}
+.ppt-file-actions,
+.ppt-fill-change,
+.ppt-fill-change > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ppt-file-actions {
+  margin: 12px 0;
+}
+.ppt-file-button {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+.ppt-file-button:focus-within {
+  outline: 3px solid #d0a23f;
+  outline-offset: 3px;
+}
+.ppt-file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.ppt-working-file,
+.ppt-located {
+  padding: 10px;
+  border-left: 3px solid var(--accent);
+  margin: 10px 0;
+}
+.ppt-working-file > strong {
+  overflow-wrap: anywhere;
+}
+.ppt-fill-sample {
+  width: 30px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.ppt-fill-change,
+.ppt-page-diff,
+.ppt-data-diff {
+  margin: 9px 0;
+  font-size: 13px;
+}
+.ppt-issues {
+  list-style: none;
+  padding: 0;
+}
+.ppt-issues li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ppt-issues p,
+.ppt-page-diff p,
+.ppt-located p {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ppt-data-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.ppt-data-scroll table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.ppt-data-scroll td,
+.ppt-data-scroll th {
+  padding: 3px 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+}
+.ppt-data-diff {
+  display: grid;
+  gap: 10px;
+}
+.ppt-slide-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  background-color: white;
+}
+.ppt-map-review {
+  font-size: 13px;
+}
+.ppt-map-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.ppt-map-pair figure {
+  margin: 0;
+}
+.ppt-map-pair figcaption {
+  margin-top: 3px;
+}

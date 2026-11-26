@@ -12,10 +12,10 @@
 
 | 系统和芯片 | 安装包 |
 | --- | --- |
-| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Windows-x64.zip) |
-| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Windows-arm64.zip) |
-| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Mac-arm64.zip) |
-| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.10.0/TrioBridge-AI-Mac-x64.zip) |
+| Windows · Intel/AMD x64 | [TrioBridge-AI-Windows-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Windows-x64.zip) |
+| Windows · ARM64 | [TrioBridge-AI-Windows-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Windows-arm64.zip) |
+| Mac · Apple silicon | [TrioBridge-AI-Mac-arm64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Mac-arm64.zip) |
+| Mac · Intel | [TrioBridge-AI-Mac-x64.zip](https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.11.0/TrioBridge-AI-Mac-x64.zip) |
 
 **Windows** 保存文档，完全退出三款 Office，解压 ZIP，再双击 **Install.cmd**。安装后用同一 Windows 账户以普通权限打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。Intel / AMD 电脑选 x64，ARM 电脑选 ARM64。
 
@@ -44,6 +44,8 @@ Mac 包使用临时签名，Windows 包未签署 Authenticode。系统可能提�
 - **Word** 读取选区后可以改写、摘要、翻译，或生成结构化报告。模型返回 Markdown 时，先预览排版，再将标题、列表、表格和加粗等格式写入 Word。
 - **Excel** 读取连续区域的数值和公式，预览公式后写入目标单元格，或在新工作表中生成结构化数据。
 - **PowerPoint** 选择本地素材目录，生成带可编辑文字、数据图表和表格的 PPTX。也能读取现有页面，预览局部文字、样式和位置改动后应用。要把生成的整套 PPT 追加到当前演示稿，可用 Windows 工作台或 Mac 内嵌侧栏。Mac 独立窗口可将整稿打开为新演示文稿。
+
+可以统一整稿背景，也可以单独指定某几页。打开 PPTX 工作副本，还能套用参考页样式、插页和拆页、刷新原图表及其内嵌工作簿，并按批注和版面问题逐项修改。[PowerPoint 编辑说明](docs/POWERPOINT.md)
 
 桌面集成面向 Windows 和 Mac 版 Office。Windows 桌面 Office 交互按人工验收。 [验证记录](docs/TESTING.md) · [下载与安装说明](https://kobe8bryant24lakers.github.io/triobridge-ai/zh-CN.html#install)
 

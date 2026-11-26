@@ -339,6 +339,54 @@ function excel(a, q) {
     fail('请选择普通单元格，不能覆盖合并区域或数组公式。');
   r.formula = String(q.value);
 }
+function pptHex(rgb) {
+  if (!Array.isArray(rgb) || rgb.length < 3) return null;
+  return (
+    '#' +
+    rgb
+      .slice(0, 3)
+      .map((c) =>
+        Math.round(c > 255 ? c / 257 : c)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+      .toUpperCase()
+  );
+}
+function pptBackground(slide) {
+  if (slide.followMasterBackground()) return { kind: 'master' };
+  const fill = slide.background.fillFormat,
+    type = String(fill.fillFormatType());
+  if (type === 'fill solid' && !fill.transparency())
+    return { kind: 'solid', color: pptHex(fill.foreColor()) };
+  if (
+    type === 'fill gradient' &&
+    String(fill.gradientColorType()) === 'two colors gradient type' &&
+    String(fill.gradientStyle()) === 'vertical gradient' &&
+    fill.gradientVariant() === 1
+  )
+    return { kind: 'gradient', from: pptHex(fill.foreColor()), to: pptHex(fill.backColor()) };
+  return { kind: 'other', label: type };
+}
+function pptSetBackground(app, slide, style) {
+  if (style.kind === 'master') {
+    slide.followMasterBackground = true;
+    return;
+  }
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const fill = slide.background.fillFormat;
+  slide.followMasterBackground = false;
+  if (style.kind === 'solid') {
+    app.solid(fill);
+    fill.foreColor = rgb(style.color);
+    fill.transparency = 0;
+  } else if (style.kind === 'gradient') {
+    app.twoColorGradient(fill, { style: 'vertical gradient', variant: 1 });
+    fill.foreColor = rgb(style.from);
+    fill.backColor = rgb(style.to);
+  } else fail('请在 PPTX 工作副本中使用此背景。');
+}
 function pptSnapshot(a, scope) {
   const doc = a.activePresentation,
     window = a.activeWindow;
@@ -384,23 +432,16 @@ function pptSnapshot(a, scope) {
         const r = s.textFrame.textRange,
           colors = optional(() => r.font.fontColor(), null);
         shape.text = limited(value);
-        shape.role = /title|标题/i.test(name) ? 'title' : 'body';
+        shape.role = /footer|页脚/i.test(name)
+          ? 'footer'
+          : /title|标题/i.test(name)
+            ? 'title'
+            : 'body';
         shape.font = {
           name: optional(() => r.font.fontName(), null),
           size: optional(() => r.font.fontSize(), null),
           bold: optional(() => r.font.bold(), null),
-          color: Array.isArray(colors)
-            ? '#' +
-              colors
-                .slice(0, 3)
-                .map((c) =>
-                  Math.round(c / 257)
-                    .toString(16)
-                    .padStart(2, '0'),
-                )
-                .join('')
-                .toUpperCase()
-            : null,
+          color: pptHex(colors),
         };
         shape.alignment = optional(
           () =>
@@ -415,6 +456,7 @@ function pptSnapshot(a, scope) {
     return {
       id,
       index,
+      background: optional(() => pptBackground(slide), undefined),
       title:
         (shapes.find((s) => s.role === 'title' && s.text) || shapes.find((s) => s.text) || {})
           .text || '第 ' + (index + 1) + ' 页',
@@ -433,6 +475,15 @@ function powerpoint(a, q) {
     return;
   }
   if (q.op === 'presentation') return pptSnapshot(a, q.scope);
+  if (q.op === 'presentationCopy') {
+    const current = a.activePresentation,
+      path = String(current.fullName());
+    if (!current.saved() || !/\.pptx$/i.test(path) || path[0] !== '/')
+      fail('请先在 PowerPoint 中将当前演示稿保存为本地 PPTX，再读取工作副本。');
+    if (!$.NSFileManager.defaultManager.copyItemAtPathToPathError(path, q.file, null))
+      fail('无法读取当前文件，请通过文件选择器打开 PPTX。');
+    return;
+  }
   const doc = a.activePresentation;
   if (q.op === 'selection') {
     const data = pptSnapshot(a, 'selected');
@@ -481,6 +532,25 @@ function powerpoint(a, q) {
   same(q.guard, now.guard);
   same(q.snapshot, now.snapshot);
   if (q.proposal.slideOrder) fail('请在 PowerPoint 中调整页面顺序。');
+  const namedDoc = a.presentations.byName(String(doc.name()));
+  same(documentKey(doc), documentKey(namedDoc));
+  const backgrounds = (q.proposal.actions || []).map((action) => {
+    const target = now.snapshot.slides.find((s) => s.id === action.slideId);
+    if (
+      action.kind !== 'background' ||
+      !target ||
+      !target.background ||
+      target.background.kind === 'other'
+    )
+      fail('使用 PPTX 工作副本处理此页面操作。');
+    const fill =
+      action.fill.kind === 'reference'
+        ? (now.snapshot.slides.find((s) => s.id === action.fill.sourceId) || {}).background
+        : action.fill;
+    if (!fill || !['master', 'solid', 'gradient'].includes(fill.kind))
+      fail('请通过 PPTX 工作副本处理图片或模板背景。');
+    return { target, fill };
+  });
   const rollback = [];
   function set(obj, key, v) {
     const old = obj[key]();
@@ -490,6 +560,12 @@ function powerpoint(a, q) {
     });
   }
   try {
+    for (const task of backgrounds) {
+      const slide = namedDoc.slides[task.target.index];
+      rollback.push(() => pptSetBackground(a, slide, task.target.background));
+      pptSetBackground(a, slide, task.fill);
+      same(task.fill, pptBackground(slide));
+    }
     for (const p of q.proposal.changes) {
       const slide = now.snapshot.slides.find((s) => s.id === p.slideId),
         shape = slide && slide.shapes.find((s) => s.id === p.shapeId);
@@ -504,7 +580,7 @@ function powerpoint(a, q) {
         set(
           r.font,
           'fontColor',
-          [1, 3, 5].map((i) => parseInt(p.fontColor.slice(i, i + 2), 16) * 257),
+          [1, 3, 5].map((i) => parseInt(p.fontColor.slice(i, i + 2), 16)),
         );
       if (p.alignment !== undefined)
         set(r.paragraphFormat, 'alignment', 'paragraph align ' + p.alignment.toLowerCase());

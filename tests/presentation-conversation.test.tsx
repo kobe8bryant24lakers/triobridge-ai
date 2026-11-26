@@ -220,6 +220,47 @@ describe('PowerPoint multi-turn editing', () => {
     expect(screen.queryByLabelText('继续调整')).not.toBeInTheDocument();
   });
 
+  it('only sends explicitly read slides for a numbered request or mixed background instruction', async () => {
+    const f = fixture();
+    const read = vi.spyOn(f.access, 'read');
+    f.request.mockResolvedValue(JSON.stringify({ summary: '修改选中页', changes: [] }));
+    render(<PresentationEdit {...f.props} />);
+    await userEvent.click(screen.getByRole('button', { name: '读取页面与对象' }));
+    for (const brief of ['精简第 1 页的标题', '把第 2 页背景改为米白色，并改写整份演示稿']) {
+      fireEvent.change(screen.getByLabelText('编辑要求'), { target: { value: brief } });
+      await userEvent.click(screen.getByRole('button', { name: '生成局部修改方案' }));
+    }
+    expect(read.mock.calls).toEqual([['selected']]);
+    expect(f.request).toHaveBeenCalledTimes(2);
+    for (const [messages] of f.request.mock.calls) {
+      const { presentation } = content(messages, 1).request;
+      expect(presentation.slideIds).toEqual(['demo-1']);
+      expect(presentation.slides).toHaveLength(1);
+      expect(JSON.stringify(messages)).not.toContain('增长与挑战');
+    }
+  });
+
+  it('keeps a cross-slide background preview local until the user explicitly reads the whole deck', async () => {
+    const f = fixture();
+    f.request.mockResolvedValue(JSON.stringify({ summary: '整稿调整', changes: [] }));
+    render(<PresentationEdit {...f.props} />);
+    await userEvent.click(screen.getByRole('button', { name: '读取页面与对象' }));
+    fireEvent.change(screen.getByLabelText('编辑要求'), {
+      target: { value: '把整份 PPT 背景改为米白色，但第 2 页改为深蓝色' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: '生成局部修改方案' }));
+    await followUp('把第 3 页背景改为深蓝色');
+    expect(f.errors).not.toHaveBeenCalled();
+    await followUp('精简每页的标题');
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.errors.mock.calls[0][0].message).toContain('重新读取页面');
+    await userEvent.click(screen.getByRole('button', { name: '重新读取页面' }));
+    expect(screen.getByLabelText('继续调整')).toHaveValue('精简每页的标题');
+    await userEvent.click(screen.getByRole('button', { name: '发送修改要求' }));
+    expect(f.request).toHaveBeenCalledTimes(1);
+    expect(content(f.request.mock.calls[0][0], 1).request.presentation.slides).toHaveLength(3);
+  });
+
   it('revises chart recommendations with manual settings, never alters data, and rejects invalid revisions atomically', async () => {
     const f = fixture();
     f.request
