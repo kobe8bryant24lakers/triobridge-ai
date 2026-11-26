@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.0 — 2026-11-26
+
+- Compare three themes on a slide from your own deck. Choose a built-in design, ask the current model for three custom options, or adjust fonts and colors. Apply a design to the full deck, save a favorite, or undo the change.
+- Review a generated deck for missing sources and notes, long or repeated titles, and chart units. Refine one slide with a before-and-after text review and accept individual edits.
+- Preview alternative layouts on generated slides. On existing PPTX working copies, compare layouts side by side, move a picture and its text column, and review alignment, overflow and minor overlaps before exporting.
+- The illustrated Chinese guide adds four pages with fictional examples. This release was tested with a 12-slide editable presentation in PowerPoint on Apple silicon.
+
+### 简体中文
+
+- 在真实页面上比较三套主题，可按描述设计，或手动微调标题、正文和配色。一键应用整稿，也可收藏主题和撤销换色。
+- 在初稿中检查标题、来源、图表单位与演讲备注。逐条比较并采用单页修改建议。
+- 为图文、要点和步骤页预览新布局。对已有文件，可指定页码并排查看改前、改后布局，勾选图文换位、对齐、越界与轻微重叠修复，再导出工作副本。
+- 中文图解指南增加四页虚构教学示例。
+
 ## 0.11.0 — 2026-11-26
 
 - Set native slide backgrounds across a deck, on specific pages or on a range with exceptions. Choose a solid color, a two-color gradient, a picture with transparency, or the slide master. New decks support a default background and per-slide overrides.

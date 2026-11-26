@@ -14,6 +14,7 @@ import { writeBackground } from './package-background';
 import { P, child, nodes, base64, bytes64, OfficePackage, unpack } from './package-xml';
 import { parseFill } from './page-edits';
 import { preserveChartData } from './chart-workbooks';
+import { chartPalette, readableOn } from './design-themes';
 
 export const DEFAULT_THEME: PresentationTheme = {
   font: 'Aptos',
@@ -67,7 +68,11 @@ export function addNativeChart(
       valAxisLabelFontFace: theme.font,
       valAxisLabelFontSize: 11,
       valAxisLabelFormatCode: numberFormat,
-      chartColors: [color(theme.accent), '6F94A8', 'C59B53', '937A9B', '9AAB75', 'C88176'],
+      chartColors: chartPalette(theme).map(color),
+      catAxisLabelColor: color(theme.ink),
+      valAxisLabelColor: color(theme.ink),
+      dataLabelColor: color(theme.ink),
+      legendColor: color(theme.ink),
       showLegend: data.series.length > 1 || kind === 'pie' || kind === 'doughnut',
       legendPos: 'b',
       legendFontFace: theme.font,
@@ -108,10 +113,12 @@ export async function renderDeck(
   );
   pptx.title = deck.title;
   pptx.company = '';
-  pptx.theme = { headFontFace: theme.font, bodyFontFace: theme.font };
+  pptx.theme = { headFontFace: theme.headingFont || theme.font, bodyFontFace: theme.font };
   const w = size.width / 72,
     h = size.height / 72,
     scale = Math.min(w / 13.333, h / 7.5);
+  const accentText = readableOn(theme.background, theme.accent);
+  const onAccent = readableOn(theme.accent, '#FFFFFF');
   const tables = allTables(context);
   const chartSources: ChartData[] = [];
   for (const [index, page] of deck.slides.entries()) {
@@ -132,9 +139,9 @@ export async function renderDeck(
         w: width * w,
         h: height * h,
         fontSize: fontSize * scale,
-        fontFace: theme.font,
+        fontFace: fontSize >= 28 && y < 0.5 ? theme.headingFont || theme.font : theme.font,
         lang: getUiLanguage() === 'en' ? 'en-US' : 'zh-CN',
-        color: color(theme.ink),
+        color: color(fontSize >= 28 && y < 0.5 && theme.headingFont ? accentText : theme.ink),
         margin: 0,
         breakLine: false,
         valign: 'middle',
@@ -186,7 +193,7 @@ export async function renderDeck(
         0.25,
         0.16,
         68,
-        { color: 'FFFFFF', bold: true },
+        { color: color(onAccent), bold: true },
       );
       tx(page.title, 0.42, 0.24, 0.52, 0.25, 40, { bold: true });
       tx(page.subtitle || '', 0.42, 0.55, 0.5, 0.2, 22, { valign: 'top' });
@@ -201,12 +208,16 @@ export async function renderDeck(
       });
       switch (page.layout) {
         case 'bullets':
-          bullets(page.bullets!, 0.065, 0.27, 0.86, 0.56, 25);
+          if (page.arrangement === 'bulletsInColumns') {
+            const split = Math.ceil(page.bullets!.length / 2);
+            bullets(page.bullets!.slice(0, split), 0.065, 0.27, 0.415, 0.56, 22);
+            bullets(page.bullets!.slice(split), 0.525, 0.27, 0.415, 0.56, 22);
+          } else bullets(page.bullets!, 0.065, 0.27, 0.86, 0.56, 25);
           break;
         case 'twoColumn':
           page.columns!.forEach((col, i) => {
             const x = 0.055 + i * 0.46;
-            tx(col.heading, x, 0.27, 0.42, 0.09, 24, { color: color(theme.accent), bold: true });
+            tx(col.heading, x, 0.27, 0.42, 0.09, 24, { color: color(accentText), bold: true });
             bullets(col.bullets, x, 0.4, 0.41, 0.43, 21);
           });
           break;
@@ -223,7 +234,7 @@ export async function renderDeck(
               cw,
               0.22,
               Math.min(n > 3 ? 40 : 50, (cw * w * 72) / scale / Math.max(1, textUnits(item.value))),
-              { color: color(theme.accent), bold: true, wrap: false },
+              { color: color(accentText), bold: true, wrap: false },
             );
             tx(item.label, x, 0.55, cw, 0.1, 23, { bold: true });
             tx(item.detail, x, 0.69, cw, 0.16, 17, { valign: 'top' });
@@ -231,6 +242,20 @@ export async function renderDeck(
           break;
         }
         case 'process': {
+          if (page.arrangement === 'stackSteps') {
+            const items = page.steps!,
+              height = 0.6 / items.length;
+            items.forEach((item, i) => {
+              const y = 0.235 + i * height;
+              tx(String(i + 1), 0.06, y, 0.055, height * 0.88, 22, {
+                bold: true,
+                color: color(accentText),
+              });
+              tx(item.title, 0.135, y, 0.29, height * 0.88, 21, { bold: true });
+              tx(item.detail, 0.445, y, 0.49, height * 0.88, 18);
+            });
+            break;
+          }
           const items = page.steps!,
             n = items.length;
           items.forEach((item, i) => {
@@ -246,7 +271,7 @@ export async function renderDeck(
             });
             tx(String(i + 1), x, 0.29, (0.44 * scale) / w, (0.44 * scale) / h, 18, {
               align: 'center',
-              color: 'FFFFFF',
+              color: color(onAccent),
               bold: true,
             });
             tx(item.title, x, 0.43, cw, 0.12, 22, { bold: true });
@@ -257,7 +282,7 @@ export async function renderDeck(
         case 'image': {
           const image = context.materials.find((m) => m.id === page.imageId)!.image!;
           const box = {
-            x: 0.055 * w,
+            x: (page.arrangement === 'imageRight' && page.bullets?.length ? 0.42 : 0.055) * w,
             y: 0.25 * h,
             w: (page.bullets?.length ? 0.52 : 0.89) * w,
             h: 0.59 * h,
@@ -273,7 +298,15 @@ export async function renderDeck(
             h: ih,
             altText: context.materials.find((m) => m.id === page.imageId)!.name,
           });
-          if (page.bullets?.length) bullets(page.bullets, 0.62, 0.27, 0.32, 0.56, 21);
+          if (page.bullets?.length)
+            bullets(
+              page.bullets,
+              page.arrangement === 'imageRight' ? 0.055 : 0.62,
+              0.27,
+              0.32,
+              0.56,
+              21,
+            );
           break;
         }
         case 'chart': {
@@ -335,7 +368,11 @@ export async function renderDeck(
             [
               table.headers.map((t) => ({
                 text: t,
-                options: { bold: true, color: 'FFFFFF', fill: { color: color(theme.accent) } },
+                options: {
+                  bold: true,
+                  color: color(onAccent),
+                  fill: { color: color(theme.accent) },
+                },
               })),
               ...table.rows.map((row) => row.map((v) => ({ text: String(v ?? '') }))),
             ],
@@ -349,7 +386,7 @@ export async function renderDeck(
               fontFace: theme.font,
               fontSize: tableFont,
               color: color(theme.ink),
-              fill: { color: 'FFFFFF' },
+              fill: { color: theme.headingFont ? color(theme.background) : 'FFFFFF' },
               border: { type: 'solid', color: 'DDE5DE', pt: 0.5 },
               margin: 5,
               autoPage: false,
@@ -372,7 +409,7 @@ export async function renderDeck(
       page.layout === 'cover' || page.layout === 'closing' ? 0.43 : 0.79,
       0.035,
       9,
-      { color: '647569' },
+      { color: color(readableOn(theme.background, '#647569')) },
     );
     tx(`${index + 1} / ${deck.slides.length}`, 0.86, 0.925, 0.085, 0.035, 10, { align: 'right' });
     s.addNotes(

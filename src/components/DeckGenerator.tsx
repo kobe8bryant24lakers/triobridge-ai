@@ -3,7 +3,8 @@ import { t } from '../i18n';
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Download, Presentation, Sparkles, Trash2 } from 'lucide-react';
 import type { DeckContent, DeckSlide, MaterialContext } from '../presentation/types';
-import { deckMessages, parseDeck } from '../presentation/content';
+import { allTables, deckMessages, parseDeck } from '../presentation/content';
+import { chartData } from '../presentation/charts';
 import {
   DEFAULT_THEME,
   downloadPresentation,
@@ -20,6 +21,11 @@ import {
   type EditingTurn,
 } from '../core/editing-conversation';
 import { EditingConversation } from './EditingConversation';
+import { ThemeDesigner } from './ThemeDesigner';
+import { DeckReview } from './DeckReview';
+import { DraftLayout } from './DraftLayout';
+import { SlideRefinement } from './SlideRefinement';
+import { themeFonts } from '../presentation/design-themes';
 
 function demoDeck(count: number): DeckContent {
   const pages: DeckSlide[] = [
@@ -106,6 +112,31 @@ export function DeckGenerator(runtime: PresentationRuntime) {
     [page, setPage] = useState(0),
     [confirmAppend, setConfirmAppend] = useState(false),
     [appended, setAppended] = useState(false);
+  const [undoDesign, setUndoDesign] = useState<{
+    before: DeckContent;
+    after: DeckContent;
+    beforeTheme: typeof theme;
+    afterTheme: typeof theme;
+    kind: 'theme' | 'layout' | 'text';
+  }>();
+  const canUndo = undoDesign?.after === draft && undoDesign?.afterTheme === theme;
+  function undoLastDesign() {
+    if (undoDesign && canUndo) {
+      setDraft(undoDesign.before);
+      updateTheme(undoDesign.beforeTheme);
+      setUndoDesign(undefined);
+    }
+  }
+  function changeDesign(
+    next: DeckContent,
+    nextTheme: typeof theme,
+    kind: 'theme' | 'layout' | 'text',
+  ) {
+    if (!draft) return;
+    setUndoDesign({ before: draft, after: next, beforeTheme: theme, afterTheme: nextTheme, kind });
+    setDraft(next);
+    updateTheme(nextTheme);
+  }
   const [turns, setTurns] = useState<EditingTurn[]>([]),
     [followUp, setFollowUp] = useState('');
   const count = Number(countInput),
@@ -319,9 +350,11 @@ export function DeckGenerator(runtime: PresentationRuntime) {
                 disabled={busy}
                 onChange={(e) => updateTheme({ ...theme, font: e.target.value })}
               >
-                <option>Aptos</option>
-                <option>Arial</option>
-                <option value="等线">{t('等线', 'DengXian')}</option>
+                {themeFonts.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -387,6 +420,80 @@ export function DeckGenerator(runtime: PresentationRuntime) {
               )}
             </p>
           )}
+          <div className="post-generation-tools">
+            <DeckReview deck={draft} busy={busy} onSelect={setPage} />
+            <ThemeDesigner
+              runtime={runtime}
+              initialPage={page}
+              disabled={outdated}
+              samples={draft.slides.map((s) => {
+                const chart = s.chart;
+                const table =
+                  chart && allTables(usedContext).find((entry) => entry.id === chart.tableId);
+                const data =
+                  table && chart && chartData(table, chart.category, chart.series, chart.type);
+                return {
+                  title: s.title,
+                  detail:
+                    s.subtitle ||
+                    s.bullets?.[0] ||
+                    s.columns?.[0]?.heading ||
+                    s.steps?.[0]?.detail ||
+                    s.metrics?.[0]?.label,
+                  values: data?.series[0].values
+                    .flatMap((value, index) =>
+                      value === null ? [] : [{ label: data.categories[index], value }],
+                    )
+                    .slice(0, 3),
+                };
+              })}
+              onApply={(style) =>
+                changeDesign(
+                  {
+                    ...draft,
+                    slides: draft.slides.map((s) => {
+                      const { background: previousBackground, ...rest } = s;
+                      return rest;
+                    }),
+                  },
+                  { ...style, fill: { kind: 'solid', color: style.background } },
+                  'theme',
+                )
+              }
+              onUndo={canUndo && undoDesign?.kind === 'theme' ? undoLastDesign : undefined}
+            />
+            <SlideRefinement
+              key={page}
+              page={current}
+              index={page}
+              runtime={runtime}
+              disabled={outdated}
+              onApply={(next) =>
+                changeDesign(
+                  { ...draft, slides: draft.slides.map((s, i) => (i === page ? next : s)) },
+                  theme,
+                  'text',
+                )
+              }
+            />
+            {canUndo && undoDesign?.kind === 'text' && (
+              <button className="text-button" disabled={busy} onClick={undoLastDesign}>
+                {t('撤销本页优化', 'Undo slide refinement')}
+              </button>
+            )}
+            <DraftLayout
+              context={localPictures.withPictures(usedContext)}
+              theme={theme}
+              deck={draft}
+              busy={busy || outdated}
+              onApply={(next) => changeDesign(next, theme, 'layout')}
+            />
+            {canUndo && undoDesign?.kind === 'layout' && (
+              <button className="text-button" disabled={busy} onClick={undoLastDesign}>
+                {t('撤销布局优化', 'Undo layout optimization')}
+              </button>
+            )}
+          </div>
           <label className="field-label">
             {t('文件标题', 'File title')}
             <input

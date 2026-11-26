@@ -88,6 +88,11 @@ export function readShape(pkg: OfficePackage, path: string, e: Element): ShapeSt
     ...geometry(family.map(transform).find(Boolean)),
   };
   if (chart) shape.chart = readChart(pkg, chart);
+  if (e.localName === 'pic') {
+    const blip = child(child(e, P, 'blipFill'), A, 'blip');
+    const part = pkg.target(path, blip?.getAttributeNS(R, 'embed') ?? null);
+    if (part) shape.picturePart = part;
+  }
   if (text !== undefined && (text || nodes(e, P, 'ph').length)) {
     shape.text = text;
     shape.role =

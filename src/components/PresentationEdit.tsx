@@ -23,7 +23,7 @@ import {
 import { PptxWorkingCopy } from '../presentation/pptx-editor';
 import { base64 } from '../presentation/package-xml';
 import { useBackgroundPictures } from './SlideBackground';
-import { PageChange, SlideTools } from './SlideTools';
+import { GeometryComparison, PageChange, SlideTools } from './SlideTools';
 import { downloadBlob } from '../presentation/render';
 import type { PresentationRuntime } from './presentation-runtime';
 import {
@@ -32,6 +32,14 @@ import {
   type EditingTurn,
 } from '../core/editing-conversation';
 import { EditingConversation } from './EditingConversation';
+import { ThemeDesigner } from './ThemeDesigner';
+import { optimizeLayout, swapPictureColumns } from '../presentation/layout-optimization';
+
+function displayChange(value: unknown, empty: string) {
+  if (typeof value === 'number')
+    return t(`${Number(value.toFixed(2))} 磅`, `${Number(value.toFixed(2))} pt`);
+  return value === null || value === undefined || value === '' ? empty : String(value);
+}
 
 export function PresentationEdit({
   context,
@@ -46,7 +54,31 @@ export function PresentationEdit({
   const localPictures = useBackgroundPictures(run);
   const visualContext = localPictures.withPictures(context);
   const [working, setWorking] = useState<{ file: PptxWorkingCopy; name: string; id: string }>();
+  const [layoutOpen, setLayoutOpen] = useState(false),
+    [layoutTarget, setLayoutTarget] = useState('all'),
+    [layoutAction, setLayoutAction] = useState('align');
   const access: PresentationAccess | undefined = working?.file || host;
+  const [themeUndo, setThemeUndo] = useState<{
+    previous: NonNullable<typeof working>;
+    applied: PresentationSnapshot;
+  }>();
+  async function showDesignedCopy(copy: NonNullable<typeof working>) {
+    const fresh = await copy.file.read();
+    setWorking(copy);
+    setSnapshot(fresh);
+    explicitlyRead.current = fresh;
+    setScope('all');
+    setNeedsRead(false);
+    setWritten(false);
+    setConfirmed(false);
+    setPlanStamp('');
+    setProposal(undefined);
+    setThumbnail('');
+    setTurns([]);
+    setFollowUp('');
+    setInitialInstruction('');
+    return fresh;
+  }
   const [actionSelection, setActionSelection] = useState<Set<number>>(new Set());
   const [scope, setScope] = useState<'selected' | 'all'>(
       access?.capabilities.selected ? 'selected' : 'all',
@@ -175,6 +207,8 @@ export function PresentationEdit({
         const copy = new PptxWorkingCopy(new Uint8Array(await blob.arrayBuffer())),
           snap = await copy.read();
         if (signal.aborted) return;
+        setLayoutTarget('all');
+        setLayoutOpen(false);
         setWorking({
           file: copy,
           id: crypto.randomUUID(),
@@ -512,6 +546,111 @@ export function PresentationEdit({
         )}
         {snapshot && (
           <>
+            {working && (
+              <ThemeDesigner
+                key={working.id}
+                runtime={{ busy, run, request, notify, demo }}
+                disabled={
+                  needsRead ||
+                  snapshot.scope !== 'all' ||
+                  Boolean(
+                    proposal &&
+                    !written &&
+                    (chosen.size || actionSelection.size || proposal.slideOrder),
+                  )
+                }
+                samples={snapshot.slides.map((s) => {
+                  const data = s.shapes.find((o) => o.chart)?.chart?.data;
+                  return {
+                    title: s.title,
+                    detail: s.shapes.find((o) => o.role === 'body' && o.text)?.text,
+                    values: data?.categories.slice(0, 3).flatMap((label, i) => {
+                      const v = data.series[0]?.values[i];
+                      return typeof v === 'number' ? [{ label, value: v }] : [];
+                    }),
+                  };
+                })}
+                onApply={async (style) => {
+                  const previous = working;
+                  const copy = working.file.themed(snapshot, style);
+                  const applied = await showDesignedCopy({ ...working, file: copy });
+                  setThemeUndo({ previous, applied });
+                }}
+                onUndo={
+                  themeUndo?.applied === snapshot && !needsRead
+                    ? async () => {
+                        await showDesignedCopy(themeUndo.previous);
+                        setThemeUndo(undefined);
+                      }
+                    : undefined
+                }
+              />
+            )}
+            <button
+              className="secondary"
+              disabled={busy || needsRead || scope !== snapshot.scope}
+              aria-expanded={layoutOpen}
+              onClick={() => setLayoutOpen(!layoutOpen)}
+            >
+              {t('优化布局', 'Optimize layout')}
+            </button>
+            {layoutOpen && (
+              <div className="theme-sheet">
+                <div className="ppt-field-grid">
+                  <label>
+                    {t('布局范围', 'Layout scope')}
+                    <select
+                      disabled={busy}
+                      value={layoutTarget}
+                      onChange={(e) => setLayoutTarget(e.target.value)}
+                    >
+                      <option value="all">{t('已读取的全部页', 'All slides in scope')}</option>
+                      {snapshot.slides.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.index + 1}. {s.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t('布局调整', 'Layout adjustment')}
+                    <select
+                      disabled={busy}
+                      value={layoutAction}
+                      onChange={(e) => setLayoutAction(e.target.value)}
+                    >
+                      <option value="align">
+                        {t('对齐、越界与轻微重叠', 'Alignment, overflow and shallow overlaps')}
+                      </option>
+                      <option value="swap">
+                        {t('交换图文位置', 'Swap image and text columns')}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  className="secondary"
+                  disabled={busy || needsRead || scope !== snapshot.scope}
+                  onClick={() =>
+                    void run(t('预览布局优化', 'Previewing layout'), async () => {
+                      const scoped =
+                        layoutTarget === 'all'
+                          ? snapshot
+                          : {
+                              ...snapshot,
+                              slides: snapshot.slides.filter((s) => s.id === layoutTarget),
+                            };
+                      preview(
+                        (layoutAction === 'swap' ? swapPictureColumns : optimizeLayout)(scoped),
+                      );
+                    })
+                  }
+                >
+                  {t('预览布局改动', 'Preview layout changes')}
+                </button>
+              </div>
+            )}
+
             <p className="ppt-scope">
               {t(
                 `已读取 ${snapshot.slides.length} 页 · ${objectCount} 个对象 · `,
@@ -830,6 +969,17 @@ export function PresentationEdit({
               )}
             </p>
           )}
+          {draftView && !outdated && !written && (
+            <GeometryComparison
+              original={snapshot}
+              preview={draftView}
+              proposal={proposal}
+              image={(id) =>
+                working?.file.image(id) ||
+                visualContext.materials.find((m) => m.id === id)?.image?.data
+              }
+            />
+          )}
           {proposal.changes.length > 0 && (
             <label className="checkbox-label">
               <input
@@ -941,13 +1091,16 @@ export function PresentationEdit({
                           <dt>{PATCH_LABELS[key]}</dt>
                           <dd>
                             <span className="change-before">
-                              {String(
-                                originalValue(shape, key) ?? t('混合样式', 'Mixed formatting'),
+                              {displayChange(
+                                originalValue(shape, key),
+                                t('混合样式', 'Mixed formatting'),
                               )}
                             </span>
                             <span className="change-after">
-                              {String((patch as unknown as Record<string, unknown>)[key]) ||
-                                t('（清空）', '(clear)')}
+                              {displayChange(
+                                (patch as unknown as Record<string, unknown>)[key],
+                                t('（清空）', '(clear)'),
+                              )}
                             </span>
                           </dd>
                         </div>

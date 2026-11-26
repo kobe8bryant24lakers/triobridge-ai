@@ -36,10 +36,22 @@ export const modelTransport: typeof fetch = async (url, options) => {
   const id = crypto.randomUUID();
   const signal = options.signal;
   signal?.throwIfAborted();
-  const cancel = () => native.cancel(id);
+  let rejectCompletion: ((reason: unknown) => void) | undefined;
+  const cancelled =
+    action === 'complete' && signal
+      ? new Promise<never>((_, reject) => {
+          rejectCompletion = reject;
+        })
+      : undefined;
+  const cancel = () => {
+    rejectCompletion?.(signal?.reason ?? new DOMException('Cancelled', 'AbortError'));
+    native.cancel(id);
+  };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
-    const result = await native.model(id, action, options.body);
+    const pending = native.model(id, action, options.body);
+    // A system credential prompt can outlive the renderer's cancel or timeout.
+    const result = await (cancelled ? Promise.race([pending, cancelled]) : pending);
     signal?.throwIfAborted();
     return new Response(JSON.stringify(result.body), {
       status: result.status,

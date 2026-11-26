@@ -2360,6 +2360,19 @@ summary {
 .ppt-map-review {
   font-size: 13px;
 }
+.ppt-geometry-review {
+  margin: 10px 0;
+  container-type: inline-size;
+}
+.ppt-geometry-review h3 {
+  margin: 0;
+  font-size: 14px;
+}
+@container (max-width: 260px) {
+  .ppt-geometry-review .ppt-map-pair {
+    grid-template-columns: 1fr;
+  }
+}
 .ppt-map-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2371,4 +2384,194 @@ summary {
 }
 .ppt-map-pair figcaption {
   margin-top: 3px;
+}
+
+.theme-designer {
+  margin: 12px 0;
+}
+.theme-sheet {
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+}
+.theme-sheet label:not(.checkbox-label) {
+  min-width: 0;
+}
+.theme-sheet .field-help {
+  margin: 0;
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 116px), 1fr));
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.theme-options legend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 0 6px;
+}
+.theme-option {
+  display: grid;
+  padding: 3px;
+  border: 1px solid var(--border, #cbd9d3);
+  border-radius: 7px;
+  position: relative;
+  cursor: pointer;
+}
+.theme-option.chosen {
+  border: 2px solid var(--accent, #126b61);
+  padding: 2px;
+}
+.theme-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.theme-option:focus-within {
+  outline: 2px solid #b48724;
+  outline-offset: 2px;
+}
+.theme-tile {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+  min-height: 84px;
+  border-top: 5px solid;
+  border-radius: 4px;
+}
+.theme-tile strong,
+.theme-tile small {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.theme-tile strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.theme-tile small {
+  font-size: 10px;
+  line-height: 1.35;
+}
+.theme-option-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  font-size: 12px;
+}
+.theme-data {
+  display: grid;
+  gap: 2px;
+}
+.theme-data > span {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font: 10px system-ui;
+}
+.theme-data i {
+  display: inline-block;
+  height: 5px;
+}
+.theme-brand {
+  width: 44px;
+  height: 28px;
+}
+.theme-saved-preview {
+  padding: 12px;
+  border-radius: 6px;
+}
+.slide-preview h3 {
+  font-family: var(--slide-heading, inherit);
+  color: var(--slide-heading-color, inherit);
+}
+.slide-preview .slide-columns h4,
+.slide-preview .slide-steps strong,
+.slide-preview .slide-metrics dd {
+  color: var(--slide-accent, #28604a);
+}
+.slide-preview .slide-layout-name,
+.slide-preview .chart-preview figcaption {
+  color: var(--slide-ink, #4f6859);
+}
+.slide-preview .table-scroll th {
+  background: var(--slide-header-fill, #28604a);
+  color: var(--slide-header-ink, white);
+}
+.slide-preview.bulletsInColumns > ul {
+  columns: 2;
+  column-gap: 1.8em;
+}
+.slide-preview.bulletsInColumns li {
+  break-inside: avoid;
+}
+.slide-preview.imageRight {
+  display: flow-root;
+}
+.slide-preview.imageRight > img {
+  float: right;
+  max-width: 54%;
+  margin: 0 0 8px 12px;
+}
+.slide-preview.imageRight > ul {
+  width: 43%;
+}
+.slide-preview.stackSteps .slide-steps {
+  display: grid;
+  gap: 5px;
+}
+.draft-layout {
+  margin: 8px 0 12px;
+}
+.slide-refinement {
+  margin: 8px 0;
+}
+.refine-diff {
+  align-items: start;
+}
+.refine-diff del,
+.refine-diff ins {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 4px 0;
+}
+.refine-diff del {
+  color: #74514b;
+}
+.refine-diff ins {
+  color: #155c49;
+  text-decoration: none;
+}
+.post-generation-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0 16px;
+}
+.post-generation-tools > * {
+  margin: 0;
+}
+.post-generation-tools > :has(button[aria-expanded='true']) {
+  flex: 1 0 100%;
+}
+.post-generation-tools .secondary {
+  min-height: 33px;
+}
+.deck-review ol {
+  margin: 0;
+  padding-left: 22px;
+}
+.deck-review li {
+  margin: 0 0 8px;
 }

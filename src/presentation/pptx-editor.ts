@@ -37,6 +37,8 @@ import {
 } from './package-shapes';
 import { addNativeChart, DEFAULT_THEME } from './render';
 import { preserveChartData } from './chart-workbooks';
+import { restylePackage } from './package-design';
+import { validatedTheme, type DeckTheme } from './design-themes';
 
 const mime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const unsupported = () => {
@@ -381,6 +383,14 @@ export class PptxWorkingCopy implements PresentationAccess {
     this.revisions.set(snapshot, this.version);
     return snapshot;
   };
+  themed(snapshot: PresentationSnapshot, theme: DeckTheme) {
+    if (this.revisions.get(snapshot) !== this.version)
+      throw Error(t('请重新读取工作副本。', 'Read the working copy again.'));
+    const pkg = new OfficePackage(unpack(this.bytes));
+    const paths = slideEntries(pkg, mainPart(pkg)).map((entry) => entry.path);
+    restylePackage(pkg, paths, snapshot, validatedTheme(theme));
+    return new PptxWorkingCopy(pkg.pack());
+  }
   backup = async () => new Blob([new Uint8Array(this.bytes)], { type: mime });
   image = (id: string) =>
     this.pkg.files[id] && /^image\/(png|jpeg|gif)$/i.test(this.pkg.contentType(id) || '')

@@ -685,53 +685,120 @@ function SlideMap({
       aria-hidden="true"
       style={fillStyle(background, image)}
     >
-      {slide.shapes.map(
-        (s) =>
-          s.width > 0 &&
-          s.height > 0 && (
-            <svg
-              key={s.id}
-              x={s.left}
-              y={s.top}
-              width={s.width}
-              height={s.height}
-              overflow="hidden"
-            >
-              {s.id === focus && (
-                <rect
-                  x="1"
-                  y="1"
-                  width={Math.max(0, s.width - 2)}
-                  height={Math.max(0, s.height - 2)}
-                  fill="none"
-                  stroke="#28604A"
-                  strokeWidth="4"
-                />
-              )}
-              {s.text ? (
-                s.text
-                  .split('\n')
-                  .slice(0, 6)
-                  .map((line, i) => (
-                    <text
-                      key={i}
-                      x="1"
-                      y={(i + 1) * (s.font?.size || 16) * 1.12}
-                      fontSize={s.font?.size || 16}
-                      fontFamily={s.font?.name || 'sans-serif'}
-                      fontWeight={s.font?.bold ? 700 : 400}
-                      fill={s.font?.color || '#25362D'}
-                    >
-                      {line}
-                    </text>
-                  ))
-              ) : (
-                <rect width="100%" height="100%" fill="#85968B" opacity={s.chart ? 0.3 : 0.14} />
-              )}
-            </svg>
-          ),
-      )}
+      {slide.shapes.map((s) => {
+        if (s.width <= 0 || s.height <= 0) return null;
+        const picture = s.picturePart && image(s.picturePart);
+        return (
+          <svg key={s.id} x={s.left} y={s.top} width={s.width} height={s.height} overflow="hidden">
+            {s.id === focus && (
+              <rect
+                x="1"
+                y="1"
+                width={Math.max(0, s.width - 2)}
+                height={Math.max(0, s.height - 2)}
+                fill="none"
+                stroke="#28604A"
+                strokeWidth="4"
+              />
+            )}
+            {picture ? (
+              <image
+                href={picture}
+                width="100%"
+                height="100%"
+                preserveAspectRatio="xMidYMid meet"
+              />
+            ) : s.text ? (
+              s.text
+                .split('\n')
+                .slice(0, 6)
+                .map((line, i) => (
+                  <text
+                    key={i}
+                    x="1"
+                    y={(i + 1) * (s.font?.size || 16) * 1.12}
+                    fontSize={s.font?.size || 16}
+                    fontFamily={s.font?.name || 'sans-serif'}
+                    fontWeight={s.font?.bold ? 700 : 400}
+                    fill={s.font?.color || '#25362D'}
+                  >
+                    {line}
+                  </text>
+                ))
+            ) : (
+              <rect width="100%" height="100%" fill="#85968B" opacity={s.chart ? 0.3 : 0.14} />
+            )}
+          </svg>
+        );
+      })}
     </svg>
+  );
+}
+export function GeometryComparison({
+  original,
+  preview,
+  proposal,
+  image,
+}: {
+  original: PresentationSnapshot;
+  preview: PresentationSnapshot;
+  proposal: EditProposal;
+  image: (id: string) => string | undefined;
+}) {
+  const [page, setPage] = useState('');
+  const changed = new Set(
+    proposal.changes
+      .filter(
+        (c) =>
+          c.left !== undefined ||
+          c.top !== undefined ||
+          c.width !== undefined ||
+          c.height !== undefined,
+      )
+      .map((c) => c.slideId),
+  );
+  const slides = original.slides.filter((s) => changed.has(s.id));
+  const before = slides.find((s) => s.id === page) || slides[0];
+  const after = before && preview.slides.find((s) => s.id === before.id);
+  if (!original.size || !before || !after) return null;
+  const size = original.size;
+  return (
+    <section
+      className="ppt-geometry-review"
+      aria-label={t('布局前后对比', 'Before and after layout')}
+    >
+      {slides.length > 1 ? (
+        <label>
+          {t('对比页面', 'Compare slide')}
+          <select value={before.id} onChange={(e) => setPage(e.target.value)}>
+            {slides.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.index + 1}. {s.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <h3>{t(`第 ${before.index + 1} 页布局对比`, `Slide ${before.index + 1} layout`)}</h3>
+      )}
+      <div className="ppt-map-pair">
+        {[before, after].map((slide, i) => (
+          <figure key={i}>
+            <SlideMap
+              slide={slide}
+              size={size}
+              background={slide.effectiveBackground || slide.background}
+              image={image}
+            />
+            <figcaption>
+              {i === 0
+                ? t('修改前', 'Before')
+                : t('所选改动（布局示意）', 'Selected changes (layout preview)')}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </section>
   );
 }
 export function PageChange({
