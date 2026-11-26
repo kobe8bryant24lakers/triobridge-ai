@@ -12,9 +12,22 @@ public class TestSlide
 {
     public int SlideID { get; set; }
     public string Text { get; set; }
+    public int FollowMasterBackground { get; set; }
+    public TestBackground Background = new TestBackground();
+    public int SlideIndex { get { return Owner.Items.IndexOf(this) + 1; } }
     public TestSlides Owner { get; set; }
     public object Shapes { get { throw new Exception("Insertion must not read slide objects."); } }
     public void Delete() { Owner.Items.Remove(this); }
+}
+public class TestColor { public int RGB { get; set; } }
+public class TestBackground { public TestBackgroundFill Fill = new TestBackgroundFill(); }
+public class TestBackgroundFill
+{
+    public int Type = 1, GradientColorType, GradientStyle, GradientVariant;
+    public double Transparency;
+    public TestColor ForeColor = new TestColor(), BackColor = new TestColor();
+    public void Solid() { Type = 1; }
+    public void TwoColorGradient(int style, int variant) { Type = 3; GradientColorType = 2; GradientStyle = style; GradientVariant = variant; }
 }
 public class TestSlides : IEnumerable
 {
@@ -24,14 +37,15 @@ public class TestSlides : IEnumerable
     public int Count { get { return Items.Count; } }
     public TestSlide this[int index] { get { return Items[index - 1]; } }
     public IEnumerator GetEnumerator() { return Items.GetEnumerator(); }
+    public TestSlide FindBySlideID(int id) { return Items.Single(s => s.SlideID == id); }
     public void Add(int id) { Items.Add(new TestSlide { SlideID = id, Owner = this }); }
     public int InsertFromFile(string file, int index)
     {
         if (file != "generated.pptx") throw new Exception("Unexpected input file.");
         ImportCalls++;
         ImportIndex = index;
-        Add(900);
-        Add(901);
+        Items.Insert(index,new TestSlide {SlideID=900,Owner=this});
+        Items.Insert(index+1,new TestSlide {SlideID=901,Owner=this});
         return 2;
     }
 }
@@ -524,6 +538,28 @@ internal class WindowsOfficeTests
         Check(word.ActiveDocument.Writes == 0, "Rejected pane dispatches must never write.");
         Console.WriteLine("Windows pane dispatch: 8 scenarios passed.");
     }
+    static void BackgroundScenarios()
+    {
+        var flags = BindingFlags.Static | BindingFlags.NonPublic;
+        var write = typeof(Office).GetMethod("SetBackground", flags);
+        var read = typeof(Office).GetMethod("Background", flags);
+        var slide = new TestSlide();
+        var solid = new Dictionary<string,object> { { "kind","solid" }, { "color","#17365D" } };
+        write.Invoke(null,new object[]{slide, solid});
+        var current = (Dictionary<string,object>)read.Invoke(null,new object[]{slide});
+        Check(slide.FollowMasterBackground==0 && slide.Background.Fill.ForeColor.RGB==0x5D3617 && (string)current["color"]=="#17365D","Solid background channel order");
+        var gradient = new Dictionary<string,object>{{"kind","gradient"},{"from","#F5F1E8"},{"to","#17365D"}};
+        write.Invoke(null,new object[]{slide,gradient});
+        current=(Dictionary<string,object>)read.Invoke(null,new object[]{slide});
+        Check((string)current["from"]=="#F5F1E8" && (string)current["to"]=="#17365D", "Gradient stops");
+        write.Invoke(null,new object[]{slide,new Dictionary<string,object>{{"kind","master"}}});
+        current=(Dictionary<string,object>)read.Invoke(null,new object[]{slide});
+        Check((string)current["kind"]=="master", "Master restore");
+        var app=App();var prepared=Prepare(app);
+        Call(app,"append", new Dictionary<string,object>{{"guard",prepared["guard"]},{"target",prepared["target"]},{"file","generated.pptx"},{"count",2},{"afterSlideId","256"}});
+        Check(app.ActivePresentation.Slides.Items.Select(s=>s.SlideID).SequenceEqual(new[]{256,900,901,257}), "Targeted insertion order");
+        Console.WriteLine("Windows PowerPoint backgrounds and anchored insertion: 4 scenarios passed.");
+    }
     public static void Main()
     {
         var app = App();
@@ -553,6 +589,7 @@ internal class WindowsOfficeTests
         Check(failed && rollback.ActivePresentation.Slides.Items.Select(s => s.SlideID)
                   .SequenceEqual(new[] { 256, 257 }), "Count mismatch must roll back new slides.");
         Console.WriteLine("Windows PowerPoint insertion: 9 scenarios passed.");
+        BackgroundScenarios();
         WordScenarios();
         PaneDispatchScenarios();
     }

@@ -6,6 +6,7 @@ import type {
   PresentationInsertTarget,
   PresentationSnapshot,
   ShapeState,
+  SlideBackground,
 } from '../presentation/types';
 import {
   assertSnapshotUnchanged,
@@ -65,6 +66,20 @@ async function readPresentation(
       throw new Error('一次最多读取 60 页，演示稿最多 500 页。请缩小选区或拆分演示稿。');
     const slides = all.items.filter((s) => ids.includes(s.id));
     if (slides.length !== ids.length) throw new Error('目标页面已经删除，请重新读取。');
+    const backgrounds = new Map(
+      slides
+        .filter((s) => supports('1.10') && s.background)
+        .map((s) => {
+          const bg = s.background;
+          bg.load('isMasterBackgroundFollowed');
+          bg.fill.load('type');
+          const solid = bg.fill.getSolidFillOrNullObject();
+          solid.load('color,transparency');
+          const image = bg.fill.getPictureOrTextureFillOrNullObject();
+          image.load('transparency');
+          return [s.id, { bg, solid, image }] as const;
+        }),
+    );
     slides.forEach((s) =>
       s.shapes.load('items/id,items/name,items/type,items/left,items/top,items/width,items/height'),
     );
@@ -125,7 +140,22 @@ async function readPresentation(
           } else if (['Group', 'Table', 'Chart', 'SmartArt'].includes(s.type)) skipped++;
           return shape;
         });
+        const fill = backgrounds.get(slide.id);
+        let background: SlideBackground | undefined;
+        if (fill) {
+          if (fill.bg.isMasterBackgroundFollowed) background = { kind: 'master' };
+          else if (!fill.solid.isNullObject && !fill.solid.transparency)
+            background = { kind: 'solid', color: fill.solid.color.toUpperCase() };
+          else if (!fill.image.isNullObject)
+            background = {
+              kind: 'image',
+              imageId: 'office:' + slide.id,
+              transparency: Math.round(fill.image.transparency * 100),
+            };
+          else background = { kind: 'other', label: fill.bg.fill.type };
+        }
         return {
+          ...(background ? { background } : {}),
           id: slide.id,
           index: slideIds.indexOf(slide.id),
           title:
@@ -144,8 +174,35 @@ async function readPresentation(
   });
 }
 
-async function applyEdits(snapshot: PresentationSnapshot, input: EditProposal) {
+async function applyEdits(
+  snapshot: PresentationSnapshot,
+  input: EditProposal,
+  images: Record<string, string> = {},
+) {
   const proposal = validateEdit(input, snapshot);
+  const fills = (proposal.actions || []).map((a) => {
+    if (a.kind !== 'background' || !supports('1.10'))
+      throw Error(
+        t('请在 PPTX 工作副本中应用这项编辑。', 'Open a PPTX working copy for this edit.'),
+      );
+    const fill =
+      a.fill.kind === 'reference'
+        ? snapshot.slides.find((s) => s.id === (a.fill as { sourceId: string }).sourceId)
+            ?.background
+        : a.fill;
+    if (
+      !fill ||
+      !['master', 'solid', 'image'].includes(fill.kind) ||
+      (fill.kind === 'image' && !images[fill.imageId])
+    )
+      throw Error(
+        t(
+          '请在 PPTX 工作副本中复制该背景或指定双色渐变。',
+          'Open a PPTX working copy to copy this background or set both gradient colors.',
+        ),
+      );
+    return { id: a.slideId, fill };
+  });
   if (proposal.slideOrder && !supports('1.8'))
     throw new Error('当前 PowerPoint 不支持页面重排，请更新 Office。');
   // Re-read every scoped object before any writes, including style/geometry and page order.
@@ -186,6 +243,16 @@ async function applyEdits(snapshot: PresentationSnapshot, input: EditProposal) {
         for (const key of ['left', 'top', 'width', 'height'] as const)
           if (patch[key] !== undefined) shape[key] = patch[key]!;
       }
+      for (const { id, fill } of fills) {
+        const bg = ctx.presentation.slides.getItem(id).background;
+        bg.isMasterBackgroundFollowed = fill.kind === 'master';
+        if (fill.kind === 'solid') bg.fill.setSolidFill({ color: fill.color, transparency: 0 });
+        if (fill.kind === 'image')
+          bg.fill.setPictureOrTextureFill({
+            imageBase64: images[fill.imageId].split(',').pop(),
+            transparency: fill.transparency / 100,
+          });
+      }
       if (proposal.slideOrder)
         reorderedIds(snapshot, proposal.slideOrder).forEach((id, index) =>
           ctx.presentation.slides.getItem(id).moveTo(index),
@@ -201,6 +268,19 @@ async function applyEdits(snapshot: PresentationSnapshot, input: EditProposal) {
       JSON.stringify(now.slideIds) !== JSON.stringify(reorderedIds(snapshot, proposal.slideOrder))
     )
       throw new Error('页面顺序核对未通过。');
+    for (const { id, fill } of fills) {
+      const actual = now.slides.find((s) => s.id === id)?.background;
+      if (
+        actual?.kind !== fill.kind ||
+        (fill.kind === 'solid' && actual.kind === 'solid' && actual.color !== fill.color) ||
+        (fill.kind === 'image' &&
+          actual.kind === 'image' &&
+          actual.transparency !== fill.transparency)
+      )
+        throw Error(
+          t('背景回读与预览不一致。', 'The background read back differs from the preview.'),
+        );
+    }
     for (const patch of proposal.changes) {
       const shape = now.slides
         .find((s) => s.id === patch.slideId)
@@ -276,6 +356,8 @@ async function backupPresentation(): Promise<Blob> {
 export function createPresentationAccess(): PresentationAccess {
   return {
     capabilities: {
+      backgrounds: supports('1.10'),
+      pictureBackground: supports('1.10'),
       read: supports('1.4'),
       selected: supports('1.5'),
       reorder: supports('1.8'),
@@ -285,12 +367,20 @@ export function createPresentationAccess(): PresentationAccess {
       backup: Office.context.requirements.isSetSupported('CompressedFile', '1.1'),
     },
     read: readPresentation,
+    focus: async (id, shape) => {
+      if (supports('1.5'))
+        await PowerPoint.run(async (ctx) => {
+          ctx.presentation.setSelectedSlides([id]);
+          if (shape) ctx.presentation.slides.getItem(id).setSelectedShapes([shape]);
+          await ctx.sync();
+        });
+    },
     prepareInsert: () => PowerPoint.run(loadInsertTarget),
     apply: applyEdits,
     create: async (base64) => {
       await PowerPoint.createPresentation(base64);
     },
-    insert: async (base64, count, target) => {
+    insert: async (base64, count, target, afterSlideId) => {
       if (!supports('1.2')) throw new Error('当前 Office 不支持插入整页，请下载后手动导入。');
       let started = false;
       try {
@@ -304,22 +394,28 @@ export function createPresentationAccess(): PresentationAccess {
             throw new Error('演示稿页序或尺寸已变化，尚未插入。请检查当前演示稿并更新预览。');
           const slides = ctx.presentation.slides;
           const before = now.slideIds;
+          const pos = afterSlideId === undefined ? before.length : before.indexOf(afterSlideId) + 1;
+          if (afterSlideId !== undefined && !pos)
+            throw Error(t('插入位置已变化。', 'The insertion point changed.'));
           ctx.presentation.insertSlidesFromBase64(base64, {
             formatting: PowerPoint.InsertSlideFormatting.keepSourceFormatting,
-            ...(before.length ? { targetSlideId: before[before.length - 1] } : {}),
+            ...(before.length ? { targetSlideId: before[pos - 1] } : {}),
           });
           started = true;
           await ctx.sync();
           slides.load('items/id');
           await ctx.sync();
           const after = slides.items.map((s) => s.id);
-          if (after.length !== before.length + count || before.some((id, i) => after[i] !== id))
+          if (
+            after.length !== before.length + count ||
+            before.some((id, i) => after[i < pos ? i : i + count] !== id)
+          )
             throw new Error('插入后的页数或位置核对未通过。');
         });
       } catch (error) {
         if (started)
           throw new Error(
-            '插入未能确认全部成功，请检查演示稿末尾，必要时使用 Office 撤销。不要直接重复插入。',
+            '插入未能确认全部成功，请检查演示稿中的插入位置，必要时使用 Office 撤销。不要直接重复插入。',
           );
         throw error;
       }

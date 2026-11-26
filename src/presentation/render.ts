@@ -10,6 +10,9 @@ import type {
 } from './types';
 import { allTables, parseDeck } from './content';
 import { chartData } from './charts';
+import { writeBackground } from './package-background';
+import { P, child, nodes, base64, bytes64, OfficePackage, unpack } from './package-xml';
+import { parseFill } from './page-edits';
 import { preserveChartData } from './chart-workbooks';
 
 export const DEFAULT_THEME: PresentationTheme = {
@@ -381,10 +384,28 @@ Sources: ${sourceNames.join('; ') || 'No sources cited. Verify the facts.'}`,
       ),
     );
   }
-  return preserveChartData(
+  const rendered = preserveChartData(
     (await pptx.write({ outputType: 'base64', compression: true })) as string,
     chartSources,
   );
+  if (!theme.fill && !deck.slides.some((page) => page.background)) return rendered;
+  const pkg = new OfficePackage(unpack(bytes64(rendered)));
+  const images = Object.fromEntries(
+    context.materials.filter((m) => m.image).map((m) => [m.id, m.image!.data]),
+  );
+  const cache = new Map<string, string>();
+  if (theme.fill) {
+    const master = 'ppt/slideMasters/slideMaster1.xml';
+    writeBackground(pkg, master, parseFill(theme.fill), images, cache);
+    for (const path of pkg.paths().filter((p) => /^ppt\/slideLayouts\/[^/]+\.xml$/.test(p)))
+      child(nodes(pkg.edit(path), P, 'cSld')[0], P, 'bg')?.remove();
+  }
+  deck.slides.forEach((page, index) => {
+    const fill = page.background ?? theme.fill;
+    if (fill)
+      writeBackground(pkg, `ppt/slides/slide${index + 1}.xml`, parseFill(fill), images, cache);
+  });
+  return base64(pkg.pack());
 }
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob),

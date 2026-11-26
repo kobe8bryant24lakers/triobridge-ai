@@ -323,6 +323,32 @@ internal class Office
         return "#" + (n & 255).ToString("X2") + ((n >> 8) & 255).ToString("X2") +
                ((n >> 16) & 255).ToString("X2");
     }
+    static Dictionary<string, object> Background(dynamic slide)
+    {
+        var result = new Dictionary<string, object>();
+        if (I(slide.FollowMasterBackground) == -1) { result["kind"] = "master"; return result; }
+        dynamic f = slide.Background.Fill;
+        if (I(f.Type) == 1 && (double)f.Transparency == 0)
+        {
+            result["kind"] = "solid"; result["color"] = Hex(I(f.ForeColor.RGB));
+        }
+        else if (I(f.Type) == 3 && I(f.GradientColorType) == 2 && I(f.GradientStyle) == 2 && I(f.GradientVariant) == 1)
+        {
+            result["kind"] = "gradient"; result["from"] = Hex(I(f.ForeColor.RGB)); result["to"] = Hex(I(f.BackColor.RGB));
+        }
+        else { result["kind"] = "other"; result["label"] = "PowerPoint fill " + S(f.Type); }
+        return result;
+    }
+    static void SetBackground(dynamic slide, Dictionary<string, object> fill)
+    {
+        string kind = S(fill["kind"]);
+        if (kind == "master") { slide.FollowMasterBackground = -1; return; }
+        Check(kind == "solid" || kind == "gradient", "请在 PPTX 工作副本中应用此背景。");
+        slide.FollowMasterBackground = 0;
+        dynamic f = slide.Background.Fill;
+        if (kind == "solid") { f.Solid(); f.ForeColor.RGB = Rgb(S(fill["color"])); f.Transparency = 0; }
+        else { f.TwoColorGradient(2, 1); f.ForeColor.RGB = Rgb(S(fill["from"])); f.BackColor.RGB = Rgb(S(fill["to"])); }
+    }
     static Dictionary<string, object> Snapshot(dynamic app, string scope)
     {
         dynamic doc = app.ActivePresentation, win = app.ActiveWindow, sel = win.Selection;
@@ -382,7 +408,7 @@ internal class Office
                     string text = Bound(S(r.Text));
                     bool isTitle =
                         sh.Type == 14 && (sh.PlaceholderFormat.Type == 1 || sh.PlaceholderFormat.Type == 3);
-                    shape["role"] = isTitle ? "title" : "body";
+                    shape["role"] = isTitle || S(sh.Name).EndsWith("Title") ? "title" : S(sh.Name).EndsWith("Footer") ? "footer" : "body";
                     shape["text"] = text;
                     dynamic f = r.Font;
                     int align = I(r.ParagraphFormat.Alignment);
@@ -402,7 +428,7 @@ internal class Office
                 shapes.Add(shape);
             }
             slides.Add(new { id, index = ids.IndexOf(id),
-                             title = title ?? first ?? ("第 " + sl.SlideIndex + " 页"), shapes });
+                             title = title ?? first ?? ("第 " + sl.SlideIndex + " 页"), shapes, background = Background(sl) });
         }
         return new Dictionary<string, object> { { "scope", scope },
                                                 { "slides", slides },
@@ -433,6 +459,7 @@ internal class Office
         // PowerPoint.DocumentWindow has no HWND property (unlike Word/Excel windows).
         // Use its documented, read-only caption together with the presentation path.
         object guard = new { name = S(doc.FullName), window = S(app.ActiveWindow.Caption) };
+        if (op == "presentationCopy") { doc.SaveCopyAs(S(q["file"]), 24); return null; }
         if (op == "presentationTarget")
             return new { guard, target = PresentationTarget(doc) };
         if (op == "presentation")
@@ -484,15 +511,19 @@ internal class Office
             // Keep the original document, page order and dimensions fixed across rendering.
             Same(q["target"], PresentationTarget(doc));
             int before = doc.Slides.Count;
+            int position = q.ContainsKey("afterSlideId") ? I(doc.Slides.FindBySlideID(I(q["afterSlideId"])).SlideIndex) : before;
+            var originals = A(D(q["target"])["slideIds"]).Select(S).ToArray();
             try
             {
-                int n = doc.Slides.InsertFromFile(S(q["file"]), before);
-                Check(n == I(q["count"]), "导入页数与预览不一致。");
+                int n = doc.Slides.InsertFromFile(S(q["file"]), position);
+                Check(n == I(q["count"]) && doc.Slides.Count == before+n, "导入页数与预览不一致。");
+                for (int i=0;i<originals.Length;i++)
+                    Check(S(doc.Slides[i < position ? i+1 : i+n+1].SlideID) == originals[i], "插入位置与预览不一致。");
             }
             catch
             {
-                while (doc.Slides.Count > before)
-                    doc.Slides[doc.Slides.Count].Delete();
+                for (int i = doc.Slides.Count; i > 0; i--)
+                    if (!originals.Contains((string)S(doc.Slides[i].SlideID))) doc.Slides[i].Delete();
                 throw;
             }
             return null;
@@ -507,6 +538,26 @@ internal class Office
         app.StartNewUndoEntry();
         try
         {
+            foreach (object item in A(Get(proposal, "actions") ?? new object[0]))
+            {
+                var a = D(item);
+                Check(S(a["kind"]) == "background", "在 PPTX 工作副本中使用此操作。");
+                var reviewed = A(snapshot["slides"]).Select(D).FirstOrDefault(x => S(x["id"]) == S(a["slideId"]));
+                Check(reviewed != null, "目标页不在选区内。");
+                dynamic target = doc.Slides.FindBySlideID(I(a["slideId"]));
+                var old = D(reviewed["background"]);
+                var fill = D(a["fill"]);
+                if (S(fill["kind"]) == "reference")
+                {
+                    var reference = A(snapshot["slides"]).Select(D).FirstOrDefault(x => S(x["id"]) == S(fill["sourceId"]));
+                    Check(reference != null, "参考页不在选区内。");
+                    fill = D(reference["background"]);
+                }
+                Check(S(old["kind"]) != "other" && new[] { "master", "solid", "gradient" }.Contains(S(fill["kind"])), "请在 PPTX 工作副本中处理模板或图片背景。");
+                undo.Push(() => { SetBackground(target, old); });
+                SetBackground(target, fill);
+                Same(fill, Background(target));
+            }
             foreach (object obj in changes)
             {
                 var p = D(obj);

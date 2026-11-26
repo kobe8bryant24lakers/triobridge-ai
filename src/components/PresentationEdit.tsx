@@ -1,8 +1,8 @@
 import { englishCount } from './presentation-runtime';
 import { t } from '../i18n';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Download, RefreshCw, Sparkles } from 'lucide-react';
-import type { EditProposal, PresentationSnapshot } from '../presentation/types';
+import type { EditProposal, PresentationAccess, PresentationSnapshot } from '../presentation/types';
 import {
   alignProposal,
   editMessages,
@@ -14,6 +14,16 @@ import {
   styleProposal,
   validateEdit,
 } from '../presentation/editing';
+import { mergeProposals } from '../presentation/page-edits';
+import {
+  localBackgroundRequest,
+  parseBackgroundClauses,
+  proposedSnapshot,
+} from '../presentation/slide-tools';
+import { PptxWorkingCopy } from '../presentation/pptx-editor';
+import { base64 } from '../presentation/package-xml';
+import { useBackgroundPictures } from './SlideBackground';
+import { PageChange, SlideTools } from './SlideTools';
 import { downloadBlob } from '../presentation/render';
 import type { PresentationRuntime } from './presentation-runtime';
 import {
@@ -25,7 +35,7 @@ import { EditingConversation } from './EditingConversation';
 
 export function PresentationEdit({
   context,
-  access,
+  access: host,
   busy,
   run,
   request,
@@ -33,10 +43,16 @@ export function PresentationEdit({
   modelStamp,
   demo,
 }: PresentationRuntime) {
+  const localPictures = useBackgroundPictures(run);
+  const visualContext = localPictures.withPictures(context);
+  const [working, setWorking] = useState<{ file: PptxWorkingCopy; name: string; id: string }>();
+  const access: PresentationAccess | undefined = working?.file || host;
+  const [actionSelection, setActionSelection] = useState<Set<number>>(new Set());
   const [scope, setScope] = useState<'selected' | 'all'>(
       access?.capabilities.selected ? 'selected' : 'all',
     ),
     [snapshot, setSnapshot] = useState<PresentationSnapshot>();
+  const explicitlyRead = useRef<PresentationSnapshot | undefined>(undefined);
   const [brief, setBrief] = useState(''),
     [proposal, setProposal] = useState<EditProposal>(),
     [chosen, setChosen] = useState<Set<number>>(new Set()),
@@ -64,15 +80,42 @@ export function PresentationEdit({
     needsRead ||
     Boolean(snapshot && scope !== snapshot.scope) ||
     Boolean(planStamp && planStamp !== fingerprint);
-  function preview(plan: EditProposal, stamp = '') {
+  function selectedPlan(): EditProposal {
+    return {
+      summary: proposal?.summary || '',
+      changes: proposal?.changes.filter((_, i) => chosen.has(i)) || [],
+      ...(proposal?.actions?.length
+        ? { actions: proposal.actions.filter((_, i) => actionSelection.has(i)) }
+        : {}),
+      ...(includeOrder && proposal?.slideOrder ? { slideOrder: proposal.slideOrder } : {}),
+    };
+  }
+  const draftView = useMemo(
+    () =>
+      snapshot && proposal && !outdated && !written
+        ? proposedSnapshot(snapshot, selectedPlan())
+        : snapshot,
+    [snapshot, proposal, chosen, actionSelection, includeOrder, outdated, written],
+  );
+  const [combined, setCombined] = useState(false);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (proposal && window.matchMedia?.('(max-width: 900px)').matches) {
+      reviewHeading.current?.focus({ preventScroll: true });
+      reviewHeading.current?.scrollIntoView?.({ block: 'start' });
+    }
+  }, [proposal]);
+  function preview(plan: EditProposal, stamp = '', combined = false) {
+    setCombined(combined);
     setProposal(plan);
     setChosen(new Set(plan.changes.map((_, i) => i)));
+    setActionSelection(new Set(plan.actions?.map((_, i) => i) || []));
     setIncludeOrder(true);
     setConfirmed(false);
     setWritten(false);
     setPlanStamp(stamp);
     setShowAll(false);
-    if (!plan.changes.length && !plan.slideOrder)
+    if (!plan.changes.length && !plan.actions?.length && !plan.slideOrder)
       notify(t(`没有需要应用的改动。${plan.summary}`, `No changes to apply. ${plan.summary}`));
   }
   async function read() {
@@ -88,8 +131,23 @@ export function PresentationEdit({
           );
         const value = await access.read(scope);
         if (signal.aborted) return;
-        const objects = value.slides.reduce((total, slide) => total + slide.shapes.length, 0);
+        const sameLocalPreview =
+          explicitlyRead.current?.scope === 'selected' &&
+          scope === 'all' &&
+          snapshot?.scope === 'all' &&
+          JSON.stringify(snapshot) === JSON.stringify(value);
+        explicitlyRead.current = value;
         setSnapshot(value);
+        if (sameLocalPreview) {
+          notify(
+            t(
+              '已读取整稿，可继续调整当前方案。',
+              'Entire deck read. You can continue refining the current proposal.',
+            ),
+          );
+          return;
+        }
+        const objects = value.slides.reduce((total, slide) => total + slide.shapes.length, 0);
         setProposal(undefined);
         setNeedsRead(false);
         setWritten(false);
@@ -108,12 +166,108 @@ export function PresentationEdit({
       true,
     );
   }
+  async function openCopy(file?: File) {
+    await run(
+      t('打开 PPTX 工作副本', 'Opening PPTX working copy'),
+      async (signal) => {
+        const blob = file || (await host?.backup());
+        if (!blob) throw Error(t('请选择一个 PPTX 文件。', 'Select a PPTX file.'));
+        const copy = new PptxWorkingCopy(new Uint8Array(await blob.arrayBuffer())),
+          snap = await copy.read();
+        if (signal.aborted) return;
+        setWorking({
+          file: copy,
+          id: crypto.randomUUID(),
+          name: (file?.name || t('当前演示稿', 'Presentation')).replace(/\.pptx$/i, ''),
+        });
+        setScope('all');
+        explicitlyRead.current = snap;
+        setSnapshot(snap);
+        setProposal(undefined);
+        setNeedsRead(false);
+        setWritten(false);
+        setConfirmed(false);
+        setPlanStamp('');
+        setThumbnail('');
+        setFollowUp('');
+        setTurns([]);
+        notify(
+          t(
+            '工作副本已打开。确认改动后可下载或在 PowerPoint 中打开。',
+            'Working copy opened. Confirm changes to download or open it in PowerPoint.',
+          ),
+        );
+      },
+      true,
+    );
+  }
+  async function exportCopy(open: boolean) {
+    if (!working) return;
+    await run(t('导出工作副本', 'Exporting working copy'), async () => {
+      const blob = await working.file.backup();
+      if (open && host) await host.create(base64(new Uint8Array(await blob.arrayBuffer())));
+      else downloadBlob(blob, working.name + t('-已编辑.pptx', '-edited.pptx'));
+    });
+  }
+  async function comment(
+    slide: PresentationSnapshot['slides'][number],
+    instruction: string,
+    shapeId?: string,
+  ) {
+    if (!snapshot) return;
+    const target = {
+      ...snapshot,
+      slides: [{ ...slide, shapes: slide.shapes.filter((s) => !shapeId || s.id === shapeId) }],
+    };
+    await run(
+      t('按批注生成方案', 'Preparing comment edit'),
+      async (signal) => {
+        const result =
+          localBackgroundRequest(instruction, target) ||
+          parseEdit(
+            await request(
+              editMessages(context, target, instruction),
+              signal,
+              JSON.stringify({
+                summary: t(
+                  '请连接模型以处理此条批注。',
+                  'Connect a model to interpret this comment.',
+                ),
+                changes: [],
+              }),
+            ),
+            target,
+          );
+        if (!signal.aborted)
+          preview(
+            validateEdit(
+              mergeProposals(outdated ? { summary: '', changes: [] } : selectedPlan(), result),
+              snapshot,
+            ),
+            fingerprint,
+          );
+      },
+      true,
+    );
+  }
   async function generate() {
     if (!snapshot) return;
     await run(
       t('生成已有页面的编辑方案', 'Generating a slide edit proposal'),
       async (signal) => {
-        const first = snapshot.slides[0],
+        const clauses = parseBackgroundClauses(brief);
+        const needsAll =
+          clauses &&
+          snapshot.scope === 'selected' &&
+          snapshot.slides.length !== snapshot.slideIds.length &&
+          /(?:整[份稿套个]|全[稿部]|所有页|第\s*\d+|entire|whole|all slides|slides?\s+\d+)/i.test(
+            brief,
+          );
+        // Only fully recognized local background commands can widen the host read.
+        let target = explicitlyRead.current || snapshot;
+        if (clauses) target = needsAll && access ? await access.read('all') : snapshot;
+        if (signal.aborted) return;
+        const first = target.slides[0],
           title = first.shapes.find((s) => s.role === 'title') || first.shapes.find((s) => s.text);
         const demo = {
           summary: t(
@@ -130,13 +284,17 @@ export function PresentationEdit({
               ]
             : [],
         };
-        const raw = await request(
-          editMessages(context, snapshot, brief),
-          signal,
-          JSON.stringify(demo),
-        );
+        const local = clauses && localBackgroundRequest(brief, target, clauses);
+        const raw = local
+          ? JSON.stringify(local)
+          : await request(editMessages(context, target, brief), signal, JSON.stringify(demo));
         if (signal.aborted) return;
-        const result = parseEdit(raw, snapshot);
+        const result = parseEdit(raw, target);
+        if (target !== snapshot) {
+          setScope(target.scope);
+          setSnapshot(target);
+          setNeedsRead(false);
+        }
         preview(result, fingerprint);
         setTurns([{ instruction: brief, result: JSON.stringify(result) }]);
         setInitialInstruction(brief);
@@ -147,8 +305,14 @@ export function PresentationEdit({
   }
   async function quick(action: () => EditProposal) {
     await run(t('准备改动预览', 'Preparing change preview'), async () => {
-      const result = action();
-      preview(result, fingerprint);
+      const next = action();
+      const base = outdated ? { summary: '', changes: [] } : selectedPlan();
+      const result = validateEdit(mergeProposals(base, next), snapshot!);
+      preview(
+        result,
+        fingerprint,
+        Boolean(base.changes.length || base.actions?.length || base.slideOrder),
+      );
       setInitialInstruction(result.summary);
       setTurns([{ instruction: result.summary, result: JSON.stringify(result) }]);
       setFollowUp('');
@@ -162,18 +326,27 @@ export function PresentationEdit({
       async (signal) => {
         // Revisions remain a complete proposal against the original read snapshot.
         // Unchecked changes are absent from the current draft sent to the model.
-        const current = JSON.stringify({
-          summary: proposal.summary,
-          changes: proposal.changes.filter((_, i) => chosen.has(i)),
-          ...(includeOrder && proposal.slideOrder ? { slideOrder: proposal.slideOrder } : {}),
-        });
-        const messages = buildEditingFollowUp(
-          editMessages(context, snapshot, initialInstruction),
-          turns,
-          current,
-          instruction,
-        );
-        const raw = await request(messages, signal, current);
+        const current = JSON.stringify(selectedPlan());
+        const direct = localBackgroundRequest(instruction, draftView || snapshot);
+        if (!direct && explicitlyRead.current?.scope === 'selected' && snapshot.scope === 'all')
+          throw Error(
+            t(
+              '跨页背景已在本机预览。要让模型继续编辑整稿，请点击「重新读取页面」，然后再次发送修改要求。',
+              'The cross-slide background preview was prepared locally. Choose Read slides again to share the entire deck with the model, then resend your request.',
+            ),
+          );
+        const raw = direct
+          ? JSON.stringify(mergeProposals(selectedPlan(), direct))
+          : await request(
+              buildEditingFollowUp(
+                editMessages(context, snapshot, initialInstruction),
+                turns,
+                current,
+                instruction,
+              ),
+              signal,
+              current,
+            );
         if (signal.aborted) return;
         const result = parseEdit(raw, snapshot);
         preview(result, fingerprint);
@@ -199,40 +372,108 @@ export function PresentationEdit({
   async function apply() {
     if (!snapshot || !proposal || !access || outdated || written) return;
     await run(t('应用并核对页面改动', 'Applying and verifying slide edits'), async () => {
-      const selected = validateEdit(
-        {
-          summary: proposal.summary,
-          changes: proposal.changes.filter((_, i) => chosen.has(i)),
-          ...(includeOrder && proposal.slideOrder ? { slideOrder: proposal.slideOrder } : {}),
-        },
-        snapshot,
-      );
+      const selected = validateEdit(selectedPlan(), snapshot);
       setNeedsRead(true);
       setConfirmed(false);
-      await access.apply(snapshot, selected);
+      const images = Object.fromEntries(
+        visualContext.materials.filter((m) => m.image).map((m) => [m.id, m.image!.data]),
+      );
+      await access.apply(snapshot, selected, images);
       setWritten(true);
       notify(
-        t(
-          `已应用并回读核对 ${selected.changes.length} 个对象${selected.slideOrder ? '及页面顺序' : ''}。请检查实际排版；继续编辑前重新读取页面。`,
-          `Applied and verified ${englishCount(selected.changes.length, 'object')}${selected.slideOrder ? ' and the slide order' : ''}. Check the layout in PowerPoint. Read the slides again before continuing.`,
-        ),
+        selected.actions?.length
+          ? t(
+              `已核对 ${selected.actions.length} 项页面操作与 ${selected.changes.length} 个对象。`,
+              `Verified ${selected.actions.length} slide edits and ${selected.changes.length} objects.`,
+            )
+          : t(
+              `已应用并回读核对 ${selected.changes.length} 个对象${selected.slideOrder ? '及页面顺序' : ''}。请检查实际排版；继续编辑前重新读取页面。`,
+              `Applied and verified ${englishCount(selected.changes.length, 'object')}${selected.slideOrder ? ' and the slide order' : ''}. Check the layout in PowerPoint. Read the slides again before continuing.`,
+            ),
       );
     });
   }
   const objectCount =
     snapshot?.slides.reduce((total, slide) => total + slide.shapes.length, 0) ?? 0;
-  const selectedCount = chosen.size + (includeOrder && proposal?.slideOrder ? 1 : 0),
+  const selectedCount =
+      chosen.size + actionSelection.size + (includeOrder && proposal?.slideOrder ? 1 : 0),
     findings = snapshot ? inspectSlides(snapshot) : [];
+  const selected = selectedPlan(),
+    affected = new Set([...selected.changes, ...(selected.actions || [])].map((c) => c.slideId));
+  if (selected.slideOrder)
+    snapshot?.slides.forEach((s, i) => {
+      if (selected.slideOrder![i] !== s.id) affected.add(s.id);
+    });
+  const ranges: string[] = [];
+  const numbers = snapshot?.slides.filter((s) => affected.has(s.id)).map((s) => s.index + 1) || [];
+  for (let i = 0; i < numbers.length; i++) {
+    const start = numbers[i];
+    while (i + 1 < numbers.length && numbers[i + 1] === numbers[i] + 1) i++;
+    ranges.push(start === numbers[i] ? String(start) : start + '–' + numbers[i]);
+  }
   return (
     <div className="ppt-flow">
       <section className="ppt-compose" aria-label={t('已有页面编辑', 'Edit existing slides')}>
         <h2>{t('编辑现有 PPT', 'Edit an existing deck')}</h2>
         <p className="field-help">
           {t(
-            '参考已选素材，改写局部内容、统一样式、调整对象位置或页面顺序。先读取，再预览具体改动。',
-            'Read the slides to review proposed changes to text, formatting, object positions or slide order using your selected sources.',
+            '读取当前演示稿，或打开本地 PPTX 工作副本。可按页调整背景、内容和图表，预览后确认应用。',
+            'Read the open presentation or choose a local PPTX. Review changes to backgrounds, content and charts before applying them.',
           )}
         </p>
+        <div className="ppt-file-actions">
+          <label className="secondary ppt-file-button">
+            {t('打开 PPTX 工作副本', 'Open a PPTX working copy')}
+            <input
+              type="file"
+              accept=".pptx"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) void openCopy(f);
+              }}
+            />
+          </label>
+          {host?.capabilities.backup && (
+            <button className="text-button" disabled={busy} onClick={() => void openCopy()}>
+              {t('读取当前稿为工作副本', 'Use a copy of the open deck')}
+            </button>
+          )}
+        </div>
+        {working && (
+          <div className="ppt-working-file">
+            <strong>{working.name}.pptx</strong>
+            <div className="button-row">
+              <button className="secondary" disabled={busy} onClick={() => void exportCopy(false)}>
+                {t('下载工作副本', 'Download working copy')}
+              </button>
+              {host?.capabilities.create && (
+                <button className="secondary" disabled={busy} onClick={() => void exportCopy(true)}>
+                  {t('在 PowerPoint 打开副本', 'Open copy in PowerPoint')}
+                </button>
+              )}
+              {host && (
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => {
+                    setWorking(undefined);
+                    explicitlyRead.current = undefined;
+                    setScope(host.capabilities.selected ? 'selected' : 'all');
+                    setSnapshot(undefined);
+                    setProposal(undefined);
+                    setPlanStamp('');
+                    setNeedsRead(false);
+                    setThumbnail('');
+                  }}
+                >
+                  {t('返回当前演示稿', 'Return to open deck')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="ppt-field-grid">
           <label>
             {t('页面范围', 'Slide range')}
@@ -264,8 +505,8 @@ export function PresentationEdit({
         {!access?.capabilities.read && (
           <p className="notice warning">
             {t(
-              '当前版本无法读取页面对象。请更新 PowerPoint；仍可使用素材生成并下载整套 PPT。',
-              'This PowerPoint version cannot read slide objects. Update PowerPoint, or build a new deck from files and download it.',
+              '可打开本地 PPTX 工作副本读取并编辑页面。',
+              'Open a local PPTX working copy to read and edit its slides.',
             )}
           </p>
         )}
@@ -341,6 +582,28 @@ export function PresentationEdit({
                 />
               )}
             </details>
+            {draftView && (
+              <SlideTools
+                key={(working?.id || 'live') + ':' + snapshot.slideIds.join(',') + ':' + scope}
+                snapshot={draftView}
+                context={visualContext}
+                pickPicture={localPictures.pick}
+                disabled={busy || needsRead || scope !== snapshot.scope}
+                full={!!working}
+                canImage={!!host?.capabilities.pictureBackground}
+                canGradient={!!host?.capabilities.gradient}
+                demo={demo && !!snapshot.slides[0]?.id.startsWith('demo-')}
+                stage={quick}
+                notice={notify}
+                focus={(slide, id) => {
+                  if (access?.focus)
+                    void run(t('定位页面', 'Locating slide'), async () =>
+                      access.focus!(slide.id, id),
+                    );
+                }}
+                comment={(s, text, id) => void comment(s, text, id)}
+              />
+            )}
             <label className="field-label" htmlFor="ppt-edit-brief">
               {t('编辑要求', 'Editing instructions')}
             </label>
@@ -363,8 +626,8 @@ export function PresentationEdit({
               {t('将参考 ', 'Using ')}
               {context.materials.length}{' '}
               {t(
-                '份素材和已读取页面。仅修改明确列出的文字、样式、对象位置或页序。',
-                'source(s) and the slides you read. Only the listed changes to text, styles, positions or slide order will be applied.',
+                '份素材。明确指定整稿或页码时会读取相应页面，并列出待确认的改动。',
+                'source(s). Requests for the whole deck or numbered slides read the required pages for review.',
               )}
             </p>
             <button
@@ -408,7 +671,7 @@ export function PresentationEdit({
               <button
                 className="secondary"
                 disabled={busy || needsRead || scope !== snapshot.scope}
-                onClick={() => void quick(() => styleProposal(snapshot, font, accent))}
+                onClick={() => void quick(() => styleProposal(draftView!, font, accent))}
               >
                 {t('预览统一样式', 'Preview styles')}
               </button>
@@ -434,7 +697,7 @@ export function PresentationEdit({
               <button
                 className="secondary"
                 disabled={busy || !find || needsRead || scope !== snapshot.scope}
-                onClick={() => void quick(() => replaceProposal(snapshot, find, replacement))}
+                onClick={() => void quick(() => replaceProposal(draftView!, find, replacement))}
               >
                 {t('预览批量替换', 'Preview replacements')}
               </button>
@@ -523,16 +786,34 @@ export function PresentationEdit({
       {proposal && snapshot && (
         <section className="ppt-result" aria-label={t('改动预览', 'Change preview')}>
           <div className="section-heading">
-            <h2>{t('改动预览', 'Change preview')}</h2>
+            <h2 ref={reviewHeading} tabIndex={-1}>
+              {t('改动预览', 'Change preview')}
+            </h2>
             <span>
               {t(
                 `${proposal.changes.length} 个对象`,
                 `${englishCount(proposal.changes.length, 'object')}`,
               )}
+              {proposal.actions?.length
+                ? t(
+                    ` · ${proposal.actions.length} 项页面改动`,
+                    ` · ${proposal.actions.length} slide edits`,
+                  )
+                : ''}
               {proposal.slideOrder ? t(' + 页序', ' + slide order') : ''}
             </span>
           </div>
-          <p>{proposal.summary}</p>
+          {!combined && <p>{proposal.summary}</p>}
+          {selectedCount > 0 ? (
+            <p>
+              {t(
+                `已选 ${selectedCount} 项改动，涉及第 ${ranges.join('、')} 页。`,
+                `${selectedCount} selected edits on slides ${ranges.join(', ')}.`,
+              )}
+            </p>
+          ) : (
+            <p>{t('请选择要应用的改动。', 'Select changes to apply.')}</p>
+          )}
           {outdated && !written && (
             <p className="notice warning" role="status">
               {t(
@@ -565,6 +846,67 @@ export function PresentationEdit({
               {t('选择全部对象改动', 'Select all changes')}
             </label>
           )}
+          {proposal.actions?.length ? (
+            <div className="change-list">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  aria-label={t('选择全部页面操作', 'Select all slide edits')}
+                  disabled={busy || outdated || written}
+                  checked={actionSelection.size === proposal.actions.length}
+                  onChange={(e) => {
+                    setActionSelection(
+                      e.target.checked ? new Set(proposal.actions!.map((_, i) => i)) : new Set(),
+                    );
+                    setConfirmed(false);
+                  }}
+                />
+                {t('选择全部页面操作', 'Select all slide edits')}
+              </label>
+              {proposal.actions.map((a, i) => {
+                const sl = snapshot.slides.find((s) => s.id === a.slideId)!;
+                const labels = {
+                  background: t('页面背景', 'Background'),
+                  chart: t('刷新图表', 'Chart data'),
+                  insert: t('在此页后插入', 'Insert after slide'),
+                  split: t('拆分正文', 'Split body'),
+                };
+                return (
+                  <article className="change-row" key={i}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={actionSelection.has(i)}
+                        disabled={busy || outdated || written}
+                        onChange={(e) => {
+                          const next = new Set(actionSelection);
+                          if (e.target.checked) next.add(i);
+                          else next.delete(i);
+                          setActionSelection(next);
+                          setConfirmed(false);
+                        }}
+                      />
+                      <strong>
+                        {t('第 ' + (sl.index + 1) + ' 页', 'Slide ' + (sl.index + 1))} ·{' '}
+                        {labels[a.kind]}
+                      </strong>
+                    </label>
+                    <PageChange
+                      size={snapshot.size}
+                      current={draftView?.slides.find((s) => s.id === sl.id)}
+                      action={a}
+                      slide={sl}
+                      slides={snapshot.slides}
+                      image={(id) =>
+                        visualContext.materials.find((m) => m.id === id)?.image?.data ||
+                        working?.file.image(id)
+                      }
+                    />
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="change-list">
             {proposal.changes.slice(0, showAll ? undefined : 50).map((patch, i) => {
               const slide = snapshot.slides.find((s) => s.id === patch.slideId)!,
@@ -647,10 +989,15 @@ export function PresentationEdit({
             </label>
           )}
           <p className="field-help">
-            {t(
-              '改写文字可能影响框内局部格式；统一字体会替换混合样式。应用前建议备份原稿，应用后可使用 Office 撤销。',
-              'Rewriting can change local formatting. Applying one font replaces mixed styles. Save a backup first. Use Office Undo to revert.',
-            )}
+            {working
+              ? t(
+                  '改动将保存到工作副本。可下载编辑结果，或重新打开原始 PPTX 重新开始。',
+                  'Changes are saved in the working copy. Download your edits, or reopen the original PPTX to start over.',
+                )
+              : t(
+                  '改写文字可能影响框内局部格式；统一字体会替换混合样式。应用前建议备份原稿，应用后可使用 Office 撤销。',
+                  'Rewriting can change local formatting. Applying one font replaces mixed styles. Save a backup first. Use Office Undo to revert.',
+                )}
           </p>
           <EditingConversation
             id="slides-conversation"
@@ -703,10 +1050,15 @@ export function PresentationEdit({
           {confirmed && !outdated && (
             <div className="ppt-confirm">
               <p>
-                {t(
-                  `确认修改 ${snapshot.scope === 'all' ? '整稿' : '选中页'}范围内的 ${chosen.size} 个对象${includeOrder && proposal.slideOrder ? '及页序' : ''}？应用前会再次核对页面和内容。`,
-                  `Apply changes to ${englishCount(chosen.size, 'object')} in ${snapshot.scope === 'all' ? 'the entire deck' : 'the selected slides'}${includeOrder && proposal.slideOrder ? ' and change the slide order' : ''}? The slides and content will be checked again.`,
-                )}
+                {actionSelection.size
+                  ? t(
+                      `确认应用所选 ${selectedCount} 项改动？${working ? '结果保存在工作副本中。' : '将写入当前演示稿。'}`,
+                      `Apply ${selectedCount} selected edits to the ${working ? 'working copy' : 'open presentation'}?`,
+                    )
+                  : t(
+                      `确认修改 ${snapshot.scope === 'all' ? '整稿' : '选中页'}范围内的 ${chosen.size} 个对象${includeOrder && proposal.slideOrder ? '及页序' : ''}？应用前会再次核对页面和内容。`,
+                      `Apply changes to ${englishCount(chosen.size, 'object')} in ${snapshot.scope === 'all' ? 'the entire deck' : 'the selected slides'}${includeOrder && proposal.slideOrder ? ' and change the slide order' : ''}? The slides and content will be checked again.`,
+                    )}
               </p>
               <div className="button-row">
                 <button className="primary" disabled={busy} onClick={() => void apply()}>

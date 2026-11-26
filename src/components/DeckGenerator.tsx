@@ -11,6 +11,7 @@ import {
   STANDARD,
   WIDE,
 } from '../presentation/render';
+import { BackgroundPicker, useBackgroundPictures } from './SlideBackground';
 import { SlidePreview } from './PresentationPreview';
 import type { PresentationRuntime } from './presentation-runtime';
 import {
@@ -94,6 +95,7 @@ function demoDeck(count: number): DeckContent {
 }
 export function DeckGenerator(runtime: PresentationRuntime) {
   const { context, access, busy, run, request, notify, modelStamp } = runtime;
+  const localPictures = useBackgroundPictures(run);
   const [brief, setBrief] = useState(''),
     [countInput, setCountInput] = useState('8'),
     [ratio, setRatio] = useState('wide'),
@@ -116,6 +118,11 @@ export function DeckGenerator(runtime: PresentationRuntime) {
     modelStamp,
   ]);
   const outdated = Boolean(draft && stamp !== fingerprint);
+  function updateTheme(next: typeof theme) {
+    setTheme(next);
+    setAppended(false);
+    setConfirmAppend(false);
+  }
   function updatePage(patch: Partial<DeckSlide>) {
     setDraft((d) =>
       d ? { ...d, slides: d.slides.map((s, i) => (i === page ? { ...s, ...patch } : s)) } : d,
@@ -169,7 +176,7 @@ export function DeckGenerator(runtime: PresentationRuntime) {
         );
         const raw = await request(messages, signal, current, 'presentation-deck');
         if (signal.aborted) return;
-        const result = parseDeck(raw, usedContext, draft.slides.length);
+        const result = parseDeck(raw, localPictures.withPictures(usedContext), draft.slides.length);
         setDraft(result);
         setTurns((previous) =>
           appendEditingTurn(previous, current, instruction, JSON.stringify(result)),
@@ -211,7 +218,7 @@ export function DeckGenerator(runtime: PresentationRuntime) {
           );
         const base64 = await renderDeck(
           draft,
-          usedContext,
+          localPictures.withPictures(usedContext),
           theme,
           insertTarget?.size || (ratio === 'wide' ? WIDE : STANDARD),
         );
@@ -310,7 +317,7 @@ export function DeckGenerator(runtime: PresentationRuntime) {
               <select
                 value={theme.font}
                 disabled={busy}
-                onChange={(e) => setTheme({ ...theme, font: e.target.value })}
+                onChange={(e) => updateTheme({ ...theme, font: e.target.value })}
               >
                 <option>Aptos</option>
                 <option>Arial</option>
@@ -323,10 +330,20 @@ export function DeckGenerator(runtime: PresentationRuntime) {
                 type="color"
                 value={theme.accent}
                 disabled={busy}
-                onChange={(e) => setTheme({ ...theme, accent: e.target.value })}
+                onChange={(e) => updateTheme({ ...theme, accent: e.target.value })}
               />
             </label>
           </div>
+          <fieldset disabled={busy} className="ppt-tool-fields">
+            <legend>{t('整稿默认背景', 'Deck background')}</legend>
+            <BackgroundPicker
+              fill={theme.fill || { kind: 'solid', color: theme.background }}
+              context={localPictures.withPictures(context)}
+              pickPicture={localPictures.pick}
+              defaultColor={theme.background}
+              onChange={(fill) => updateTheme({ ...theme, fill })}
+            />
+          </fieldset>
           <p className="field-help">
             {t(
               '使用本机 Office 可用字体；缺失字体会由 Office 替换。',
@@ -433,7 +450,24 @@ export function DeckGenerator(runtime: PresentationRuntime) {
               </button>
             </div>
           </div>
-          <SlidePreview page={current} context={usedContext} />
+          <SlidePreview
+            page={current}
+            context={localPictures.withPictures(usedContext)}
+            theme={theme}
+          />
+          <details className="ppt-options">
+            <summary>{t('本页背景', 'Slide background')}</summary>
+            <fieldset className="ppt-tool-fields" disabled={busy}>
+              <BackgroundPicker
+                allowDefault
+                fill={current.background}
+                context={localPictures.withPictures(usedContext)}
+                pickPicture={localPictures.pick}
+                defaultColor={theme.background}
+                onChange={(background) => updatePage({ background })}
+              />
+            </fieldset>
+          </details>
           <p className="field-help">
             {t(
               '内容与版式概览；最终排版请在 PowerPoint 中核对。来源：',

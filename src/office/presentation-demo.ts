@@ -17,6 +17,7 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
       id: `demo-${i + 1}`,
       index: i,
       title,
+      background: { kind: 'master' },
       shapes: [
         {
           id: 'title',
@@ -76,6 +77,7 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
       create: false,
       thumbnail: false,
       backup: false,
+      backgrounds: true,
     },
     read,
     prepareInsert: async () =>
@@ -84,6 +86,16 @@ export function createDemoPresentation(onWrite: (text: string) => void): Present
       const snapshot = current();
       assertSnapshotUnchanged(before, await read(before.scope));
       const plan = validateEdit(input, before);
+      for (const a of plan.actions || []) {
+        if (a.kind !== 'background')
+          throw Error(t('请打开 PPTX 工作副本。', 'Open a PPTX working copy.'));
+        const source =
+          a.fill.kind === 'reference'
+            ? before.slides.find((s) => s.id === (a.fill as { sourceId: string }).sourceId)
+                ?.background
+            : a.fill;
+        snapshot.slides.find((s) => s.id === a.slideId)!.background = structuredClone(source);
+      }
       for (const p of plan.changes) {
         const shape = snapshot.slides
           .find((s) => s.id === p.slideId)!

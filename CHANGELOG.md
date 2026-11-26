@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0 — 2026-11-26
+
+- Set native slide backgrounds across a deck, on specific pages or on a range with exceptions. Choose a solid color, a two-color gradient, a picture with transparency, or the slide master. New decks support a default background and per-slide overrides.
+- Preview batch changes individually, save editing recipes, match a reference slide, insert a slide after an anchor, or split a text box across two slides.
+- Update a supported native chart and its embedded Excel workbook from a table. Review comments, text density, overflow, small type and contrast in a PPTX working copy.
+- Recognized background instructions run locally. Model-assisted edits send the explicitly read slides and selected materials. A cross-slide background preview can be refined with the model after explicitly reading the full deck.
+
+### 简体中文
+
+- 支持整稿、单页、页码范围及例外页的原生背景。可选纯色、双色渐变、带透明度的图片或恢复母版。新稿支持默认背景与单页覆盖。
+- 批量改动可逐项勾选，常用操作可保存为配方。可套用参考页样式、在指定位置插页，或把一个长文本框拆成两页。
+- 可用表格刷新支持的原生图表及其内嵌 Excel 工作簿。PPTX 工作副本支持按批注修改，并检查文字过密、越界、字号和对比度。
+- 可识别的背景指令在本机处理。模型辅助编辑使用明确读取的页面和选中素材。跨页背景预览后，明确读取整稿即可让模型继续调整。
+
 ## 0.10.0 — 2026-11-26
 
 - Add **Conversation** for multi-turn questions about the add-in, presentation planning, and general topics. This mode does not read or change the current document.

@@ -1,3 +1,4 @@
+import type { PresentationInsertTarget } from '../presentation/types';
 import { t, getUiLanguage } from '../i18n';
 import { useMemo, useState } from 'react';
 import { Download, Sparkles } from 'lucide-react';
@@ -39,6 +40,23 @@ export function DataChart({
     [reason, setReason] = useState(''),
     [confirm, setConfirm] = useState(false),
     [inserted, setInserted] = useState('');
+  const [after, setAfter] = useState(''),
+    [location, setLocation] = useState<{ target: PresentationInsertTarget; id: string }>();
+  async function reviewInsertion() {
+    if (!after || !access) {
+      setLocation(undefined);
+      setConfirm(true);
+      return;
+    }
+    await run(t('核对插入页码', 'Checking insertion point'), async () => {
+      const target = await access.prepareInsert(),
+        page = Number(after);
+      if (!Number.isInteger(page) || page < 1 || page > target.slideIds.length)
+        throw Error(t('请输入当前稿中存在的页码。', 'Enter a slide number in the current deck.'));
+      setLocation({ target, id: target.slideIds[page - 1] });
+      setConfirm(true);
+    });
+  }
   const [turns, setTurns] = useState<EditingTurn[]>([]),
     [followUp, setFollowUp] = useState(''),
     [conversationStamp, setConversationStamp] = useState('');
@@ -89,6 +107,7 @@ export function DataChart({
   const fingerprint = JSON.stringify([
     source,
     pasted,
+    after,
     parsed.table,
     category,
     series,
@@ -209,7 +228,9 @@ export function DataChart({
         : t('生成可编辑图表文件', 'Building an editable chart'),
       async (signal) => {
         const insertTarget =
-          target === 'insert' && access ? await access.prepareInsert() : undefined;
+          target === 'insert' && access
+            ? location?.target || (await access.prepareInsert())
+            : undefined;
         if (target === 'insert' && !insertTarget?.size)
           throw new Error(
             t(
@@ -265,12 +286,18 @@ export function DataChart({
         } else if (access && insertTarget) {
           setConfirm(false);
           setInserted(fingerprint);
-          await access.insert(base64, 1, insertTarget);
+          if (location) await access.insert(base64, 1, insertTarget, location.id);
+          else await access.insert(base64, 1, insertTarget);
           notify(
-            t(
-              '已在末尾插入 1 页原生图表，并核对页数。可右键图表编辑数据。',
-              'One editable chart slide was appended and the slide count verified. Right-click the chart to edit its data.',
-            ),
+            location
+              ? t(
+                  `已在第 ${after} 页后插入并核对图表页。`,
+                  `Inserted and verified the chart after slide ${after}.`,
+                )
+              : t(
+                  '已在末尾插入 1 页原生图表，并核对页数。可右键图表编辑数据。',
+                  'One editable chart slide was appended and the slide count verified. Right-click the chart to edit its data.',
+                ),
           );
         }
       },
@@ -547,7 +574,7 @@ export function DataChart({
               <button
                 className="secondary"
                 disabled={busy || !title.trim() || inserted === fingerprint}
-                onClick={() => setConfirm(true)}
+                onClick={() => void reviewInsertion()}
               >
                 {inserted === fingerprint
                   ? t('已尝试插入，请检查末尾', 'Insertion attempted. Check the last slide.')
@@ -555,13 +582,35 @@ export function DataChart({
               </button>
             )}
           </div>
+          {access?.capabilities.insert && (
+            <label className="field-label">
+              {t('插在第几页之后', 'Insert after slide')}
+              <input
+                type="number"
+                min={1}
+                value={after}
+                disabled={busy}
+                placeholder={t('默认在末尾', 'End of deck by default')}
+                onChange={(e) => {
+                  setAfter(e.target.value);
+                  setConfirm(false);
+                  setLocation(undefined);
+                }}
+              />
+            </label>
+          )}
           {confirm && (
             <div className="ppt-confirm">
               <p>
-                {t(
-                  '在当前演示稿末尾新增 1 页图表。图表可继续编辑，原有页面保留。',
-                  'Append one editable chart slide to the end of the current deck.',
-                )}
+                {location
+                  ? t(
+                      `在第 ${after} 页后新增 1 页可编辑图表。`,
+                      `Insert one editable chart after slide ${after}.`,
+                    )
+                  : t(
+                      '在当前演示稿末尾新增 1 页图表。图表可继续编辑，原有页面保留。',
+                      'Append one editable chart slide to the end of the current deck.',
+                    )}
               </p>
               <div className="button-row">
                 <button
