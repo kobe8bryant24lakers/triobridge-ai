@@ -90,6 +90,58 @@ async function fixture(t, options = {}) {
 const add = (store, id = 'first', expectedRevision = 0, credential = replace()) =>
   store.upsert({ expectedRevision, profile: profile(id), credential });
 
+test('conversation history accepts assistant text without accepting tools or assistant images', () => {
+  const messages = [
+    { role: 'system', content: 'Read-only conversation.' },
+    { role: 'user', content: 'Help me plan a presentation.' },
+    { role: 'assistant', content: 'Who is the audience?' },
+    { role: 'user', content: 'New teammates.' },
+  ];
+  assert.deepEqual(validateSharedMessages(messages), messages);
+  for (const message of [
+    { role: 'tool', content: 'write_document' },
+    { role: 'assistant', content: 'Answer', tool_calls: [] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Answer' }] },
+  ])
+    assert.throws(() => validateSharedMessages([message]), { code: 'request' });
+  assert.throws(() => validateSharedMessages(Array(17).fill(messages[1])), { code: 'request' });
+  assert.throws(
+    () => validateSharedMessages([{ role: 'assistant', content: 'x'.repeat(150001) }]),
+    { code: 'request' },
+  );
+});
+
+test('installed shared completions preserve multi-turn conversation for both model protocols', async (t) => {
+  for (const apiFormat of ['openai', 'anthropic']) {
+    let payload;
+    const { store } = await fixture(t, {
+      fetcher: async (_url, options) => {
+        payload = JSON.parse(options.body);
+        return Response.json(
+          apiFormat === 'anthropic'
+            ? { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Here is an outline.' }] }
+            : body('Here is an outline.'),
+        );
+      },
+    });
+    await store.upsert({
+      expectedRevision: 0,
+      profile: profile('chat', { apiFormat }),
+      credential: replace(),
+    });
+    const messages = [
+      { role: 'system', content: 'Read-only conversation.' },
+      { role: 'user', content: 'Help me plan a presentation.' },
+      { role: 'assistant', content: 'Who is the audience?' },
+      { role: 'user', content: 'New teammates.' },
+    ];
+    const result = await store.complete({ profileId: 'chat', profileRevision: 1, messages });
+    assert.equal(result.body.choices[0].message.content, 'Here is an outline.');
+    assert.deepEqual(payload.messages, apiFormat === 'anthropic' ? messages.slice(1) : messages);
+    if (apiFormat === 'anthropic') assert.equal(payload.system, messages[0].content);
+  }
+});
+
 test('shared metadata persists without credentials and is readable by another store instance', async (t) => {
   const { store, directory, keys, vault, fetcher } = await fixture(t);
   assert.equal((await store.state()).revision, 0);

@@ -9,8 +9,23 @@ import { DEFAULT_THEME, downloadPresentation, renderDeck, WIDE } from '../presen
 import type { ChartKind, DeckContent, MaterialContext, MaterialTable } from '../presentation/types';
 import { ChartPreview } from './PresentationPreview';
 import type { PresentationRuntime } from './presentation-runtime';
+import {
+  appendEditingTurn,
+  buildEditingFollowUp,
+  type EditingTurn,
+} from '../core/editing-conversation';
+import { EditingConversation } from './EditingConversation';
 
-export function DataChart({ context, access, busy, run, request, notify }: PresentationRuntime) {
+export function DataChart({
+  context,
+  access,
+  busy,
+  run,
+  request,
+  notify,
+  modelStamp,
+  demo,
+}: PresentationRuntime) {
   const tables = allTables(context),
     [source, setSource] = useState('paste'),
     [pasted, setPasted] = useState(''),
@@ -24,6 +39,9 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
     [reason, setReason] = useState(''),
     [confirm, setConfirm] = useState(false),
     [inserted, setInserted] = useState('');
+  const [turns, setTurns] = useState<EditingTurn[]>([]),
+    [followUp, setFollowUp] = useState(''),
+    [conversationStamp, setConversationStamp] = useState('');
   const title = customTitle ?? t('业务数据对比', 'Business comparison');
   const language = getUiLanguage();
   const start = Number(startInput),
@@ -78,9 +96,31 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
     title,
     unit,
   ]);
+  const dataStamp = JSON.stringify([source, pasted, parsed.table, category, series, modelStamp]);
+  const conversationOutdated = Boolean(conversationStamp && conversationStamp !== dataStamp);
   function reset() {
     setConfirm(false);
     setReason('');
+  }
+  function recommendationMessages() {
+    return materialMessages(
+      { materials: [], includeImages: false },
+      t(
+        '你是数据可视化助手。根据提供的数据推荐图表类型与简明标题，不修改数字。只返回 JSON：{"type":"column|bar|line|pie|doughnut","title":"≤64字符","reason":"≤300字符"}。饼图和圆环图只能一个系列、最多8个分类，不能包含负数、空值或全零；趋势适用折线，比较适用柱形或条形。',
+        'Recommend a chart type and concise title for the supplied data without changing any numbers. Return only JSON with type (column, bar, line, pie or doughnut), title (up to 64 characters), and reason (up to 300 characters). Pie and doughnut charts require one complete nonnegative series, at most 8 categories and a positive total. Use a line for trends and bars or columns for comparisons.',
+      ),
+      { title, unit, data: parsed.data },
+    );
+  }
+  function parseRecommendation(raw: string) {
+    const result = json(raw);
+    fields(result, ['type', 'title', 'reason'], t('图表建议', 'Chart recommendation'));
+    chartData(parsed.table!, category, series, result.type as ChartKind);
+    return {
+      type: result.type as ChartKind,
+      title: text(result.title, 64, t('图表标题', 'Chart title')),
+      reason: text(result.reason, 300, t('推荐理由', 'Recommendation')),
+    };
   }
   async function recommend() {
     if (!parsed.data) return;
@@ -88,14 +128,7 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
       t('根据数据推荐图表', 'Recommending a chart'),
       async (signal) => {
         const raw = await request(
-          materialMessages(
-            { materials: [], includeImages: false },
-            t(
-              '你是数据可视化助手。根据提供的数据推荐图表类型与简明标题，不修改数字。只返回 JSON：{"type":"column|bar|line|pie|doughnut","title":"≤64字符","reason":"≤300字符"}。饼图和圆环图只能一个系列、最多8个分类，不能包含负数、空值或全零；趋势适用折线，比较适用柱形或条形。',
-              'Recommend a chart type and concise title for the supplied data without changing any numbers. Return only JSON with type (column, bar, line, pie or doughnut), title (up to 64 characters), and reason (up to 300 characters). Pie and doughnut charts require one complete nonnegative series, at most 8 categories and a positive total. Use a line for trends and bars or columns for comparisons.',
-            ),
-            { title, unit, data: parsed.data },
-          ),
+          recommendationMessages(),
           signal,
           JSON.stringify({
             type: 'column',
@@ -107,13 +140,63 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
           }),
         );
         if (signal.aborted) return;
-        const result = json(raw);
-        fields(result, ['type', 'title', 'reason'], t('图表建议', 'Chart recommendation'));
-        chartData(parsed.table!, category, series, result.type as ChartKind);
-        setKind(result.type as ChartKind);
-        setTitle(text(result.title, 64, t('图表标题', 'Chart title')));
-        setReason(text(result.reason, 300, t('推荐理由', 'Recommendation')));
+        const result = parseRecommendation(raw);
+        setKind(result.type);
+        setTitle(result.title);
+        setReason(result.reason);
         setConfirm(false);
+        setConversationStamp(dataStamp);
+        setTurns([
+          {
+            instruction: t('根据当前数据推荐图表。', 'Recommend a chart for the current data.'),
+            result: JSON.stringify(result),
+          },
+        ]);
+        setFollowUp('');
+      },
+      true,
+    );
+  }
+  async function refine() {
+    if (!parsed.data || !conversationStamp || conversationOutdated || busy || !followUp.trim())
+      return;
+    const instruction = followUp.trim();
+    await run(
+      t('根据对话调整图表建议', 'Refining the chart recommendation'),
+      async (signal) => {
+        const current = JSON.stringify({
+          type: kind,
+          title,
+          reason: reason || t('当前预览中的图表设置。', 'Chart settings in the current preview.'),
+        });
+        const messages = buildEditingFollowUp(
+          recommendationMessages(),
+          turns,
+          current,
+          instruction,
+        );
+        const raw = await request(messages, signal, current);
+        if (signal.aborted) return;
+        const result = parseRecommendation(raw);
+        setKind(result.type);
+        setTitle(result.title);
+        setReason(result.reason);
+        setConfirm(false);
+        setTurns((previous) =>
+          appendEditingTurn(previous, current, instruction, JSON.stringify(result)),
+        );
+        setFollowUp('');
+        notify(
+          demo
+            ? t(
+                '固定演示保留当前图表；连接真实模型后可按对话调整。',
+                'The demo keeps the current chart. Connect a model to refine it through conversation.',
+              )
+            : t(
+                '已更新图表预览，数据保持不变。请检查后再插入。',
+                'Chart preview updated without changing the data. Review it before insertion.',
+              ),
+        );
       },
       true,
     );
@@ -436,6 +519,21 @@ export function DataChart({ context, access, busy, run, request, notify }: Prese
               </table>
             </div>
           </details>
+          {conversationStamp && (
+            <EditingConversation
+              id="chart-conversation"
+              turns={turns}
+              value={followUp}
+              onChange={setFollowUp}
+              onSubmit={() => void refine()}
+              onReset={() => {
+                setTurns([]);
+                setFollowUp('');
+              }}
+              disabled={busy}
+              stale={conversationOutdated}
+            />
+          )}
           <div className="button-row ppt-export">
             <button
               className="primary"

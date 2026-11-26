@@ -933,6 +933,208 @@ pre {
   font-size: 12px;
   flex: 0 0 auto;
 }
+.conversation {
+  max-width: 880px;
+  margin-inline: auto;
+}
+.conversation-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px 0 24px;
+}
+.conversation-boundary svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.conversation-toolbar,
+.conversation-send-row,
+.conversation-model-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.conversation-toolbar {
+  margin-bottom: 12px;
+}
+.conversation-toolbar h2 {
+  margin: 0;
+}
+.conversation-empty {
+  padding: 28px 0 32px;
+  border-block: 1px solid var(--line);
+}
+.conversation-empty > p {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 550;
+}
+.conversation-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.conversation-transcript {
+  max-height: min(520px, 60dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 4px 12px 4px 4px;
+  border-block: 1px solid var(--line);
+}
+.conversation-transcript:focus-visible {
+  outline: 3px solid #d0a23f;
+  outline-offset: 3px;
+}
+.conversation-exchange {
+  padding-block: 16px;
+}
+.conversation-exchange + .conversation-exchange {
+  border-top: 1px solid var(--line);
+}
+.conversation-question {
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+}
+.conversation-question p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.conversation-answer {
+  padding: 20px 4px 4px;
+}
+.conversation-exchange h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.conversation-answer h3 span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.conversation-question p,
+.conversation-answer > .word-rich-text {
+  max-width: 75ch;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.conversation-answer > .word-rich-text {
+  overflow-x: auto;
+}
+.conversation-answer .word-rich-text h1 {
+  font-size: 20px;
+}
+.conversation-answer .word-rich-text h2 {
+  font-size: 17px;
+}
+.conversation-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.conversation-composer {
+  padding-top: 24px;
+}
+.conversation-composer label {
+  margin-bottom: 8px;
+}
+.conversation-composer textarea {
+  min-height: 110px;
+}
+.conversation-send-row {
+  margin-top: 12px;
+}
+.conversation-send-row .field-help {
+  margin: 0;
+}
+.conversation-send-row button {
+  margin-left: auto;
+}
+.conversation-retention {
+  margin: 12px 0 0;
+}
+.editing-conversation {
+  margin: 20px 0;
+  padding-block: 18px;
+  border-block: 1px solid var(--line);
+  min-width: 0;
+}
+.editing-conversation-heading,
+.editing-conversation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.editing-conversation-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.editing-conversation-history {
+  margin: 12px 0 16px;
+  max-height: 260px;
+  overflow: auto;
+  padding-inline: 4px;
+}
+.editing-conversation-history summary {
+  cursor: pointer;
+  padding-block: 8px;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.editing-conversation-turn {
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.editing-conversation-turn p {
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+.editing-conversation-result {
+  font-size: 13px;
+  max-height: 200px;
+  overflow: auto;
+  margin: 8px 0;
+  padding: 10px;
+  background: var(--canvas);
+}
+.editing-conversation label {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.editing-conversation textarea {
+  min-height: 88px;
+  font-size: 14px;
+}
+.editing-conversation-actions {
+  margin-top: 12px;
+}
+.editing-conversation-actions .field-help {
+  margin: 0;
+}
+.editing-conversation-actions button {
+  margin-left: auto;
+}
+.editing-conversation .field-help {
+  margin-bottom: 0;
+}
+.editing-conversation-history:focus-visible,
+.editing-conversation-result:focus-visible {
+  outline: 3px solid #d0a23f;
+  outline-offset: 3px;
+}
 .model-select select {
   border: 0;
   background-color: transparent;
@@ -1866,6 +2068,7 @@ summary {
     margin-top: 9px;
     padding: 0;
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 8px;
   }
   .utility-nav button {
@@ -1957,6 +2160,8 @@ summary {
     min-height: 165px;
   }
   .source-input,
+  .conversation-composer textarea,
+  .editing-conversation textarea,
   .instruction-input,
   .result-editor,
   .slide-editor input,

@@ -13,6 +13,12 @@ import {
 } from '../presentation/render';
 import { SlidePreview } from './PresentationPreview';
 import type { PresentationRuntime } from './presentation-runtime';
+import {
+  appendEditingTurn,
+  buildEditingFollowUp,
+  type EditingTurn,
+} from '../core/editing-conversation';
+import { EditingConversation } from './EditingConversation';
 
 function demoDeck(count: number): DeckContent {
   const pages: DeckSlide[] = [
@@ -98,12 +104,14 @@ export function DeckGenerator(runtime: PresentationRuntime) {
     [page, setPage] = useState(0),
     [confirmAppend, setConfirmAppend] = useState(false),
     [appended, setAppended] = useState(false);
+  const [turns, setTurns] = useState<EditingTurn[]>([]),
+    [followUp, setFollowUp] = useState('');
   const count = Number(countInput),
     validCount = Number.isInteger(count) && count >= 2 && count <= 20;
   const fingerprint = JSON.stringify([
     brief,
     count,
-    context.materials.map((m) => [m.id, m.name, m.text, m.image?.modelData]),
+    context.materials.map((m) => [m.id, m.name, m.text, m.tables, m.image?.modelData]),
     context.includeImages,
     modelStamp,
   ]);
@@ -134,11 +142,51 @@ export function DeckGenerator(runtime: PresentationRuntime) {
         setPage(0);
         setAppended(false);
         setConfirmAppend(false);
+        setTurns([{ instruction: brief, result: JSON.stringify(result) }]);
+        setFollowUp('');
         notify(
           t(
             `已生成 ${result.slides.length} 页。请预览内容与来源，再打开或下载 PPT。`,
             `Generated ${result.slides.length} slides. Review their content and sources before opening or downloading the deck.`,
           ),
+        );
+      },
+      true,
+    );
+  }
+  async function refine() {
+    if (!draft || !usedContext || outdated || busy || !followUp.trim()) return;
+    const instruction = followUp.trim();
+    await run(
+      t('根据对话调整整套 PPT', 'Refining the deck'),
+      async (signal) => {
+        const current = JSON.stringify(draft);
+        const messages = buildEditingFollowUp(
+          deckMessages(usedContext, brief, draft.slides.length),
+          turns,
+          current,
+          instruction,
+        );
+        const raw = await request(messages, signal, current, 'presentation-deck');
+        if (signal.aborted) return;
+        const result = parseDeck(raw, usedContext, draft.slides.length);
+        setDraft(result);
+        setTurns((previous) =>
+          appendEditingTurn(previous, current, instruction, JSON.stringify(result)),
+        );
+        setFollowUp('');
+        setAppended(false);
+        setConfirmAppend(false);
+        notify(
+          runtime.demo
+            ? t(
+                '固定演示保留当前预览；连接真实模型后可按对话调整。',
+                'The demo keeps the current preview. Connect a model to refine it through conversation.',
+              )
+            : t(
+                '已更新整稿预览，请检查后再导出或插入。',
+                'Deck preview updated. Review it before exporting or inserting.',
+              ),
         );
       },
       true,
@@ -535,6 +583,19 @@ export function DeckGenerator(runtime: PresentationRuntime) {
               />
             </label>
           </details>
+          <EditingConversation
+            id="deck-conversation"
+            turns={turns}
+            value={followUp}
+            onChange={setFollowUp}
+            onSubmit={() => void refine()}
+            onReset={() => {
+              setTurns([]);
+              setFollowUp('');
+            }}
+            disabled={busy}
+            stale={outdated}
+          />
           <div className="button-row ppt-export">
             <button
               className="primary"

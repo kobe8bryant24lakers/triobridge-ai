@@ -9,12 +9,14 @@ import {
   Grid2X2,
   LayoutDashboard,
   Languages,
+  MessageCircle,
   Monitor,
   Presentation,
   Settings2,
 } from 'lucide-react';
 import { ModelSettings } from './components/ModelSettings';
 import { Workbench } from './components/Workbench';
+import { Conversation } from './components/Conversation';
 import { WordTextPreview } from './components/WordTextPreview';
 import { HOST_NAMES } from './core/tasks';
 import { createProfileController, type LocalProfileState } from './core/profile-store';
@@ -38,7 +40,7 @@ export default function App({ officeBridge }: Props) {
   const language = useUiLanguage();
   const [savingLanguage, setSavingLanguage] = useState(false);
   const [languageSaveFailed, setLanguageSaveFailed] = useState(false);
-  const [page, setPage] = useState<'work' | 'settings' | 'help'>('work');
+  const [page, setPage] = useState<'work' | 'conversation' | 'settings' | 'help'>('work');
   const [presentationMode, setPresentationMode] = useState<PresentationMode>('generate');
   const profileController = useMemo(() => createProfileController(), []);
   const profiles = useSyncExternalStore(profileController.subscribe, profileController.getSnapshot);
@@ -46,7 +48,9 @@ export default function App({ officeBridge }: Props) {
     profileController.start();
     return () => profileController.stop();
   }, [profileController]);
-  const [busy, setBusy] = useState(false);
+  const [workBusy, setWorkBusy] = useState(false);
+  const [conversationBusy, setConversationBusy] = useState(false);
+  const busy = workBusy || conversationBusy;
   const [demoDocument, setDemoDocument] = useState('');
   const [demoScenario, setDemoScenario] = useState<DemoScenario>('basic');
   const bridge = useMemo(
@@ -152,6 +156,15 @@ export default function App({ officeBridge }: Props) {
               {t('工作台', 'Workbench')}
             </button>
             <button
+              className={page === 'conversation' ? 'active' : ''}
+              aria-current={page === 'conversation' ? 'page' : undefined}
+              onClick={() => setPage('conversation')}
+              disabled={busy}
+            >
+              <MessageCircle size={18} aria-hidden="true" />
+              {t('对话模式', 'Conversation')}
+            </button>
+            <button
               className={page === 'settings' ? 'active' : ''}
               onClick={() => setPage('settings')}
               disabled={busy}
@@ -180,7 +193,7 @@ export default function App({ officeBridge }: Props) {
             <br />
             {t('把选择留在你手里。', 'You choose what to share.')}
           </p>
-          <span>TrioBridge AI · 0.9.1</span>
+          <span>TrioBridge AI · 0.10.0</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -190,7 +203,9 @@ export default function App({ officeBridge }: Props) {
               ? t('模型设置', 'Model Settings')
               : page === 'help'
                 ? t('使用指南', 'User Guide')
-                : `${HOST_NAMES[host]} / ${t('工作台', 'Workbench')}`}
+                : page === 'conversation'
+                  ? t('对话模式', 'Conversation')
+                  : `${HOST_NAMES[host]} / ${t('工作台', 'Workbench')}`}
           </span>
           <span>
             <Monitor size={14} />
@@ -293,6 +308,16 @@ export default function App({ officeBridge }: Props) {
               )}
             </section>
           ) : null}
+          <div hidden={page !== 'conversation'}>
+            <Conversation
+              host={host}
+              profiles={profiles}
+              visible={page === 'conversation'}
+              onChooseModel={(id) => profileController.activate(id)}
+              onSettings={() => setPage('settings')}
+              onBusyChange={setConversationBusy}
+            />
+          </div>
           <div hidden={page !== 'work'}>
             <Workbench
               key={`${host}-${demoScenario}`}
@@ -300,7 +325,7 @@ export default function App({ officeBridge }: Props) {
               profiles={profiles}
               onChooseModel={(id) => profileController.activate(id)}
               onSettings={() => setPage('settings')}
-              onBusyChange={setBusy}
+              onBusyChange={setWorkBusy}
               demoScenario={demoScenario}
               presentationMode={presentationMode}
               onPresentationModeChange={setPresentationMode}
@@ -326,7 +351,9 @@ export default function App({ officeBridge }: Props) {
         <footer className="main-footer">
           <span>{t('TrioBridge AI · 三桥 AI', 'TrioBridge AI')}</span>
           <span>
-            {t('内容由你审核，改动由你确认。', 'Review the result before applying changes.')}
+            {page === 'conversation'
+              ? t('只回答问题，不修改文档。', 'Answers only. Your document stays unchanged.')
+              : t('内容由你审核，改动由你确认。', 'Review the result before applying changes.')}
           </span>
         </footer>
       </div>
