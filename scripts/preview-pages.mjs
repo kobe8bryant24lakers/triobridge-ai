@@ -12,6 +12,7 @@ const types = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   '.xml': 'application/xml',
 };

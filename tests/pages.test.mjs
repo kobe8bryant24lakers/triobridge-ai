@@ -45,6 +45,9 @@ test('site packaging copies only approved files for both languages and refuses s
       'TrioBridge-AI-User-Guide-en.pptx',
       'TrioBridge-AI-User-Guide-zh-CN.pptx',
       'icon.svg',
+      'office-excel.webp',
+      'office-powerpoint.webp',
+      'office-word.webp',
       'workbench.png',
     ]);
     await rm(join(root, 'docs/assets/icon.svg'));
