@@ -17,6 +17,13 @@ for (const [path, lang] of [
     }
     await expect(install).toContainText('Install.cmd');
     await expect(install).toContainText('Install.command');
+    for (const platform of ['Windows', 'Mac']) {
+      const card = install.getByRole('article', { name: platform, exact: true });
+      const instructions = card.locator('details p');
+      await expect(instructions).toBeHidden();
+      await card.locator('summary').press('Enter');
+      await expect(instructions).toBeVisible();
+    }
     await expect(page.locator('a[href*="/app/"], a[href$=".xml"], a[href*="-Local-"]')).toHaveCount(
       0,
     );
@@ -71,6 +78,41 @@ test('publishes only the public site, with no hosted application, manifest, inst
 });
 test.describe('without JavaScript', () => {
   test.use({ javaScriptEnabled: false });
+  for (const path of ['', 'zh-CN.html']) {
+    test(`app previews respond to click and arrow keys on ${path || 'the English page'}`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto(path);
+      const showcase = page.locator('.showcase');
+      const previewLink = showcase.getByRole('link');
+      await expect(showcase.getByRole('radio', { name: 'Word', exact: true })).toBeChecked();
+      await expect(previewLink).toHaveAttribute('href', '#word');
+      for (const image of await showcase.locator('img').all()) {
+        await expect(image).toHaveCSS('transition-duration', '0s');
+        expect(await image.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(
+          0,
+        );
+      }
+
+      const excelModel = showcase.locator('.excel-model');
+      const backWidth = await excelModel.evaluate((image) => image.getBoundingClientRect().width);
+      await showcase.locator('label[for="show-excel"]').click();
+      const excel = showcase.getByRole('radio', { name: 'Excel', exact: true });
+      await expect(excel).toBeChecked();
+      await expect(previewLink).toHaveAttribute('href', '#excel');
+      expect(
+        await excelModel.evaluate((image) => image.getBoundingClientRect().width),
+      ).toBeGreaterThan(backWidth);
+      await excel.press('ArrowRight');
+      await expect(showcase.getByRole('radio', { name: 'PowerPoint', exact: true })).toBeChecked();
+      await expect(previewLink).toHaveAttribute('href', '#powerpoint');
+      await previewLink.click();
+      await expect(page).toHaveURL(/#powerpoint$/);
+      await expect(page.locator('#powerpoint h3')).toBeInViewport();
+    });
+  }
+
   test('both languages link to downloads', async ({ page }) => {
     await page.goto('');
     await page.locator('.language-switch').getByRole('link', { name: '中文' }).click();

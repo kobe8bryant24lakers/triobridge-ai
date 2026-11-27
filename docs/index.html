@@ -34,10 +34,12 @@
           <a href="#compatibility">Compatibility</a>
         </nav>
         <a class="header-link" href="https://github.com/kobe8bryant24lakers/triobridge-ai"
-          >GitHub</a
-        >
+          >GitHub
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M6 18 18 6M8 6h10v10" /></svg
+        ></a>
         <nav class="language-switch" aria-label="Language">
-          <a href="./" lang="en" hreflang="en" aria-current="page">English</a
+          <a href="./index.html" lang="en" hreflang="en" aria-current="page">English</a
           ><a href="./zh-CN.html" lang="zh-CN" hreflang="zh-CN">中文</a>
         </nav>
       </div>
@@ -47,50 +49,146 @@
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-grid wrap">
           <div class="hero-copy">
-            <h1 id="hero-title">Connect Office<br />to your AI models</h1>
+            <h1 id="hero-title">Connect Office<br /><em>to your AI models</em></h1>
             <p class="hero-description">
               Start with a passage, a table, or an idea for a presentation. Review the result, then
               confirm every change.
             </p>
             <div class="actions">
-              <a class="button primary" href="#install">Download and install</a>
+              <a class="button primary" href="#install"
+                ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                  <path
+                    d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                  /></svg
+                >Download and install</a
+              >
+              <a class="text-link" href="#guide"
+                >View workbench<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
             </div>
             <p class="hero-note">
-              For Mac and Windows<br />Also supports perpetual Office editions with the required
-              capabilities
+              <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="13" rx="2" />
+                <path d="M8 21h8m-4-4v4" /></svg
+              >Mac and Windows<span aria-hidden="true">·</span
+              ><a href="#compatibility">Office requirements</a>
             </p>
           </div>
-          <figure class="hero-figure">
-            <a
-              class="screenshot-link"
-              href="./assets/workbench.png"
-              aria-label="View the full workbench screenshot"
-            >
+          <fieldset class="showcase">
+            <legend class="sr-only">Preview an Office app</legend>
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-word"
+              aria-describedby="word-caption"
+              checked
+            />
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-excel"
+              aria-describedby="excel-caption"
+            />
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-powerpoint"
+              aria-describedby="powerpoint-caption"
+            />
+            <div class="studio" aria-hidden="true">
+              <div class="desk-grid"></div>
               <img
-                src="./assets/workbench.png"
-                width="1440"
-                height="1128"
+                class="model word-model"
+                src="./assets/office-word.webp"
+                width="856"
+                height="628"
+                alt=""
                 fetchpriority="high"
-                alt="TrioBridge AI Word workbench in Chinese: tasks and reference content on the left, results awaiting confirmation and write actions on the right."
               />
-            </a>
-            <figcaption>
-              <span>Actual workbench · Chinese interface</span
-              ><span>Fixed demo sample · No AI call</span>
-            </figcaption>
-          </figure>
-        </div>
-        <div class="hero-principles wrap" aria-label="How it works">
-          <p>
-            <strong>Your own models</strong><span>Connect your choice of compatible provider</span>
-          </p>
-          <p><strong>Visible context</strong><span>Use only the content you read or paste</span></p>
-          <p>
-            <strong>Explicit confirmation</strong
-            ><span>Check the destination and result before writing</span>
-          </p>
+              <img
+                class="model excel-model"
+                src="./assets/office-excel.webp"
+                width="866"
+                height="588"
+                alt=""
+              />
+              <img
+                class="model powerpoint-model"
+                src="./assets/office-powerpoint.webp"
+                width="878"
+                height="600"
+                alt=""
+              />
+            </div>
+            <div class="model-controls">
+              <label for="show-word">Word</label>
+              <label for="show-excel">Excel</label>
+              <label for="show-powerpoint">PowerPoint</label>
+            </div>
+            <p class="model-captions">
+              <a id="word-caption" href="#word"
+                >Rewrite a passage in Word<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+              <a id="excel-caption" href="#excel"
+                >Build a table with Excel formulas<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+              <a id="powerpoint-caption" href="#powerpoint"
+                >Turn source materials into slides<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+            </p>
+          </fieldset>
         </div>
       </section>
+      <div class="hero-principles wrap" role="group" aria-label="How it works">
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path
+              d="m13.5 6.5 4 4M16 4l-3 3m7 1-3 3M6.5 12.5l5 5m-2.5-7.5 5.5 5.5-2 2a4 4 0 0 1-5.5-5.5l2-2ZM7.5 16.5 4 20"
+            /></svg
+          ><strong>Your own models</strong><span>Connect your choice of compatible provider</span>
+        </p>
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path
+              d="M8 4H5a1 1 0 0 0-1 1v3m12-4h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3m8 0h3a1 1 0 0 0 1-1v-3M8 10h8m-8 4h5"
+            /></svg
+          ><strong>Visible context</strong><span>Use only the content you read or paste</span>
+        </p>
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="4" />
+            <path d="m7.5 12 3 3 6-6" /></svg
+          ><strong>Explicit confirmation</strong
+          ><span>Check the destination and result before writing</span>
+        </p>
+      </div>
 
       <section class="section wrap" id="features" aria-labelledby="features-title">
         <div class="section-heading">
@@ -101,7 +199,7 @@
           </p>
         </div>
         <div class="feature-columns">
-          <article class="feature">
+          <article class="feature" id="word">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -131,10 +229,12 @@
               </li>
             </ul>
             <p class="writeback">
-              <strong>Review before writing</strong>Check the formatted preview, then replace the selection or insert at the cursor. Markdown headings, lists, and tables remain editable in Word.
+              <strong>Review before writing</strong>Check the formatted preview, then replace the
+              selection or insert at the cursor. Markdown headings, lists, and tables remain
+              editable in Word.
             </p>
           </article>
-          <article class="feature">
+          <article class="feature" id="excel">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -168,7 +268,7 @@
               formulas in a separate worksheet. Copy analyses and explanations as needed.
             </p>
           </article>
-          <article class="feature">
+          <article class="feature" id="powerpoint">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -187,7 +287,8 @@
                 ><span>Set backgrounds by deck or page, match styles, and split slides</span>
               </li>
               <li>
-                <strong>Native charts</strong><span>Refresh a chart and its embedded Excel workbook</span>
+                <strong>Native charts</strong
+                ><span>Refresh a chart and its embedded Excel workbook</span>
               </li>
               <li>
                 <strong>Bulk tools</strong
@@ -202,113 +303,223 @@
         </div>
       </section>
 
-      <section class="section wrap" id="install" aria-labelledby="install-title">
-        <div class="section-heading">
-          <h2 id="install-title">Download and install</h2>
-          <p>
-            Choose your system and processor. The workbench opens the compiled page on your
-            computer. Your configured model can run on this computer or online. The workbench
-            starts in Simplified Chinese. Choose English near the TrioBridge AI logo in either the
-            standalone window or the Office task pane.
-          </p>
-        </div>
-        <div class="download-block">
-          <div>
-            <h3>Windows</h3>
-            <p>Check System type in Settings → System → About. Intel and AMD PCs use x64.</p>
+      <section class="install-section" id="install" aria-labelledby="install-title">
+        <div class="section wrap">
+          <div class="section-heading">
+            <h2 id="install-title">Download and install</h2>
             <p>
-              Save your documents, quit all three Office apps, extract the ZIP, and double-click
-              Install.cmd. Start Office normally under the same Windows account. On the 三桥 AI ribbon, choose 打开侧边栏 for the task pane or 打开独立窗口 for a separate window.
+              Choose your system and processor. The workbench opens the compiled page on your
+              computer. Your configured model can run on this computer or online. The workbench
+              starts in Simplified Chinese. Choose English near the TrioBridge AI logo in either the
+              standalone window or the Office task pane.
             </p>
           </div>
-          <div class="download-actions">
-            <a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-x64.zip"
-              >Windows x64</a
-            ><a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-arm64.zip"
-              >Windows ARM64</a
-            >
-          </div>
-        </div>
-        <div class="download-block">
-          <div>
-            <h3>Mac</h3>
-            <p>
-              Open About This Mac in the Apple menu. M-series Macs use the Apple silicon download.
-            </p>
-            <p>
-              Extract the ZIP and double-click Install.command. In the Word, Excel, or PowerPoint
-              app menu, choose Services → 打开三桥 AI. macOS may request permission to control the
-              selected Office app. To add the optional task pane, quit Office, run Enable-Embedded-Taskpane.command, and trust the local certificate when prompted. Reopen Office and select 三桥 AI（本机共享） under My Add-ins.
-            </p>
-          </div>
-          <div class="download-actions">
-            <a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-arm64.zip"
-              >Mac · Apple silicon</a
-            ><a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-x64.zip"
-              >Mac · Intel</a
-            >
+          <div class="platforms">
+            <article class="download-block" aria-labelledby="install-windows">
+              <h3 id="install-windows">Windows</h3>
+              <p class="platform-hint">
+                Check System type in Settings → System → About. Intel and AMD PCs use x64.
+              </p>
+              <div class="download-actions">
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-x64.zip"
+                  >Windows x64<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-arm64.zip"
+                  >Windows ARM64<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+              </div>
+              <details class="installation-steps">
+                <summary aria-label="Windows installation steps">
+                  Installation steps<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 12h14m-7-7v14" />
+                  </svg>
+                </summary>
+                <p>
+                  Save your documents, quit all three Office apps, extract the ZIP, and double-click
+                  <code>Install.cmd</code>. Start Office normally under the same Windows account. On
+                  the 三桥 AI ribbon, choose 打开侧边栏 for the task pane or 打开独立窗口 for a
+                  separate window.
+                </p>
+              </details>
+            </article>
+            <article class="download-block" aria-labelledby="install-mac">
+              <h3 id="install-mac">Mac</h3>
+              <p class="platform-hint">
+                Open About This Mac in the Apple menu. M-series Macs use the Apple silicon download.
+              </p>
+              <div class="download-actions">
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-arm64.zip"
+                  >Mac · Apple silicon<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-x64.zip"
+                  >Mac · Intel<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+              </div>
+              <details class="installation-steps">
+                <summary aria-label="Mac installation steps">
+                  Installation steps<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 12h14m-7-7v14" />
+                  </svg>
+                </summary>
+                <p>
+                  Extract the ZIP and double-click <code>Install.command</code>. In the Word, Excel,
+                  or PowerPoint app menu, choose Services → 打开三桥 AI. macOS may request
+                  permission to control the selected Office app. To add the optional task pane, quit
+                  Office, run <code>Enable-Embedded-Taskpane.command</code>, and trust the local
+                  certificate when prompted. Reopen Office and select 三桥 AI（本机共享） under My
+                  Add-ins.
+                </p>
+              </details>
+            </article>
           </div>
         </div>
       </section>
-      <section id="guide" class="section wrap">
+      <section id="guide" class="section wrap" aria-labelledby="guide-title">
         <div class="section-heading">
-          <h2>From selection to result</h2>
-          <p><a href="./assets/TrioBridge-AI-User-Guide-en.pptx" download>Download the illustrated user guide (PowerPoint, 40 slides, English)</a></p>
+          <h2 id="guide-title">From selection to result</h2>
+          <div class="guide-download">
+            <a class="text-link" href="./assets/TrioBridge-AI-User-Guide-en.pptx" download
+              ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <path
+                  d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                /></svg
+              >Download the illustrated user guide</a
+            >
+            <span>PowerPoint · 40 slides · English</span>
+          </div>
         </div>
-        <ol class="workflow-steps">
-          <li>
-            <h3>Connect a model</h3>
-            <p>
-              In model settings, choose a provider or a local API. For a local API, start your model
-              runtime first. Enter its model ID and base URL, such as http://127.0.0.1:8001/v1.
-              Choose OpenAI Chat Completions or Claude (Anthropic Messages) to match your server,
-              then select Connect and save.
-            </p>
-          </li>
-          <li>
-            <h3>Choose context</h3>
-            <p>
-              Read a Word or Excel selection, select PowerPoint slides, or choose a folder of
-              reference files.
-            </p>
-          </li>
-          <li>
-            <h3>Review the preview</h3>
-            <p>
-              Review the text, formulas, tables, or slide changes. The selected model receives
-              context when you request generation.
-            </p>
-          </li>
-          <li>
-            <h3>Confirm the destination</h3>
-            <p>
-              Check the document and location before applying. Read the selection again if the
-              target has changed.
-            </p>
-          </li>
-        </ol>
+        <div class="guide-layout">
+          <figure class="workbench-figure">
+            <a
+              class="screenshot-link"
+              href="./assets/workbench.png"
+              aria-label="View the full workbench screenshot"
+            >
+              <img
+                src="./assets/workbench.png"
+                width="1440"
+                height="1320"
+                loading="lazy"
+                decoding="async"
+                alt="TrioBridge AI Word workbench in Chinese: tasks and reference content on the left, results awaiting confirmation and write actions on the right."
+              />
+              <span class="zoom-mark"
+                ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                  <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" /></svg
+              ></span>
+            </a>
+            <figcaption>
+              <span>Actual workbench · Chinese interface</span
+              ><span>Fixed demo sample · No AI call</span>
+            </figcaption>
+          </figure>
+          <ol class="workflow-steps">
+            <li>
+              <h3>Connect a model</h3>
+              <p>
+                In model settings, choose a provider or a local API. For a local API, start your
+                model runtime first. Enter its model ID and base URL, such as
+                <code>http://127.0.0.1:8001/v1</code>. Choose OpenAI Chat Completions or Claude
+                (Anthropic Messages) to match your server, then select Connect and save.
+              </p>
+            </li>
+            <li>
+              <h3>Choose context</h3>
+              <p>
+                Read a Word or Excel selection, select PowerPoint slides, or choose a folder of
+                reference files.
+              </p>
+            </li>
+            <li>
+              <h3>Review the preview</h3>
+              <p>
+                Review the text, formulas, tables, or slide changes. The selected model receives
+                context when you request generation.
+              </p>
+            </li>
+            <li>
+              <h3>Confirm the destination</h3>
+              <p>
+                Check the document and location before applying. Read the selection again if the
+                target has changed.
+              </p>
+            </li>
+          </ol>
+        </div>
       </section>
-      <section id="compatibility" class="section wrap privacy-section">
-        <div class="privacy-heading"><h2>System and model requirements</h2></div>
+      <section
+        id="compatibility"
+        class="section wrap privacy-section"
+        aria-labelledby="compatibility-title"
+      >
+        <div class="privacy-heading">
+          <h2 id="compatibility-title">System and model requirements</h2>
+        </div>
         <dl class="privacy-list">
           <div>
             <dt>Desktop Office</dt>
             <dd>
-              Use the Windows ribbon to open either the task pane or a separate window. On a Mac, open the separate window from Services, or use the optional pane from My Add-ins.
+              Perpetual editions are supported when the required capabilities are available. Use the
+              Windows ribbon to open either the task pane or a separate window. On a Mac, open the
+              separate window from Services, or use the optional pane from My Add-ins.
             </dd>
           </div>
           <div>
             <dt>Installation and permissions</dt>
             <dd>
-              The standalone window and the Windows pane load their interface from the package. If Windows needs WebView2, run the offline WebView2 installer in the ZIP. The optional Mac pane uses a local HTTPS service and downloads Office.js from Microsoft.
+              The standalone window and the Windows pane load their interface from the package. If
+              Windows needs WebView2, run the offline WebView2 installer in the ZIP. The optional
+              Mac pane uses a local HTTPS service and downloads Office.js from Microsoft.
             </dd>
           </div>
           <div>
@@ -329,11 +540,25 @@
       </section>
     </main>
     <footer class="site-footer">
-      <div class="wrap">
-        <a href="https://github.com/kobe8bryant24lakers/triobridge-ai">GitHub</a> ·
-        <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/TESTING.md"
-          >Verification notes</a
-        >
+      <div class="wrap footer-inner">
+        <a class="footer-brand" href="#top" aria-label="TrioBridge AI home">
+          <img src="./assets/icon.svg" width="28" height="28" alt="" /> TrioBridge AI
+        </a>
+        <nav aria-label="Project links">
+          <a href="https://github.com/kobe8bryant24lakers/triobridge-ai"
+            >GitHub<svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M6 18 18 6M8 6h10v10" /></svg
+          ></a>
+          <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/TESTING.md"
+            >Verification notes<svg
+              class="icon"
+              aria-hidden="true"
+              focusable="false"
+              viewBox="0 0 24 24"
+            >
+              <path d="M6 18 18 6M8 6h10v10" /></svg
+          ></a>
+        </nav>
       </div>
     </footer>
   </body>

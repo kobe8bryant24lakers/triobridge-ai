@@ -34,10 +34,12 @@
           <a href="#compatibility">兼容范围</a>
         </nav>
         <a class="header-link" href="https://github.com/kobe8bryant24lakers/triobridge-ai"
-          >GitHub</a
-        >
+          >GitHub
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M6 18 18 6M8 6h10v10" /></svg
+        ></a>
         <nav class="language-switch" aria-label="语言切换">
-          <a href="./" lang="en" hreflang="en">English</a>
+          <a href="./index.html" lang="en" hreflang="en">English</a>
           <a href="./zh-CN.html" lang="zh-CN" hreflang="zh-CN" aria-current="page">中文</a>
         </nav>
       </div>
@@ -47,40 +49,144 @@
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-grid wrap">
           <div class="hero-copy">
-            <h1 id="hero-title">让 Office<br />接上你的 AI 模型</h1>
+            <h1 id="hero-title">让 Office<br /><em>接上你的 AI 模型</em></h1>
             <p class="hero-description">
               从一段文字、一张表格、一个演示想法开始。先查看生成结果，再确认每一次改动。
             </p>
             <div class="actions">
-              <a class="button primary" href="#install">下载并安装</a>
+              <a class="button primary" href="#install"
+                ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                  <path
+                    d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                  /></svg
+                >下载并安装</a
+              >
+              <a class="text-link" href="#guide"
+                >查看工作台<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
             </div>
-            <p class="hero-note">面向 Mac 与 Windows<br />支持具备所需能力的永久授权版 Office</p>
+            <p class="hero-note">
+              <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="13" rx="2" />
+                <path d="M8 21h8m-4-4v4" /></svg
+              >Mac 与 Windows<span aria-hidden="true">·</span
+              ><a href="#compatibility">Office 兼容范围</a>
+            </p>
           </div>
-          <figure class="hero-figure">
-            <a
-              class="screenshot-link"
-              href="./assets/workbench.png"
-              aria-label="查看完整工作台截图"
-            >
+          <fieldset class="showcase">
+            <legend class="sr-only">选择要预览的 Office 应用</legend>
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-word"
+              aria-describedby="word-caption"
+              checked
+            />
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-excel"
+              aria-describedby="excel-caption"
+            />
+            <input
+              class="model-choice sr-only"
+              type="radio"
+              name="model"
+              id="show-powerpoint"
+              aria-describedby="powerpoint-caption"
+            />
+            <div class="studio" aria-hidden="true">
+              <div class="desk-grid"></div>
               <img
-                src="./assets/workbench.png"
-                width="1440"
-                height="1128"
+                class="model word-model"
+                src="./assets/office-word.webp"
+                width="856"
+                height="628"
+                alt=""
                 fetchpriority="high"
-                alt="三桥 AI 的 Word 工作台：左侧提供任务与参考内容，右侧显示待确认的结果和写回操作。"
               />
-            </a>
-            <figcaption>
-              <span>真实工作台界面</span><span>固定演示样例 · 未调用 AI</span>
-            </figcaption>
-          </figure>
-        </div>
-        <div class="hero-principles wrap" aria-label="工作方式">
-          <p><strong>自己的模型</strong><span>连接你选用的兼容服务</span></p>
-          <p><strong>可见的上下文</strong><span>只处理你读取或粘贴的内容</span></p>
-          <p><strong>明确的确认</strong><span>写入前核对位置和结果</span></p>
+              <img
+                class="model excel-model"
+                src="./assets/office-excel.webp"
+                width="866"
+                height="588"
+                alt=""
+              />
+              <img
+                class="model powerpoint-model"
+                src="./assets/office-powerpoint.webp"
+                width="878"
+                height="600"
+                alt=""
+              />
+            </div>
+            <div class="model-controls">
+              <label for="show-word">Word</label>
+              <label for="show-excel">Excel</label>
+              <label for="show-powerpoint">PowerPoint</label>
+            </div>
+            <p class="model-captions">
+              <a id="word-caption" href="#word"
+                >在 Word 中改写选区文字<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+              <a id="excel-caption" href="#excel"
+                >在 Excel 中生成带公式的表格<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+              <a id="powerpoint-caption" href="#powerpoint"
+                >在 PowerPoint 中从素材生成演示稿<svg
+                  class="icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M4.5 12h14m-5.5-5.5 5.5 5.5-5.5 5.5" /></svg
+              ></a>
+            </p>
+          </fieldset>
         </div>
       </section>
+      <div class="hero-principles wrap" role="group" aria-label="工作方式">
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path
+              d="m13.5 6.5 4 4M16 4l-3 3m7 1-3 3M6.5 12.5l5 5m-2.5-7.5 5.5 5.5-2 2a4 4 0 0 1-5.5-5.5l2-2ZM7.5 16.5 4 20"
+            /></svg
+          ><strong>自己的模型</strong><span>连接你选用的兼容服务</span>
+        </p>
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path
+              d="M8 4H5a1 1 0 0 0-1 1v3m12-4h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3m8 0h3a1 1 0 0 0 1-1v-3M8 10h8m-8 4h5"
+            /></svg
+          ><strong>可见的上下文</strong><span>只处理你读取或粘贴的内容</span>
+        </p>
+        <p>
+          <svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="4" />
+            <path d="m7.5 12 3 3 6-6" /></svg
+          ><strong>明确的确认</strong><span>写入前核对位置和结果</span>
+        </p>
+      </div>
 
       <section class="section wrap" id="features" aria-labelledby="features-title">
         <div class="section-heading">
@@ -88,7 +194,7 @@
           <p>三种应用使用同一套模型配置方式，任务跟随当前内容变化。</p>
         </div>
         <div class="feature-columns">
-          <article class="feature">
+          <article class="feature" id="word">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -105,9 +211,12 @@
               <li><strong>起草内容</strong><span>根据具体要求写出第一稿</span></li>
               <li><strong>结构化报告</strong><span>编辑章节、要点和表格后插入</span></li>
             </ul>
-            <p class="writeback"><strong>检查后写回</strong>核对排版后替换选区或插入到光标处。Markdown 标题、列表和表格可在 Word 中继续编辑。</p>
+            <p class="writeback">
+              <strong>检查后写回</strong>核对排版后替换选区或插入到光标处。Markdown
+              标题、列表和表格可在 Word 中继续编辑。
+            </p>
           </article>
-          <article class="feature">
+          <article class="feature" id="excel">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -129,7 +238,7 @@
               >写入单个公式，或在独立新表创建数据与公式。分析与解释可复制。
             </p>
           </article>
-          <article class="feature">
+          <article class="feature" id="powerpoint">
             <div class="feature-heading">
               <span class="app-symbol" aria-hidden="true"
                 ><svg viewBox="0 0 24 24">
@@ -140,9 +249,13 @@
             <p class="feature-intro">从素材生成整稿，也能修改现有页面</p>
             <ul class="feature-list">
               <li><strong>素材生成</strong><span>选择本地目录，生成可编辑整套 PPT</span></li>
-              <li><strong>现有页面编辑</strong><span>调整整稿或单页背景、套用样式、插页和拆页</span></li>
+              <li>
+                <strong>现有页面编辑</strong><span>调整整稿或单页背景、套用样式、插页和拆页</span>
+              </li>
               <li><strong>原生数据图表</strong><span>同步刷新原图表和内嵌 Excel 工作簿</span></li>
-              <li><strong>批量排版工具</strong><span>逐项预览改动，复用配方，检查批注和版面问题</span></li>
+              <li>
+                <strong>批量排版工具</strong><span>逐项预览改动，复用配方，检查批注和版面问题</span>
+              </li>
             </ul>
             <p class="writeback">
               <strong>预览后应用</strong>检查改动并写回所选对象，或另存可编辑的 PPTX。
@@ -151,94 +264,205 @@
         </div>
       </section>
 
-      <section class="section wrap" id="install" aria-labelledby="install-title">
-        <div class="section-heading">
-          <h2 id="install-title">下载与安装</h2>
-          <p>按电脑的系统和芯片选择安装包。工作台默认使用简体中文，可从独立窗口或 Office 侧边栏中三桥 AI 标志旁的语言菜单切换为 English。</p>
-        </div>
-        <div class="download-block">
-          <div>
-            <h3>Windows</h3>
-            <p>在“设置 → 系统 → 系统信息”查看系统类型。常见 Intel 和 AMD 电脑选择 x64。</p>
+      <section class="install-section" id="install" aria-labelledby="install-title">
+        <div class="section wrap">
+          <div class="section-heading">
+            <h2 id="install-title">下载与安装</h2>
             <p>
-              保存文档，退出三款 Office，完整解压 ZIP，双击 Install.cmd。用同一 Windows 账户以普通权限打开文档，在“三桥 AI”功能区选择“打开侧边栏”或“打开独立窗口”。
+              按电脑的系统和芯片选择安装包。工作台默认使用简体中文，可从独立窗口或 Office
+              侧边栏中三桥 AI 标志旁的语言菜单切换为 English。
             </p>
           </div>
-          <div class="download-actions">
-            <a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-x64.zip"
-              >Windows x64</a
-            ><a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-arm64.zip"
-              >Windows ARM64</a
-            >
-          </div>
-        </div>
-        <div class="download-block">
-          <div>
-            <h3>Mac</h3>
-            <p>在苹果菜单的“关于本机”查看芯片。M 系列芯片选 Apple 芯片，Intel 芯片选 Intel。</p>
-            <p>
-              解压 ZIP，双击 Install.command。在 Word、Excel 或 PowerPoint 的应用菜单中选择“服务 →
-              打开三桥 AI”。首次读写时，macOS 可能请求允许控制对应应用。要启用内嵌侧栏，退出 Office，运行 Enable-Embedded-Taskpane.command 并按提示信任本机证书。重开 Office，从“我的加载项”选择名称含“三桥 AI”和“本机共享”的加载项。
-            </p>
-          </div>
-          <div class="download-actions">
-            <a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-arm64.zip"
-              >Mac · Apple 芯片</a
-            ><a
-              class="button secondary"
-              href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-x64.zip"
-              >Mac · Intel</a
-            >
+          <div class="platforms">
+            <article class="download-block" aria-labelledby="install-windows">
+              <h3 id="install-windows">Windows</h3>
+              <p class="platform-hint">
+                在“设置 → 系统 → 系统信息”查看系统类型。常见 Intel 和 AMD 电脑选择 x64。
+              </p>
+              <div class="download-actions">
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-x64.zip"
+                  >Windows x64<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Windows-arm64.zip"
+                  >Windows ARM64<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+              </div>
+              <details class="installation-steps">
+                <summary aria-label="Windows 安装步骤">
+                  安装步骤<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 12h14m-7-7v14" />
+                  </svg>
+                </summary>
+                <p>
+                  保存文档，退出三款 Office，完整解压 ZIP，双击 <code>Install.cmd</code>。用同一
+                  Windows 账户以普通权限打开文档，在“三桥
+                  AI”功能区选择“打开侧边栏”或“打开独立窗口”。
+                </p>
+              </details>
+            </article>
+            <article class="download-block" aria-labelledby="install-mac">
+              <h3 id="install-mac">Mac</h3>
+              <p class="platform-hint">
+                在苹果菜单的“关于本机”查看芯片。M 系列芯片选 Apple 芯片，Intel 芯片选 Intel。
+              </p>
+              <div class="download-actions">
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-arm64.zip"
+                  >Mac · Apple 芯片<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+                <a
+                  class="button secondary"
+                  href="https://github.com/kobe8bryant24lakers/triobridge-ai/releases/download/v0.12.0/TrioBridge-AI-Mac-x64.zip"
+                  >Mac · Intel<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                    /></svg
+                ></a>
+              </div>
+              <details class="installation-steps">
+                <summary aria-label="Mac 安装步骤">
+                  安装步骤<svg
+                    class="icon"
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 12h14m-7-7v14" />
+                  </svg>
+                </summary>
+                <p>
+                  解压 ZIP，双击 <code>Install.command</code>。在 Word、Excel 或 PowerPoint
+                  的应用菜单中选择“服务 → 打开三桥 AI”。首次读写时，macOS
+                  可能请求允许控制对应应用。要启用内嵌侧栏，退出 Office，运行
+                  <code>Enable-Embedded-Taskpane.command</code> 并按提示信任本机证书。重开
+                  Office，从“我的加载项”选择名称含“三桥 AI”和“本机共享”的加载项。
+                </p>
+              </details>
+            </article>
           </div>
         </div>
       </section>
-      <section id="guide" class="section wrap">
+      <section id="guide" class="section wrap" aria-labelledby="guide-title">
         <div class="section-heading">
-          <h2>从选区到结果</h2>
-          <p><a href="./assets/TrioBridge-AI-User-Guide-zh-CN.pptx" download>下载中文图解使用指南（PowerPoint，44 页）</a></p>
+          <h2 id="guide-title">从选区到结果</h2>
+          <div class="guide-download">
+            <a class="text-link" href="./assets/TrioBridge-AI-User-Guide-zh-CN.pptx" download
+              ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <path
+                  d="M12 3v12m-4.5-4.5L12 15l4.5-4.5M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"
+                /></svg
+              >下载图解使用指南</a
+            >
+            <span>PowerPoint · 44 页 · 简体中文</span>
+          </div>
         </div>
-        <ol class="workflow-steps">
-          <li>
-            <h3>连接模型</h3>
-            <p>
-              打开模型设置，选择云端服务或本机 API。使用本机 API
-              时，先启动自己的模型程序，填写它提供的地址（例如 http://127.0.0.1:8001/v1）和模型 ID。
-              按服务支持的接口选择 OpenAI（Chat Completions）或 Claude（Anthropic Messages），再点击“连接并保存”。
-            </p>
-          </li>
-          <li>
-            <h3>选择内容</h3>
-            <p>读取 Word 或 Excel 选区，也可在 PowerPoint 选择素材目录、当前页面或整套演示稿。</p>
-          </li>
-          <li>
-            <h3>查看预览</h3>
-            <p>生成后检查文字、公式、表格或页面。模型只在你发起请求时接收所选内容。</p>
-          </li>
-          <li>
-            <h3>确认写入</h3>
-            <p>核对目标文档和位置后写入。选区变化时重新读取。</p>
-          </li>
-        </ol>
+        <div class="guide-layout">
+          <figure class="workbench-figure">
+            <a
+              class="screenshot-link"
+              href="./assets/workbench.png"
+              aria-label="查看完整工作台截图"
+            >
+              <img
+                src="./assets/workbench.png"
+                width="1440"
+                height="1320"
+                loading="lazy"
+                decoding="async"
+                alt="三桥 AI 的 Word 工作台：左侧提供任务与参考内容，右侧显示待确认的结果和写回操作。"
+              />
+              <span class="zoom-mark"
+                ><svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                  <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" /></svg
+              ></span>
+            </a>
+            <figcaption>
+              <span>真实工作台界面</span><span>固定演示样例 · 未调用 AI</span>
+            </figcaption>
+          </figure>
+          <ol class="workflow-steps">
+            <li>
+              <h3>连接模型</h3>
+              <p>
+                打开模型设置，选择云端服务或本机 API。使用本机 API
+                时，先启动自己的模型程序，填写它提供的地址（例如
+                <code>http://127.0.0.1:8001/v1</code>）和模型 ID。 按服务支持的接口选择 OpenAI（Chat
+                Completions）或 Claude（Anthropic Messages），再点击“连接并保存”。
+              </p>
+            </li>
+            <li>
+              <h3>选择内容</h3>
+              <p>读取 Word 或 Excel 选区，也可在 PowerPoint 选择素材目录、当前页面或整套演示稿。</p>
+            </li>
+            <li>
+              <h3>查看预览</h3>
+              <p>生成后检查文字、公式、表格或页面。模型只在你发起请求时接收所选内容。</p>
+            </li>
+            <li>
+              <h3>确认写入</h3>
+              <p>核对目标文档和位置后写入。选区变化时重新读取。</p>
+            </li>
+          </ol>
+        </div>
       </section>
-      <section id="compatibility" class="section wrap privacy-section">
-        <div class="privacy-heading"><h2>系统与模型</h2></div>
+      <section
+        id="compatibility"
+        class="section wrap privacy-section"
+        aria-labelledby="compatibility-title"
+      >
+        <div class="privacy-heading"><h2 id="compatibility-title">系统与模型</h2></div>
         <dl class="privacy-list">
           <div>
             <dt>桌面 Office</dt>
             <dd>
-              Windows 的两个入口都在“三桥 AI”功能区。Mac 可从“服务”菜单打开独立窗口，或从“我的加载项”打开已启用的内嵌侧栏。
+              具备所需能力的永久授权版 Office 也可使用。 Windows 的两个入口都在“三桥 AI”功能区。Mac
+              可从“服务”菜单打开独立窗口，或从“我的加载项”打开已启用的内嵌侧栏。
             </dd>
           </div>
           <div>
             <dt>安装与权限</dt>
             <dd>
-              独立窗口和 Windows 侧栏从安装包加载界面。若 Windows 缺少 WebView2，可运行 ZIP 内的离线安装程序。Mac 内嵌侧栏使用本机 HTTPS 服务，需联网从微软加载 Office.js。
+              独立窗口和 Windows 侧栏从安装包加载界面。若 Windows 缺少 WebView2，可运行 ZIP
+              内的离线安装程序。Mac 内嵌侧栏使用本机 HTTPS 服务，需联网从微软加载 Office.js。
             </dd>
           </div>
           <div>
@@ -258,11 +482,20 @@
       </section>
     </main>
     <footer class="site-footer">
-      <div class="wrap">
-        <a href="https://github.com/kobe8bryant24lakers/triobridge-ai">GitHub</a> ·
-        <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/TESTING.md"
-          >验收记录</a
-        >
+      <div class="wrap footer-inner">
+        <a class="footer-brand" href="#top" aria-label="三桥 AI 首页">
+          <img src="./assets/icon.svg" width="28" height="28" alt="" /> TrioBridge AI
+        </a>
+        <nav aria-label="项目链接">
+          <a href="https://github.com/kobe8bryant24lakers/triobridge-ai"
+            >GitHub<svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M6 18 18 6M8 6h10v10" /></svg
+          ></a>
+          <a href="https://github.com/kobe8bryant24lakers/triobridge-ai/blob/main/docs/TESTING.md"
+            >验收记录<svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M6 18 18 6M8 6h10v10" /></svg
+          ></a>
+        </nav>
       </div>
     </footer>
   </body>
